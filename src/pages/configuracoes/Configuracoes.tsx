@@ -6,6 +6,7 @@ import { AccountDialog } from '@/app/AccountDialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Segmented } from '@/components/ui/segmented'
+import { Skeleton } from '@/components/ui/skeleton'
 import { CURRENCIES, DATE_FORMATS, type Currency, type DateFormat } from '@/lib/prefs'
 import { cn } from '@/lib/utils'
 
@@ -213,12 +214,17 @@ const SOURCE: Record<string, { label: string; hint: string }> = {
 }
 
 function DataSection() {
-  const { result } = useAppData()
+  const { result, status } = useAppData()
+  const loading = status === 'loading'
   const src = SOURCE[result?.source ?? 'empty']
   return (
     <Section title="Dados">
-      <Row label="De onde vêm" hint={src.hint}>
-        <Badge variant={result?.source === 'demo' ? 'accent' : 'outline'}>{src.label}</Badge>
+      <Row label="De onde vêm" hint={loading ? 'Carregando…' : src.hint}>
+        {loading ? (
+          <Skeleton className="h-5 w-28" />
+        ) : (
+          <Badge variant={result?.source === 'demo' ? 'accent' : 'outline'}>{src.label}</Badge>
+        )}
       </Row>
       <Row label="Editar dados" hint="Criar, pagar, excluir, backup e o resto das configurações continuam no BarnaBank atual.">
         <Button asChild variant="outline" size="sm">

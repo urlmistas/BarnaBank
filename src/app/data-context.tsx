@@ -5,7 +5,7 @@ import {
 } from '@/lib/cloud'
 import { toISO } from '@/lib/finance/dates'
 import { makeDate, makeMoney } from '@/lib/format'
-import { applyPrefs, readPrefs, writePrefs, type DisplayPrefs } from '@/lib/prefs'
+import { applyPrefs, PREFS_KEY, readPrefs, writePrefs, type DisplayPrefs } from '@/lib/prefs'
 import type { Settings } from '@/lib/types'
 
 export interface CloudState {
@@ -57,7 +57,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const pull = useCallback(async () => {
     const s0 = session.current
     if (!s0) return
-    setCloud((c) => ({ ...c, status: 'loading', error: undefined }))
+    setCloud((c) => ({ ...c, status: 'loading', email: s0.email, error: undefined }))
     try {
       const s = await validSession(fetch, s0)
       if (s !== s0) {
@@ -91,6 +91,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     // outra aba (o app antigo) alterou os dados → relê
     const onStorage = (e: StorageEvent) => {
       if (e.key === null || e.key.startsWith('barnabank_')) setLocal(loadAppData(today))
+      if (e.key === null || e.key === PREFS_KEY) setPrefsState(readPrefs())
     }
     window.addEventListener('storage', onStorage)
     return () => {

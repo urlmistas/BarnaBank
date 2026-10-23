@@ -36,10 +36,18 @@ function subscribe(cb: () => void) {
   listeners.add(cb)
   const m = mq()
   const onSystem = () => pref === 'system' && apply()
+  // outra aba mudou o tema → acompanha
+  const onStorage = (e: StorageEvent) => {
+    if (e.key !== THEME_KEY && e.key !== null) return
+    pref = readPref()
+    apply()
+  }
   m.addEventListener('change', onSystem)
+  window.addEventListener('storage', onStorage)
   return () => {
     listeners.delete(cb)
     m.removeEventListener('change', onSystem)
+    window.removeEventListener('storage', onStorage)
   }
 }
 
