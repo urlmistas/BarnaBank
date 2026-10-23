@@ -27,6 +27,11 @@ export interface StoreApi {
   cards: Card[]
   cardPurchases: CardPurchase[]
   cardPayments: CardPayment[]
+  /**
+   * O JSON inteiro, para as chaves que não têm lista própria acima (budgets, goals, recurring, shares, nudges, tgLog,
+   * catRules, invites…). Altere só a chave que você conhece; as outras seguem intactas.
+   */
+  raw: Record<string, unknown>
 }
 
 const RAW_LISTS = ['wallets', 'transactions', 'groups', 'bills', 'cards', 'cardPurchases', 'cardPayments'] as const
@@ -78,6 +83,7 @@ export function commit(fn: (api: StoreApi) => void): CommitResult {
     cards: list(raw.cards),
     cardPurchases: list(raw.cardPurchases),
     cardPayments: list(raw.cardPayments),
+    raw,
   }
   fn(api)
   raw.debts = api.debts

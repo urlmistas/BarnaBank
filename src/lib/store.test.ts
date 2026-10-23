@@ -103,6 +103,16 @@ describe('commit', () => {
     expect(out.bills).toBeUndefined()
   })
 
+  it('api.raw deixa mexer em chaves sem lista própria, sem perder as outras', () => {
+    ls.setItem(STORAGE_KEY, JSON.stringify({ debts: [], budgets: { Mercado: 500 }, goals: [{ id: 'g' }] }))
+    commit((api) => {
+      api.raw.budgets = { ...(api.raw.budgets as object), Lazer: 100 }
+    })
+    const out = JSON.parse(ls.getItem(STORAGE_KEY)!)
+    expect(out.budgets).toEqual({ Mercado: 500, Lazer: 100 })
+    expect(out.goals).toEqual([{ id: 'g' }])
+  })
+
   it('guarda o telefone no contato pelo nome em minúsculas', () => {
     commit((api) => setPhone(api, '  Ana Souza ', '11999998888'))
     expect(JSON.parse(ls.getItem(STORAGE_KEY)!).contacts['ana souza']).toEqual({ phone: '11999998888' })
