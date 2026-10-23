@@ -1,7 +1,7 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
-import { ChevronLeft, ChevronRight, Receipt } from 'lucide-react'
+import { ChevronLeft, ChevronRight, CreditCard, Plus, Receipt } from 'lucide-react'
 import { useAppData } from '@/app/data-context'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -13,6 +13,7 @@ import { cn } from '@/lib/utils'
 import type { AppData, YearMonth } from '@/lib/types'
 import { ContasList, NoContas } from './ContasList'
 import { ContaDetailView } from './ContaDetail'
+import { BillFormDialog, CardFormDialog } from './dialogs'
 import { monthName, monthTitle } from './text'
 
 // Contas: contas fixas e faturas de cartão de um mês. No PC (≥1024px) a conta abre num
@@ -32,6 +33,8 @@ function ContasReady({ data, today }: { data: AppData; today: string }) {
   const { id } = useParams()
   const wide = useMediaQuery('(min-width: 1024px)')
   const [params, setParams] = useSearchParams()
+  const { canCreate } = useAppData()
+  const [creating, setCreating] = useState<'bill' | 'card' | null>(null)
   const rawF = params.get('f') as ContaFilter | null
   const filter: ContaFilter = rawF && CONTA_FILTERS.includes(rawF) ? rawF : 'todas'
   const query = params.get('q') ?? ''
@@ -84,7 +87,21 @@ function ContasReady({ data, today }: { data: AppData; today: string }) {
       <header className="flex flex-col gap-4">
         <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
           <h1 className="text-2xl font-semibold tracking-tight">Contas</h1>
-          {has && <MonthNav month={month} range={range} isCurrent={month === now} onMonth={(m) => update({ m })} />}
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+            {canCreate && (
+              <div className="flex gap-2">
+                <Button size="sm" variant="outline" onClick={() => setCreating('card')}>
+                  <CreditCard aria-hidden="true" />
+                  Novo cartão
+                </Button>
+                <Button size="sm" onClick={() => setCreating('bill')}>
+                  <Plus aria-hidden="true" />
+                  Nova conta fixa
+                </Button>
+              </div>
+            )}
+            {has && <MonthNav month={month} range={range} isCurrent={month === now} onMonth={(m) => update({ m })} />}
+          </div>
         </div>
         {has && <Metrics totals={totals} month={month} />}
       </header>
@@ -125,6 +142,8 @@ function ContasReady({ data, today }: { data: AppData; today: string }) {
           )}
         </div>
       )}
+      <BillFormDialog open={creating === 'bill'} onClose={() => setCreating(null)} month={month} />
+      <CardFormDialog open={creating === 'card'} onClose={() => setCreating(null)} />
     </div>
   )
 }

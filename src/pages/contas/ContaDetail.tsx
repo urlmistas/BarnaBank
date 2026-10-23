@@ -12,6 +12,7 @@ import { cn } from '@/lib/utils'
 import type { AppData, YearMonth } from '@/lib/types'
 import { walletHref } from '@/pages/carteiras/links'
 import { StatusBadge } from './ContasList'
+import { BillActions, CardActions, DeletePurchaseButton } from './ContaActions'
 import { dueText, monthName, monthShort, monthTitle, statusText } from './text'
 
 const ease = [0.2, 0, 0, 1] as const
@@ -191,6 +192,8 @@ function BillBody({
 
       <WalletLink data={data} walletId={cur?.row.walletId ?? b.walletId} label={cur?.row.status === 'paga' ? (isIn ? 'Recebida em' : 'Paga com') : 'Carteira padrão'} />
 
+      <BillActions bill={b} month={month} status={cur ? cur.row.status : null} padded={false} />
+
       <section aria-labelledby="conta-recorrencia">
         <h3 id="conta-recorrencia" className="mb-2 text-sm font-medium">
           Recorrência
@@ -330,6 +333,8 @@ function CardBody({
         <LimitBox d={d} />
 
         <WalletLink data={data} walletId={d.card.walletId} label={d.row.status === 'paga' ? 'Paga com' : 'Pagar com'} />
+
+        <CardActions card={d.card} invoiceKey={month} balance={balance} due={it.due!} padded={false} />
       </div>
 
       <div className="mt-5">
@@ -418,6 +423,7 @@ function Purchases({ d }: { d: CardDetail }) {
                 </span>
               </span>
               <span className="num shrink-0 text-sm font-medium whitespace-nowrap">{money(x.value)}</span>
+              <DeletePurchaseButton purchaseId={x.key.slice(0, x.key.lastIndexOf(':'))} label={x.label} installments={x.n} />
             </li>
           ))}
         </ul>

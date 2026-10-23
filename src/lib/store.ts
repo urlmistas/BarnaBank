@@ -1,4 +1,4 @@
-import type { Debt } from '@/lib/types'
+import type { Bill, Card, CardPayment, CardPurchase, Debt, Group, Transaction, Wallet } from '@/lib/types'
 import { normalizeDebts, STORAGE_KEY } from '@/lib/storage'
 
 // Escrita no armazenamento do BarnaBank (mesma chave do app antigo, `barnabank_debts_v3`).
@@ -12,10 +12,25 @@ type Raw = Record<string, unknown>
 /** avisa o DataProvider (o evento `storage` do navegador só dispara em OUTRAS abas) */
 export const STORE_EVENT = 'bbweb:store'
 
+/**
+ * Coleções que o app novo sabe alterar. As demais chaves do JSON (budgets, goals, shares, tgLog…) nunca passam por aqui.
+ * Wallets, transactions, bills, cards, cardPurchases, cardPayments e groups são os itens CRUS do armazenamento
+ * (sem normalizar), para não perder campos que o app novo não conhece.
+ */
 export interface StoreApi {
   debts: Debt[]
   contacts: Record<string, Record<string, unknown>>
+  wallets: Wallet[]
+  transactions: Transaction[]
+  groups: Group[]
+  bills: Bill[]
+  cards: Card[]
+  cardPurchases: CardPurchase[]
+  cardPayments: CardPayment[]
 }
+
+const RAW_LISTS = ['wallets', 'transactions', 'groups', 'bills', 'cards', 'cardPurchases', 'cardPayments'] as const
+const list = <T,>(v: unknown): T[] => (Array.isArray(v) ? (v.filter((x) => x && typeof x === 'object') as T[]) : [])
 
 export type CommitResult = { ok: true; before: string | null; after: string } | { ok: false; error: string }
 
@@ -56,10 +71,19 @@ export function commit(fn: (api: StoreApi) => void): CommitResult {
   const api: StoreApi = {
     debts: normalizeDebts(raw.debts),
     contacts: raw.contacts && typeof raw.contacts === 'object' && !Array.isArray(raw.contacts) ? { ...(raw.contacts as StoreApi['contacts']) } : {},
+    wallets: list(raw.wallets),
+    transactions: list(raw.transactions),
+    groups: list(raw.groups),
+    bills: list(raw.bills),
+    cards: list(raw.cards),
+    cardPurchases: list(raw.cardPurchases),
+    cardPayments: list(raw.cardPayments),
   }
   fn(api)
   raw.debts = api.debts
   raw.contacts = api.contacts
+  // só grava a lista se ela já existia ou se o app novo colocou algo nela (não cria chaves vazias à toa)
+  for (const k of RAW_LISTS) if (k in raw || api[k].length) raw[k] = api[k]
   const after = JSON.stringify(raw)
   try {
     ls.setItem(STORAGE_KEY, after)

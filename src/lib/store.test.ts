@@ -92,6 +92,17 @@ describe('commit', () => {
     expect(r).toMatchObject({ ok: false, error: expect.stringMatching(/cheio/) })
   })
 
+  it('altera carteiras e lançamentos sem normalizar nem perder campos', () => {
+    ls.setItem(STORAGE_KEY, JSON.stringify({ debts: [], wallets: [{ id: 'w1', name: 'Nubank', extra: 'x' }], transactions: [] }))
+    commit((api) => {
+      api.transactions.push({ id: 't1', walletId: 'w1', type: 'entrada', amount: 5, date: '2026-01-01' })
+    })
+    const out = JSON.parse(ls.getItem(STORAGE_KEY)!)
+    expect(out.wallets).toEqual([{ id: 'w1', name: 'Nubank', extra: 'x' }])
+    expect(out.transactions).toHaveLength(1)
+    expect(out.bills).toBeUndefined()
+  })
+
   it('guarda o telefone no contato pelo nome em minúsculas', () => {
     commit((api) => setPhone(api, '  Ana Souza ', '11999998888'))
     expect(JSON.parse(ls.getItem(STORAGE_KEY)!).contacts['ana souza']).toEqual({ phone: '11999998888' })

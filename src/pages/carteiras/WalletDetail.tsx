@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
-import { ArrowLeft, ArrowLeftRight, ChevronLeft, ChevronRight, Inbox, SearchX, Wallet, X } from 'lucide-react'
+import { ArrowLeft, ArrowLeftRight, ChevronLeft, ChevronRight, Inbox, Pencil, Plus, SearchX, Trash2, Wallet, X } from 'lucide-react'
 import { useAppData } from '@/app/data-context'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -17,7 +17,12 @@ import { MONTHS, plural, relativeDay } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import type { AppData, YearMonth } from '@/lib/types'
 import { SignedMoney } from '@/pages/pessoas/parts'
+import { ConfirmDialog } from '@/pages/pessoas/dialogs'
+import { findTxIndex, txIdFromKey } from '@/lib/finance/wallet-mutations'
 import { FILTER_LABEL, FILTER_NONE, INV_TXT } from './text'
+import { TxFormDialog, WalletFormDialog } from './dialogs'
+import { useWalletActions } from './use-wallet-actions'
+import { WalletIcon } from './wallet-icon'
 
 const WalletChart = lazy(() => import('./WalletChart').then((m) => ({ default: m.WalletChart })))
 
@@ -45,7 +50,9 @@ export function WalletDetailView({
   onFilter: (f: MovementFilter) => void
   onMonth: (m: YearMonth | null) => void
 }) {
-  const { today, money } = useAppData()
+  const { today, money, canEdit } = useAppData()
+  const { deleteWallet } = useWalletActions()
+  const [dlg, setDlg] = useState<'edit' | 'delete' | 'tx' | null>(null)
   const wallet = data.wallets.find((w) => w.id === walletId)
   const events = useMemo(() => (wallet ? walletEvents(data, wallet.id) : []), [data, wallet])
   const cards = useMemo(() => (wallet ? walletCards(data, wallet.id, today) : []), [data, wallet, today])
@@ -76,6 +83,9 @@ export function WalletDetailView({
         </Button>
       )}
       <header className={cn('flex items-start gap-3', !fullPage && 'px-5 pt-5')}>
+        <span aria-hidden="true" className="mt-0.5 grid size-9 shrink-0 place-items-center rounded-full border border-border text-fg-muted">
+          <WalletIcon icon={wallet.icon} />
+        </span>
         <div className="min-w-0 flex-1">
           <H id="carteira-nome" ref={headingRef} tabIndex={-1} className="truncate text-lg font-semibold tracking-tight outline-none">
             {wallet.name}
@@ -92,6 +102,38 @@ export function WalletDetailView({
           </Button>
         )}
       </header>
+
+      {canEdit && (
+        <div className={cn('mt-4 flex flex-wrap items-center gap-1.5', !fullPage && 'px-5')}>
+          <Button size="sm" onClick={() => setDlg('tx')}>
+            <Plus aria-hidden="true" />
+            Lançamento
+          </Button>
+          <span className="ml-auto flex gap-0.5">
+            <Button size="icon" variant="ghost" className="size-8" aria-label={`Editar carteira ${wallet.name}`} title="Editar" onClick={() => setDlg('edit')}>
+              <Pencil />
+            </Button>
+            <Button size="icon" variant="ghost" className="size-8" aria-label={`Excluir carteira ${wallet.name}`} title="Excluir" onClick={() => setDlg('delete')}>
+              <Trash2 />
+            </Button>
+          </span>
+          <TxFormDialog open={dlg === 'tx'} onClose={() => setDlg(null)} walletId={wallet.id} />
+          <WalletFormDialog open={dlg === 'edit'} onClose={() => setDlg(null)} wallet={wallet} />
+          <ConfirmDialog
+            open={dlg === 'delete'}
+            onClose={() => setDlg(null)}
+            title="Excluir carteira"
+            okLabel="Excluir carteira"
+            onOk={() => {
+              // sai da carteira excluída: volta para a lista (a rota é um HashRouter)
+              if (deleteWallet(wallet)) window.location.hash = '#' + backHref
+            }}
+          >
+            Excluir a carteira <b className="text-fg">{wallet.name}</b>? Os lançamentos dela também serão apagados. Pagamentos de empréstimo continuam
+            existindo, só perdem o vínculo com a carteira. Dá para desfazer logo depois.
+          </ConfirmDialog>
+        </div>
+      )}
 
       <div className={cn('mt-4', !fullPage && 'px-5')}>
         <p className="text-xs text-fg-muted">Saldo</p>
@@ -339,6 +381,12 @@ function Movements({
 }
 
 function MovementRow({ e }: { e: WalletEvent }) {
+  const { canEdit, money, date, result } = useAppData()
+  const { deleteTx } = useWalletActions()
+  const [dlg, setDlg] = useState<'edit' | 'delete' | null>(null)
+  // pagamento de empréstimo não se edita aqui: pertence à dívida (tela Pessoas)
+  const txId = canEdit && !e.isLoan ? txIdFromKey(e.key) : null
+  const exists = txId && result ? findTxIndex(result.data.transactions, txId) >= 0 : false
   const sub = [e.isTransfer ? 'transferência' : e.isLoan ? 'empréstimo' : e.kind === 'entrada' ? 'entrada' : 'saída', e.note]
     .filter(Boolean)
     .join(' · ')
@@ -353,6 +401,21 @@ function MovementRow({ e }: { e: WalletEvent }) {
       </span>
       {/* transferência só muda de lugar: valor com sinal, sem cor */}
       <SignedMoney value={e.kind === 'entrada' ? e.amount : -e.amount} muted={e.isTransfer} className="text-sm" />
+      {txId && exists && (
+        <span className="-mr-2 flex">
+          <Button size="icon" variant="ghost" className="size-8" aria-label="Editar lançamento" title="Editar" onClick={() => setDlg('edit')}>
+            <Pencil />
+          </Button>
+          <Button size="icon" variant="ghost" className="size-8" aria-label="Excluir lançamento" title="Excluir" onClick={() => setDlg('delete')}>
+            <Trash2 />
+          </Button>
+          <TxFormDialog open={dlg === 'edit'} onClose={() => setDlg(null)} txId={txId} />
+          <ConfirmDialog open={dlg === 'delete'} onClose={() => setDlg(null)} title="Excluir lançamento" okLabel="Excluir" onOk={() => deleteTx(txId, money(e.amount))}>
+            Excluir <b className="text-fg">{e.label}</b> de <b className="num text-fg">{money(e.amount)}</b> em <span className="num">{date(e.date)}</span>? Dá para
+            desfazer logo depois.
+          </ConfirmDialog>
+        </span>
+      )}
     </li>
   )
 }

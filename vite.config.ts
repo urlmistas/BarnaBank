@@ -27,6 +27,8 @@ export default defineConfig({
   },
   test: {
     environment: 'node',
+    // os testes de tela (jsdom) ficam lentos quando rodam todos juntos
+    testTimeout: 30000,
     include: ['src/**/*.test.{ts,tsx}'],
   },
 })

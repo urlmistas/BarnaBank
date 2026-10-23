@@ -1,16 +1,18 @@
 import { useRef, type KeyboardEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { CreditCard, Wallet } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import { useAppData } from '@/app/data-context'
 import type { WalletCardInfo, WalletRow } from '@/lib/finance/wallets'
 import { plural } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { walletHref } from './links'
 import { cardSummary, noYear } from './text'
+import { WalletIcon } from './wallet-icon'
 
-export function WalletList({ rows, selectedId, search }: { rows: WalletRow[]; selectedId?: string; search: string }) {
+export function WalletList({ rows, selectedId, search, onCreate }: { rows: WalletRow[]; selectedId?: string; search: string; onCreate?: () => void }) {
   const listRef = useRef<HTMLUListElement>(null)
-  if (!rows.length) return <NoWallets />
+  if (!rows.length) return <NoWallets onCreate={onCreate} />
 
   // setas ↑/↓ andam entre as linhas
   function onListKey(e: KeyboardEvent<HTMLUListElement>) {
@@ -53,6 +55,7 @@ function WalletRowLink({ row, selected, href }: { row: WalletRow; selected: bool
     >
       {selected && <span aria-hidden="true" className="absolute inset-y-0 left-0 w-0.5 bg-accent" />}
       <span className="flex items-center gap-3">
+        <WalletIcon icon={row.wallet.icon} className="text-fg-subtle" />
         <span className="min-w-0 flex-1">
           <span className="block truncate text-sm font-medium">{row.wallet.name}</span>
           <span className="block truncate text-xs text-fg-subtle">{sub}</span>
@@ -92,14 +95,21 @@ function CardLine({ c }: { c: WalletCardInfo }) {
   )
 }
 
-function NoWallets() {
+function NoWallets({ onCreate }: { onCreate?: () => void }) {
   return (
     <div className="flex flex-col items-center rounded-lg border border-dashed border-border px-6 py-14 text-center">
       <Wallet aria-hidden="true" className="size-5 text-fg-subtle" />
       <p className="mt-3 text-base font-medium">Nenhuma carteira ainda</p>
       <p className="mt-1 max-w-sm text-sm text-fg-muted">
-        Crie carteiras no BarnaBank atual (conta do banco, dinheiro, poupança). Elas aparecem aqui com o saldo e os movimentos de cada mês.
+        {onCreate
+          ? 'Crie carteiras para a conta do banco, o dinheiro, a poupança. Elas aparecem aqui com o saldo e os movimentos de cada mês.'
+          : 'Crie carteiras no BarnaBank atual (conta do banco, dinheiro, poupança). Elas aparecem aqui com o saldo e os movimentos de cada mês.'}
       </p>
+      {onCreate && (
+        <Button size="sm" className="mt-4" onClick={onCreate}>
+          Criar carteira
+        </Button>
+      )}
     </div>
   )
 }

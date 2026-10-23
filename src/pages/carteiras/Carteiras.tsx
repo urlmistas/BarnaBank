@@ -1,8 +1,9 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
-import { Wallet } from 'lucide-react'
+import { ArrowLeftRight, Plus, Wallet } from 'lucide-react'
 import { useAppData } from '@/app/data-context'
+import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { buildWalletRows, monthInOut, MOVEMENT_FILTERS, type MovementFilter } from '@/lib/finance/wallets'
 import { parseISO } from '@/lib/finance/dates'
@@ -12,6 +13,7 @@ import { cn } from '@/lib/utils'
 import type { AppData, YearMonth } from '@/lib/types'
 import { WalletList } from './WalletList'
 import { WalletDetailView } from './WalletDetail'
+import { TxFormDialog, WalletFormDialog } from './dialogs'
 
 // Carteiras: saldo total em destaque, uma linha por carteira. No PC (≥1024px) a carteira
 // abre num painel ao lado; no celular /carteiras/:id é uma página inteira (como Pessoas).
@@ -28,7 +30,8 @@ export function Carteiras() {
 
 function CarteirasReady({ data, today }: { data: AppData; today: string }) {
   const { id } = useParams()
-  const { money } = useAppData()
+  const { money, canCreate, canEdit } = useAppData()
+  const [dlg, setDlg] = useState<'wallet' | 'tx' | null>(null)
   const wide = useMediaQuery('(min-width: 1024px)')
   const [params, setParams] = useSearchParams()
   const rawT = params.get('t') as MovementFilter | null
@@ -90,11 +93,27 @@ function CarteirasReady({ data, today }: { data: AppData; today: string }) {
             </div>
           )}
         </div>
-        {has && <MonthFigures monthIn={view.month.monthIn} monthOut={view.month.monthOut} today={today} />}
+        <div className="flex flex-col gap-3 lg:items-end">
+          {canCreate && (
+            <div className="flex flex-wrap gap-2">
+              {canEdit && has && (
+                <Button size="sm" variant="outline" onClick={() => setDlg('tx')}>
+                  <ArrowLeftRight aria-hidden="true" />
+                  Novo lançamento
+                </Button>
+              )}
+              <Button size="sm" onClick={() => setDlg('wallet')}>
+                <Plus aria-hidden="true" />
+                Nova carteira
+              </Button>
+            </div>
+          )}
+          {has && <MonthFigures monthIn={view.month.monthIn} monthOut={view.month.monthOut} today={today} />}
+        </div>
       </header>
 
       <div className={cn('mt-6', has && 'lg:grid lg:grid-cols-[minmax(0,400px)_minmax(0,1fr)] lg:items-start lg:gap-8')}>
-        <WalletList rows={view.rows} selectedId={wide ? id : undefined} search={qs} />
+        <WalletList rows={view.rows} selectedId={wide ? id : undefined} search={qs} onCreate={canCreate ? () => setDlg('wallet') : undefined} />
         {has && wide && (
           <aside aria-label="Carteira selecionada" className="lg:sticky lg:top-20">
             <AnimatePresence mode="wait" initial={false}>
@@ -111,6 +130,8 @@ function CarteirasReady({ data, today }: { data: AppData; today: string }) {
           </aside>
         )}
       </div>
+      <WalletFormDialog open={dlg === 'wallet'} onClose={() => setDlg(null)} />
+      <TxFormDialog open={dlg === 'tx'} onClose={() => setDlg(null)} />
     </div>
   )
 }
