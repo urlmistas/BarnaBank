@@ -1,0 +1,1 @@
+import{P as e,j as t}from"./clsx-Cf6hAYDf.js";var n=e(t(),1);function r(e){let t=(0,n.useCallback)(t=>{let n=window.matchMedia(e);return n.addEventListener(`change`,t),()=>n.removeEventListener(`change`,t)},[e]);return(0,n.useSyncExternalStore)(t,()=>window.matchMedia(e).matches,()=>!1)}export{r as t};
