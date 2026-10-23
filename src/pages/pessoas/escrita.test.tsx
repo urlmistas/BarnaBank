@@ -57,6 +57,7 @@ beforeEach(() => {
   }
 })
 afterEach(cleanup)
+afterEach(() => vi.unstubAllGlobals())
 configure({ asyncUtilTimeout: 5000 })
 
 describe('Pessoas: escrita', () => {
@@ -108,12 +109,12 @@ describe('Pessoas: escrita', () => {
     await waitFor(() => expect(stored().debts).toHaveLength(0))
   })
 
-  it('com a nuvem ativa não oferece edição', async () => {
+  it('com a conta ativa continua editando neste aparelho (sincronização falhando não bloqueia)', async () => {
     seed()
+    vi.stubGlobal('fetch', vi.fn(async () => { throw new TypeError('Failed to fetch') }))
     cloud.session = { access: 'a', refresh: 'r', exp: 9999999999, uid: 'u', email: 'a@b.com' }
     mount('/pessoas')
-    await screen.findByText('Nuvem')
-    expect(screen.queryByRole('button', { name: /Nova dívida/ })).toBeNull()
-    expect(screen.getByText(/Para editar neste aparelho, saia da conta/)).toBeTruthy()
+    expect(await screen.findByRole('button', { name: /Nova dívida/ })).toBeTruthy()
+    expect(screen.queryByText(/saia da conta/)).toBeNull()
   })
 })

@@ -1,12 +1,16 @@
 import { lazy, Suspense, useId, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { ChartColumn, ChevronLeft, ChevronRight, CircleAlert, Table2 } from 'lucide-react'
+import { ChartColumn, ChevronLeft, ChevronRight, CircleAlert, Printer, Table2 } from 'lucide-react'
 import { useAppData } from '@/app/data-context'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { ErrorBoundary } from '@/components/ui/error-boundary'
 import { Segmented } from '@/components/ui/segmented'
 import { Skeleton } from '@/components/ui/skeleton'
+import { useToast } from '@/components/ui/toast'
+import { reportHtml } from '@/lib/print/documents'
+import { openPrintWindow } from '@/lib/print/html'
+import { useDocCtx } from '@/lib/print/use-doc-ctx'
 import { TabPanel, Tabs } from '@/components/ui/tabs'
 import {
   clampAnchor, pctChange, periodMonths, periodSummary, previousMonths, reportRange, REPORT_PERIODS, stepAnchor,
@@ -49,6 +53,8 @@ function RelatoriosReady({ data, today }: { data: AppData; today: string }) {
 
 function Report({ data, today, range }: { data: AppData; today: string; range: ReportRange }) {
   const { money } = useAppData()
+  const toast = useToast()
+  const doc = useDocCtx()
   const [params, setParams] = useSearchParams()
   const now = ymOf(today)
 
@@ -110,7 +116,23 @@ function Report({ data, today, range }: { data: AppData; today: string; range: R
     <div>
       <header className="flex flex-col gap-4">
         <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-          <h1 className="text-2xl font-semibold tracking-tight">Relatórios</h1>
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-semibold tracking-tight">Relatórios</h1>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                const html = reportHtml(
+                  { periodText, chartTitle: view.title, summary, head: view.table.head, rows: view.table.rows },
+                  { ...doc, issuedAt: new Date() },
+                )
+                if (!openPrintWindow(html)) toast.show('Seu navegador bloqueou a nova janela. Permita pop-ups para este site e tente de novo.')
+              }}
+            >
+              <Printer aria-hidden="true" />
+              Imprimir / PDF
+            </Button>
+          </div>
           <PeriodNav
             title={periodText}
             prev={stepAnchor(kind, anchor, -1, range)}

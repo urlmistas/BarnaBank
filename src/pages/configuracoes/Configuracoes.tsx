@@ -1,30 +1,29 @@
-import { useId, useRef, type ReactNode } from 'react'
-import { ArrowUpRight, ChevronDown, RefreshCw } from 'lucide-react'
+import { useId, useRef, useState, type FormEvent, type ReactNode } from 'react'
+import { ChevronDown, Loader2, RefreshCw } from 'lucide-react'
 import { useAppData } from '@/app/data-context'
 import { useTheme, THEME_PREFS, type ThemePref } from '@/app/theme'
 import { AccountDialog } from '@/app/AccountDialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { Segmented } from '@/components/ui/segmented'
 import { Skeleton } from '@/components/ui/skeleton'
 import { CURRENCIES, DATE_FORMATS, type Currency, type DateFormat } from '@/lib/prefs'
 import { cn } from '@/lib/utils'
 
-// Configurações: só o que vale para este app (somente leitura).
-// Ficaram no BarnaBank atual, porque só servem para criar/editar: juros/multa/mora padrão, PIX,
-// carteira padrão, confirmação ao excluir, lembrete e importação de backup.
+// Configurações: conta e nuvem, bot, tema, formatos e origem dos dados.
 
-const OLD_APP_URL = 'https://urlmistas.github.io/barna-bank/'
 const THEME_LABEL: Record<ThemePref, string> = { system: 'Sistema', light: 'Claro', dark: 'Escuro' }
 
 export function Configuracoes() {
   return (
     <div className="mx-auto max-w-2xl">
       <h1 className="text-2xl font-semibold tracking-tight">Configurações</h1>
-      <p className="mt-1 text-sm text-fg-muted">Valem só para este app. Nada aqui altera os seus dados.</p>
+      <p className="mt-1 text-sm text-fg-muted">Conta, bot, tema e formatos deste app.</p>
 
       <div className="mt-6 flex flex-col gap-6">
         <AccountSection />
+        <BotSection />
         <AppearanceSection />
         <FormatSection />
         <DataSection />
@@ -72,18 +71,18 @@ function fmtWhen(iso?: string) {
 }
 
 function AccountSection() {
-  const { cloud, refreshCloud, signOut } = useAppData()
+  const { cloud, conflict, setConflictOpen, refreshCloud, signOut } = useAppData()
   const ref = useRef<HTMLDialogElement>(null)
   const on = cloud.status !== 'off'
   const hint = !on
-    ? (cloud.error ?? 'Entre com o e-mail e a senha do BarnaBank para ver os dados da sua conta em qualquer aparelho.')
+    ? (cloud.error ?? 'Entre com o e-mail e a senha do BarnaBank para guardar os dados na conta e ver em qualquer aparelho.')
     : cloud.status === 'loading'
-      ? 'Baixando os dados da conta…'
+      ? 'Sincronizando…'
       : cloud.status === 'error'
-        ? `${cloud.error} Mostrando os dados deste aparelho.`
-        : cloud.empty
-          ? 'A conta ainda não tem dados. Mostrando os dados deste aparelho.'
-          : `Dados da conta salvos em ${fmtWhen(cloud.updatedAt)}.`
+        ? `${cloud.error} Seus dados continuam neste aparelho e serão enviados quando a conexão voltar.`
+        : cloud.updatedAt
+          ? `Sincronizado em ${fmtWhen(cloud.updatedAt)}.`
+          : 'Conectado.'
   return (
     <>
       <Section title="Conta">
@@ -95,7 +94,7 @@ function AccountSection() {
             <div className="flex gap-2">
               <Button variant="outline" size="sm" disabled={cloud.status === 'loading'} onClick={refreshCloud}>
                 <RefreshCw aria-hidden="true" className={cn(cloud.status === 'loading' && 'motion-safe:animate-spin')} />
-                Atualizar
+                Sincronizar agora
               </Button>
               <Button variant="ghost" size="sm" onClick={signOut}>
                 Sair
@@ -107,15 +106,100 @@ function AccountSection() {
             </Button>
           )}
         </Row>
+        {conflict && (
+          <Row label="Aparelho e conta são diferentes" hint="Escolha qual versão manter para voltar a sincronizar.">
+            <Button size="sm" onClick={() => setConflictOpen(true)}>
+              Resolver
+            </Button>
+          </Row>
+        )}
         {on && (
           <p className="px-4 py-2.5 text-xs text-fg-subtle sm:px-5">
-            Só leitura: para editar, use o BarnaBank atual e toque em Atualizar. Sair aqui não desconecta o app atual.
+            Os dados ficam neste aparelho e vão para a conta a cada alteração. Sair não apaga nada daqui.
           </p>
         )}
       </Section>
       {/* fora da lista com divisórias: o <dialog> não pode virar uma linha dela */}
       <AccountDialog dialogRef={ref} />
     </>
+  )
+}
+
+function BotSection() {
+  const { bot, connectBot, disconnectBot, refreshCloud } = useAppData()
+  const urlId = useId()
+  const keyId = useId()
+  const [url, setUrl] = useState('')
+  const [key, setKey] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+  const on = bot.status !== 'off'
+
+  async function connect(e: FormEvent) {
+    e.preventDefault()
+    setBusy(true)
+    setErr(null)
+    const msg = await connectBot(url, key)
+    setBusy(false)
+    if (msg) setErr(msg)
+    else {
+      setKey('')
+      setUrl('')
+    }
+  }
+
+  if (on) {
+    const hint =
+      bot.status === 'loading'
+        ? 'Sincronizando…'
+        : bot.status === 'error'
+          ? `${bot.error} Seus dados continuam neste aparelho.`
+          : bot.last
+            ? `Sincronizado em ${fmtWhen(bot.last)}.`
+            : 'Conectado.'
+    return (
+      <Section title="Nuvem e bot do Telegram">
+        <Row label={bot.url ? bot.url.replace(/^https?:\/\//, '') : 'Bot conectado'} hint={<span className={cn(bot.status === 'error' && 'text-neg')}>{hint}</span>}>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" disabled={bot.status === 'loading'} onClick={refreshCloud}>
+              <RefreshCw aria-hidden="true" className={cn(bot.status === 'loading' && 'motion-safe:animate-spin')} />
+              Sincronizar agora
+            </Button>
+            <Button variant="ghost" size="sm" onClick={disconnectBot}>
+              Desligar
+            </Button>
+          </div>
+        </Row>
+        <p className="px-4 py-2.5 text-xs text-fg-subtle sm:px-5">
+          O que você manda pelo Telegram entra aqui sozinho. Desligar só apaga o endereço e a chave deste aparelho.
+        </p>
+      </Section>
+    )
+  }
+
+  return (
+    <Section title="Nuvem e bot do Telegram">
+      <form onSubmit={connect} className="px-4 py-3.5 sm:px-5" noValidate>
+        <p className="text-xs text-fg-muted">
+          Para lançar gastos e dívidas pelo Telegram e gerar links de cobrança. Use o endereço e a chave (SYNC_KEY) do seu bot.
+        </p>
+        <label htmlFor={urlId} className="mt-3 block text-xs font-medium text-fg-muted">
+          Endereço do bot
+        </label>
+        <Input id={urlId} type="url" inputMode="url" autoComplete="off" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://barnabank-bot.seu-nome.workers.dev" className="mt-1" />
+        <label htmlFor={keyId} className="mt-3 block text-xs font-medium text-fg-muted">
+          Chave (SYNC_KEY)
+        </label>
+        <Input id={keyId} type="password" autoComplete="off" value={key} onChange={(e) => setKey(e.target.value)} className="mt-1" />
+        <p role="alert" aria-live="assertive" className="mt-2 min-h-5 text-xs text-neg">
+          {err}
+        </p>
+        <Button type="submit" size="sm" disabled={busy} className="mt-1">
+          {busy && <Loader2 aria-hidden="true" className="motion-safe:animate-spin" />}
+          {busy ? 'Conectando…' : 'Conectar'}
+        </Button>
+      </form>
+    </Section>
   )
 }
 
@@ -207,8 +291,7 @@ function FormatSection() {
 }
 
 const SOURCE: Record<string, { label: string; hint: string }> = {
-  cloud: { label: 'Conta na nuvem', hint: 'Baixados da sua conta ao abrir o app. Ficam só na memória.' },
-  local: { label: 'Este aparelho', hint: 'Os mesmos dados do BarnaBank atual neste navegador.' },
+  local: { label: 'Este aparelho', hint: 'Guardados neste aparelho. Com a conta ou o bot ligados, também vão para a nuvem.' },
   demo: { label: 'Demonstração', hint: 'Nenhum dado encontrado neste navegador: mostrando dados fictícios.' },
   empty: { label: 'Sem dados', hint: 'Ainda não há nada no BarnaBank deste navegador nem na conta.' },
 }
@@ -225,15 +308,6 @@ function DataSection() {
         ) : (
           <Badge variant={result?.source === 'demo' ? 'accent' : 'outline'}>{src.label}</Badge>
         )}
-      </Row>
-      <Row label="Editar dados" hint="Criar, pagar, excluir, backup e o resto das configurações continuam no BarnaBank atual.">
-        <Button asChild variant="outline" size="sm">
-          <a href={OLD_APP_URL} target="_blank" rel="noopener noreferrer">
-            Abrir o BarnaBank atual
-            <ArrowUpRight aria-hidden="true" />
-            <span className="sr-only">(abre em outra aba)</span>
-          </a>
-        </Button>
       </Row>
     </Section>
   )

@@ -1,14 +1,14 @@
 import type { AppData, Settings } from '@/lib/types'
 import { parseAppData } from '@/lib/storage'
 
-// Conta na nuvem (Supabase) — SOMENTE LEITURA.
+// Conta na nuvem (Supabase): login, sessão e chamadas HTTP.
 // Mesmo projeto e mesma tabela do app antigo (app.js ~l.8256: SB_URL/SB_KEY, sbPull ~l.8395):
 // a linha `bb_user_state` do usuário guarda em `data` o mesmo formato do backup (buildBackup ~l.367).
 // O app novo:
 // - faz login próprio (e-mail e senha) e guarda só os tokens em `bbweb_session`;
-// - NUNCA grava na tabela (só GET em /rest/v1) e nunca toca em `barnabank_sb` (a sessão do antigo:
-//   renovar o token dela trocaria o refresh token e derrubaria o login do app antigo);
-// - mantém os dados baixados só na memória.
+// - nunca toca em `barnabank_sb` (a sessão do antigo: renovar o token dela trocaria o refresh token
+//   e derrubaria o login do app antigo);
+// - a sincronização (ler/gravar a linha) fica em src/lib/sync/supabase.ts.
 
 export const SB_URL = 'https://epsddfqunjqopylrbbyv.supabase.co'
 /** chave publicável (pública por definição; já está no app antigo). O acesso é protegido pelo RLS. */
@@ -22,6 +22,10 @@ export interface CloudSession {
   exp: number
   uid: string
   email: string
+  /** updated_at da linha na nuvem na última sincronização (concorrência otimista) */
+  rev?: string
+  /** hash dos dados deste aparelho na última sincronização */
+  synced?: string
 }
 
 export interface CloudPull {
@@ -42,7 +46,7 @@ export class CloudError extends Error {
   }
 }
 
-async function sbFetch<T>(fetcher: Fetch, path: string, init: RequestInit, token?: string): Promise<T> {
+export async function sbFetch<T>(fetcher: Fetch, path: string, init: RequestInit, token?: string): Promise<T> {
   const headers: Record<string, string> = { apikey: SB_KEY, 'Content-Type': 'application/json' }
   if (token) headers.Authorization = 'Bearer ' + token
   let r: Response
@@ -74,6 +78,9 @@ interface TokenResponse {
 
 function toSession(j: TokenResponse, now: number, keep?: CloudSession): CloudSession {
   return {
+    // renovar o token não muda o que já foi sincronizado
+    ...(keep?.rev ? { rev: keep.rev } : {}),
+    ...(keep?.synced ? { synced: keep.synced } : {}),
     access: j.access_token,
     refresh: j.refresh_token,
     exp: Math.floor(now / 1000) + (j.expires_in || 3600),

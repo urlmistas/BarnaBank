@@ -20,32 +20,60 @@ com um visual novo, mas não cria, edita nem apaga nada. Para alterar dados, con
 Também: tema escuro por padrão, layout para celular e desktop, carregamento com *skeletons*, estados de erro e de
 dados vazios, e filtros guardados na URL (dá para compartilhar um link com o filtro aplicado).
 
-## De onde vêm os dados
+## De onde vêm os dados e como sincroniza
 
-Tudo é **somente leitura**. O app procura, nesta ordem:
+Os dados **deste aparelho** são sempre a fonte: o app lê e grava no `localStorage` (`barnabank_debts_v3` e
+`barnabank_settings_v1`, as mesmas chaves do BarnaBank antigo). A conta e o bot recebem cópias. Ordem de leitura:
 
-1. `?dados=demo` ou `?dados=vazio` na URL (para revisão).
-2. **Conta na nuvem** (Supabase), se você entrou em **Configurações**. O app baixa a sua linha da tabela
-   `bb_user_state`, a mesma que o BarnaBank atual sincroniza. Só faz `GET`: nunca grava na tabela. Os dados baixados
-   ficam apenas na memória e somem ao recarregar.
-3. O mesmo `localStorage` do BarnaBank atual (`barnabank_debts_v3` e `barnabank_settings_v1`), sem gravar nessas
-   chaves. A normalização acontece só na memória (`src/lib/storage.ts`).
-4. Sem nada disso, **dados de demonstração** (selo "Demonstração" no topo).
+1. `?dados=demo` ou `?dados=vazio` na URL (para revisão; nada é gravado nem sincronizado).
+2. O `localStorage` deste aparelho.
+3. Sem nada disso, **dados de demonstração** (selo "Demonstração" no topo).
 
-O `localStorage` só é compartilhado na mesma origem. Os dois apps ficam em `urlmistas.github.io`, então abrir o app
-antigo no navegador já deixa os dados à vista no novo. Em `localhost` não há dados do app publicado, e aparece a
-demonstração.
+Cada gravação preserva os campos que o app ainda não conhece (`budgets`, `goals`, `shares`, `tgLog`…): o JSON atual é
+lido, só o que mudou é trocado e o resto volta intacto. O `localStorage` só é compartilhado na mesma origem; em
+`localhost` não há os dados do app publicado, e aparece a demonstração.
+
+### Conta na nuvem (Supabase)
+
+Entre em **Configurações → Conta**. O app sincroniza com a linha da sua conta na tabela `bb_user_state` (a mesma do
+BarnaBank antigo): sobe os dados a cada alteração (com uma pausa de 1,5 s para juntar mudanças), confere ao voltar
+para a janela e logo depois de entrar. O envio só vale se a conta não mudou em outro aparelho desde a última leitura
+(`PATCH` condicionado a `updated_at`).
+
+| Situação | O que acontece |
+|---|---|
+| Conta sem dados, aparelho com dados | O aparelho sobe para a conta. |
+| Aparelho vazio, conta com dados | O aparelho adota os dados da conta. |
+| Só o aparelho mudou | Envia para a conta. |
+| Só a conta mudou | O aparelho adota a conta. |
+| Os dois mudaram | Pergunta **"Qual versão manter?"**: usar a da conta ou manter a deste aparelho. "Decidir depois" não troca nada. |
+
+Antes de trocar os dados do aparelho pelos da conta, o texto anterior é guardado em `bbweb_backup_prev` (só a cópia mais
+recente), para recuperar se algo der errado. Sem internet, os dados continuam salvos aqui e vão quando a conexão
+voltar. Se a sessão expirar, o app sai da conta e **nenhum dado é apagado**.
+
+### Bot do Telegram
+
+Em **Configurações → Nuvem e bot do Telegram**, informe o endereço do bot e a chave (`SYNC_KEY`). A configuração fica
+em `barnabank_cloud`, a mesma chave do app antigo, então quem já tinha configurado não precisa digitar de novo. O bot
+aplica sozinho as mensagens do Telegram (ele tem as mesmas regras do app); este app envia os dados do aparelho quando
+mudam e adota a versão do bot quando só o bot mudou. A chave só viaja no cabeçalho `Authorization`, nunca na URL, e
+não aparece em mensagens de erro.
 
 ### O que o app novo grava no navegador
 
 | Chave | Conteúdo |
 |---|---|
+| `barnabank_debts_v3`, `barnabank_settings_v1` | Os dados (mesmo formato do app antigo). |
+| `barnabank_cloud` | Endereço e chave do bot, e o controle da última sincronização. |
 | `bbweb_theme` | Tema escolhido. |
 | `bbweb_prefs` | Moeda e formato de data escolhidos em Configurações. |
-| `bbweb_session` | Sessão do login na nuvem. |
+| `bbweb_session` | Sessão do login na nuvem, com `rev` e `synced` da última sincronização. |
+| `bbweb_backup_prev` | Cópia dos dados de antes da última vez que a nuvem os substituiu. |
 
 A sessão do app antigo (`barnabank_sb`) não é lida nem renovada, para não derrubar o login dele. "Sair" em
-Configurações só apaga `bbweb_session`. Criar conta e recuperar senha continuam no app antigo.
+Configurações só apaga `bbweb_session`; os dados continuam no aparelho. Criar conta e recuperar senha continuam no app
+antigo.
 
 ## Rodar localmente
 
@@ -101,7 +129,7 @@ regras da tabela. Os secrets do app antigo (`CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE
 
 - Não cria, edita nem apaga dados (dívidas, pagamentos, carteiras, contas fixas, cartões).
 - Não lê ainda `budgets`, `goals`, `recurring` e `shares`, então não há orçamento do mês nem metas.
-- Sem PWA, sem envio para a nuvem, sem criar conta nem recuperar senha, sem bot do Telegram.
+- Sem PWA e sem criar conta nem recuperar senha (continuam no app antigo).
 - Não há linha de grupo em Pessoas: dívidas de grupo entram na linha da pessoa.
 
 O mapa do que falta portar, com as linhas de referência no app antigo, está em [MIGRATION.md](MIGRATION.md).

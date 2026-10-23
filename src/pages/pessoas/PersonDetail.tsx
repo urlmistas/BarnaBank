@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
-import { ArrowLeft, Check, ChevronDown, Circle, CircleAlert, CircleDashed, Inbox, Pencil, Trash2, UserRound, X } from 'lucide-react'
+import { ArrowLeft, Check, ChevronDown, Circle, CircleAlert, CircleDashed, Image, Inbox, Paperclip, Pencil, Trash2, UserRound, X } from 'lucide-react'
 import { useAppData } from '@/app/data-context'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -16,6 +16,9 @@ import { Avatar, SignedMoney } from './parts'
 import { DebtActions } from './DebtActions'
 import { ConfirmDialog, EditPaymentDialog } from './dialogs'
 import { useDebtActions } from './use-debt-actions'
+import { ReceiptDialog } from './receipt-ui'
+import { useReceiptActions } from './use-receipts'
+import { receiptIdOf } from '@/lib/receipts/store'
 
 const PersonCalendar = lazy(() => import('./PersonCalendar').then((m) => ({ default: m.PersonCalendar })))
 
@@ -363,6 +366,7 @@ function History({ items, debts }: { items: HistoryItem[]; debts: Debt[] }) {
               </span>
             </span>
             <SignedMoney value={h.dir === 'in' ? h.amount : -h.amount} className="text-sm" />
+            {debtOf(h.debtId) && <ReceiptButton debt={debtOf(h.debtId)!} index={h.index} />}
             {canEdit && (
               <span className="-mr-2 flex">
                 <Button size="icon" variant="ghost" className="size-8" aria-label="Editar pagamento" title="Editar" onClick={() => setEditing({ debtId: h.debtId, index: h.index })}>
@@ -378,6 +382,46 @@ function History({ items, debts }: { items: HistoryItem[]; debts: Debt[] }) {
       </ul>
       {editDebt && editing && <EditPaymentDialog open onClose={() => setEditing(null)} debt={editDebt} index={editing.index} />}
       {removeDebtOf && removing && <RemovePayment debt={removeDebtOf} index={removing.index} onClose={() => setRemoving(null)} />}
+    </>
+  )
+}
+
+/** clipe (anexar) ou imagem (ver) do comprovante de um pagamento */
+function ReceiptButton({ debt, index }: { debt: Debt; index: number }) {
+  const { canEdit } = useAppData()
+  const { attach, remove } = useReceiptActions(debt)
+  const input = useRef<HTMLInputElement>(null)
+  const [open, setOpen] = useState(false)
+  const has = !!receiptIdOf(debt.payments[index])
+  const pick = () => {
+    if (input.current) input.current.value = ''
+    input.current?.click()
+  }
+  if (!has && !canEdit) return null
+  return (
+    <>
+      <Button
+        size="icon"
+        variant="ghost"
+        className="size-8"
+        aria-label={has ? 'Ver comprovante' : 'Anexar comprovante'}
+        title={has ? 'Ver comprovante' : 'Anexar comprovante'}
+        onClick={() => (has ? setOpen(true) : pick())}
+      >
+        {has ? <Image className="text-accent-text" /> : <Paperclip />}
+      </Button>
+      <input
+        ref={input}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        aria-label="Foto do comprovante"
+        onChange={(e) => {
+          const f = e.target.files?.[0]
+          if (f) void attach(index, f)
+        }}
+      />
+      {open && <ReceiptDialog debt={debt} index={index} onClose={() => setOpen(false)} onSwap={pick} onRemove={() => remove(index)} />}
     </>
   )
 }

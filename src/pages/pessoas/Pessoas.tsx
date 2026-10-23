@@ -1,10 +1,14 @@
 import { useMemo, useState } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
-import { Plus, UserRound } from 'lucide-react'
+import { Plus, Trophy, UserRound } from 'lucide-react'
 import { useAppData } from '@/app/data-context'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
+import { useToast } from '@/components/ui/toast'
+import { rankingHtml, rankingRows } from '@/lib/print/documents'
+import { openPrintWindow } from '@/lib/print/html'
+import { useDocCtx } from '@/lib/print/use-doc-ctx'
 import { buildPersonRows, peopleTotals, PEOPLE_FILTERS, type PeopleFilter, type PeopleTotals } from '@/lib/finance/people'
 import { makeDebtCalc } from '@/lib/finance/debts'
 import { plural } from '@/lib/format'
@@ -31,8 +35,10 @@ function PessoasReady({ data, today }: { data: AppData; today: string }) {
   const { id } = useParams()
   const wide = useMediaQuery('(min-width: 1024px)')
   const [params, setParams] = useSearchParams()
-  const { canCreate, readOnlyReason, result } = useAppData()
+  const { canCreate } = useAppData()
   const [creating, setCreating] = useState(false)
+  const toast = useToast()
+  const doc = useDocCtx()
   const rawF = params.get('f') as PeopleFilter | null
   const filter: PeopleFilter = rawF && PEOPLE_FILTERS.includes(rawF) ? rawF : 'abertos'
   const query = params.get('q') ?? ''
@@ -75,14 +81,28 @@ function PessoasReady({ data, today }: { data: AppData; today: string }) {
               </p>
             )}
           </div>
-          {canCreate && (
-            <Button size="sm" onClick={() => setCreating(true)}>
-              <Plus aria-hidden="true" />
-              Nova dívida
-            </Button>
-          )}
+          <div className="flex items-center gap-2">
+            {data.debts.some((d) => d.kind === 'receivable') && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  const html = rankingHtml(rankingRows(data.debts, today), { ...doc, issuedAt: new Date() })
+                  if (!openPrintWindow(html)) toast.show('Seu navegador bloqueou a nova janela. Permita pop-ups para este site e tente de novo.')
+                }}
+              >
+                <Trophy aria-hidden="true" />
+                Ranking
+              </Button>
+            )}
+            {canCreate && (
+              <Button size="sm" onClick={() => setCreating(true)}>
+                <Plus aria-hidden="true" />
+                Nova dívida
+              </Button>
+            )}
+          </div>
         </div>
-        {result?.source === 'cloud' && readOnlyReason && <p className="text-xs text-fg-subtle">{readOnlyReason}</p>}
         {hasPeople && <Metrics totals={view.totals} />}
       </header>
 

@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 import { useTheme } from './theme'
 import { useAppData } from './data-context'
+import { SyncConflictDialog } from './SyncConflictDialog'
 
 const NAV: { to: string; label: string; icon: LucideIcon }[] = [
   { to: '/', label: 'Início', icon: House },
@@ -32,10 +33,10 @@ export function AppShell() {
   const location = useLocation()
   const outlet = useOutlet()
   const { theme, toggle } = useTheme()
-  const { result, cloud } = useAppData()
+  const { result, cloud, bot, conflict } = useAppData()
   const isDemo = result?.source === 'demo'
   // aviso discreto no ícone quando a conta não respondeu (detalhe em Configurações)
-  const cloudError = cloud.status === 'error'
+  const cloudError = cloud.status === 'error' || bot.status === 'error' || !!conflict
   // anima só ao trocar de seção: /pessoas → /pessoas/:id não refaz a página inteira
   const section = '/' + (location.pathname.split('/')[1] ?? '')
 
@@ -115,6 +116,8 @@ export function AppShell() {
           </div>
         </div>
       </header>
+
+      <SyncConflictDialog />
 
       <AnimatePresence mode="wait" initial={false}>
         <motion.main
