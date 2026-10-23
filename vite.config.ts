@@ -4,9 +4,9 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { defineConfig } from 'vite'
 
-// base '/barna-bank/' para publicar no GitHub Pages (https://<usuario>.github.io/barna-bank/)
+// base '/BarnaBank/' = repositório urlmistas/BarnaBank no GitHub Pages (https://urlmistas.github.io/BarnaBank/)
 export default defineConfig({
-  base: '/barna-bank/',
+  base: '/BarnaBank/',
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },

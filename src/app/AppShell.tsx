@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 import { useTheme } from './theme'
 import { useAppData } from './data-context'
+import { AccountButton } from './AccountDialog'
 
 const NAV: { to: string; label: string; icon: LucideIcon }[] = [
   { to: '/', label: 'Início', icon: House },
@@ -87,6 +88,7 @@ export function AppShell() {
                 Demonstração
               </Badge>
             )}
+            <AccountButton />
             <Button
               variant="ghost"
               size="icon"

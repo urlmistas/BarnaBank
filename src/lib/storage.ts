@@ -12,7 +12,8 @@ import { buildDemoData } from '@/lib/demo-data'
 export const STORAGE_KEY = 'barnabank_debts_v3'
 export const SETTINGS_KEY = 'barnabank_settings_v1'
 
-export type DataSource = 'local' | 'demo' | 'empty'
+/** 'cloud' = baixado da conta (Supabase), só na memória — ver src/lib/cloud.ts */
+export type DataSource = 'local' | 'cloud' | 'demo' | 'empty'
 
 export interface LoadResult {
   data: AppData
@@ -20,7 +21,7 @@ export interface LoadResult {
   source: DataSource
 }
 
-const DEFAULT_SETTINGS: Settings = { currency: 'BRL', dateFormat: 'dmy', ownerName: '' }
+export const DEFAULT_SETTINGS: Settings = { currency: 'BRL', dateFormat: 'dmy', ownerName: '' }
 
 const ISO_RE = /^\d{4}-\d{2}-\d{2}$/
 const YM_RE = /^\d{4}-\d{2}$/

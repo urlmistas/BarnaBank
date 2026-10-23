@@ -12,26 +12,34 @@ Stack: Vite + React + TypeScript, Tailwind CSS v4, componentes no estilo shadcn/
 
 ```bash
 npm install
-npm run dev        # http://localhost:5173/barna-bank/
+npm run dev        # http://localhost:5173/BarnaBank/
 npm test           # testes da lógica (vitest)
 npm run lint       # oxlint
 npm run build      # gera dist/
-npm run preview    # serve o dist/ em http://localhost:4173/barna-bank/
+npm run preview    # serve o dist/ em http://localhost:4173/BarnaBank/
 ```
 
 ## De onde vêm os dados
 
-O app **lê** o mesmo `localStorage` do BarnaBank atual (`barnabank_debts_v3` e
-`barnabank_settings_v1`) e **nunca grava** nessas chaves. A normalização dos dados antigos
-acontece só na memória (`src/lib/storage.ts`).
+Tudo é **somente leitura**. Ordem:
+
+1. `?dados=demo` / `?dados=vazio` na URL (revisão).
+2. **Conta na nuvem** (Supabase), se você entrou pelo ícone de nuvem no topo: o app baixa a linha da sua
+   conta na tabela `bb_user_state` — a mesma que o BarnaBank atual sincroniza — e mostra esses dados.
+   Só faz `GET`; nunca grava na tabela. Os dados baixados ficam só na memória (somem ao recarregar e são
+   baixados de novo). Login próprio: a sessão do app novo fica em `bbweb_session`; a do app antigo
+   (`barnabank_sb`) não é lida nem renovada, para não derrubar o login dele. "Sair deste app" só apaga
+   `bbweb_session`. Criar conta e recuperar senha continuam no app antigo.
+3. O mesmo `localStorage` do BarnaBank atual (`barnabank_debts_v3` e `barnabank_settings_v1`), sem gravar
+   nessas chaves. A normalização acontece só na memória (`src/lib/storage.ts`).
+4. Sem nada disso → dados de **demonstração** (selo "Demonstração" no topo).
 
 - `localStorage` só é compartilhado na **mesma origem** (mesmo domínio e porta). Em
   `localhost` de desenvolvimento não haverá dados do app publicado, então aparece a
   demonstração.
-- Sem dados → dados de **demonstração** (selo "Demonstração" no topo). Nada é gravado.
 - Para revisar: `?dados=demo` força a demonstração e `?dados=vazio` força o estado vazio
-  (ex.: `http://localhost:5173/barna-bank/?dados=vazio#/`).
-- A única chave que o app novo grava é `bbweb_theme` (tema claro/escuro).
+  (ex.: `http://localhost:5173/BarnaBank/?dados=vazio#/`).
+- As únicas chaves que o app novo grava são `bbweb_theme` (tema) e `bbweb_session` (login na nuvem).
 - Se o app antigo mudar os dados em outra aba, o app novo relê automaticamente.
 - Pessoas guarda filtro e busca na URL (`#/pessoas?f=atrasados&q=ana`), não no `localStorage`.
 - Carteiras guarda o mês e o tipo de movimento do detalhe na URL
@@ -48,17 +56,14 @@ ficam em `src/index.css` (variáveis CSS mapeadas no Tailwind via `@theme`).
 
 ## Publicar no GitHub Pages
 
-O `vite.config.ts` usa `base: '/barna-bank/'` e as rotas usam `HashRouter`
-(`/barna-bank/#/pessoas`), então recarregar a página não dá 404.
+Repositório: `urlmistas/BarnaBank` → **https://urlmistas.github.io/BarnaBank/**. O `vite.config.ts` usa
+`base: '/BarnaBank/'` e as rotas usam `HashRouter` (`/BarnaBank/#/pessoas`), então recarregar não dá 404.
+O workflow `.github/workflows/deploy.yml` roda lint, testes e build e publica `dist/` a cada push na `main`
+(Settings → Pages → Source: **GitHub Actions**).
 
-1. Crie um repositório no GitHub e envie este projeto (`main`).
-2. Em **Settings → Pages → Source**, escolha **GitHub Actions**.
-3. O workflow `.github/workflows/deploy.yml` roda lint, testes e build e publica `dist/`.
-
-Atenção: se este app for publicado no **mesmo** caminho do app atual
-(`<usuario>.github.io/barna-bank/`), ele **substitui** o antigo. Para testar lado a lado,
-publique em outro repositório/caminho e ajuste `base` — mas aí os dados só aparecem se a
-origem (`<usuario>.github.io`) for a mesma, o que é o caso para repositórios do mesmo usuário.
+O app antigo fica em `urlmistas.github.io/barna-bank/`. Mesma origem (`urlmistas.github.io`), então os dois
+enxergam o mesmo `localStorage`: abrir o antigo nesse navegador já deixa os dados à vista no novo, mesmo sem
+entrar na conta.
 
 ## Estrutura
 

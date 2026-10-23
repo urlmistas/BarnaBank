@@ -31,7 +31,7 @@ const carteiras = (
   </Suspense>
 )
 
-// HashRouter: no GitHub Pages, recarregar /barna-bank/#/pessoas não dá 404.
+// HashRouter: no GitHub Pages, recarregar /BarnaBank/#/pessoas não dá 404.
 export default function App() {
   return (
     <MotionConfig reducedMotion="user">

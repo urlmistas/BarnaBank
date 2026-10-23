@@ -16,6 +16,7 @@ Linhas aproximadas de `app.js`.
 | Pessoas (somente leitura) | `personRows` ~2049, `renderPeopleList` ~2120, `applyFilterSortSearch` ~928, `renderStats` ~824, `renderPersonPage` ~1929, `buildCard` ~1123 (parcelas/histórico), `debtLabel` ~1116, `initials` ~659, `monthEvents` ~5620, `renderChart` ~920 | `src/lib/finance/people.ts`, `src/pages/pessoas` |
 | Carteiras (somente leitura) | `renderWalletsPage` ~4061, `buildWalletCard` ~4077, `walletEvents` ~127, `cardUsed` ~3200, fatura do mês (aba Cartões ~3368), `walletIconKey` ~73 | `src/lib/finance/wallets.ts`, `cardUsed` em `bills-cards.ts`, `src/pages/carteiras` |
 | Relatórios (somente leitura) | `renderRelatorios` ~3948, `renderCategoryBars` ~3925, `monthSpending` ~4536, `renderSpendBars` ~4565, `renderMixChart` ~4666, `renderRelCards` ~4703, `renderCompare` ~7384, `renderEvoChart` ~4040, empréstimos no período ~3972 | `src/lib/finance/reports.ts`, `src/pages/relatorios` |
+| Conta na nuvem (somente leitura) | `sbFetch`/`sbToken` ~8266, login ~8340, `sbPull` ~8395, `SB_ERRS` ~8291 | `src/lib/cloud.ts`, `src/app/AccountDialog.tsx`, `data-context.tsx` |
 | Contas (somente leitura) | `renderContasPage` ~3327 (contas fixas, faturas, 4 medidas), `billTxOf` ~3059, `billStatus` ~3052, `cardInvoices` ~3160, `cardUsed` ~3200 | `src/lib/finance/contas.ts`, `src/pages/contas` |
 
 Ficaram de fora do Início (por decisão de redesenho): previsão do fim do mês
@@ -45,7 +46,8 @@ O que falta:
    repetem" (`detectSubs` ~7766, heurística), "Resumo do mês" em imagem (`btnMonthImage`), alertas de
    gastos fora do padrão (`spendingAlerts` ~7404).
 4. **Transversais**: configurações (`SETTINGS_KEY`, ~9–40), busca geral, simulador, backup (`buildBackup`
-   ~367), PWA (manifest ~3884), sincronização na nuvem/Supabase (~6353, ~8415), links públicos (`shares`),
+   ~367), PWA (manifest ~3884), **envio** para a nuvem (`sbPush` ~8410, conflito "Qual versão manter?" ~8440;
+   a **leitura** já existe), criar conta/recuperar senha (~8350), nuvem do bot (`cloudPush` ~6353), links públicos (`shares`),
    bot do Telegram (`tgLog`), "olhinho" que esconde valores, atalhos de teclado (~3467).
 
 ### Pessoas: decisões de redesenho e lógica duvidosa
@@ -186,6 +188,19 @@ O que falta:
 - Demonstração: 12 meses de histórico (salário, moradia, mercado, casa, transporte, lazer, investimentos);
   `t1`/`t2` ganharam `auto: 'bill:…'` (como o antigo grava ao marcar conta paga); `t0b`/`t0d` viraram
   "Investimentos" e `t2` virou "Moradia" (nota "Aluguel"). Saldos do Início/Carteiras mudam na demonstração.
+
+### Conta na nuvem: decisões e lógica duvidosa
+
+- **Só leitura**: login por senha (`/auth/v1/token`) e `GET /rest/v1/bb_user_state`. Não há `POST/PATCH` na
+  tabela (há teste garantindo). Os dados baixados passam pelo mesmo `parseAppData` do `localStorage`.
+- **Sessão própria** em `bbweb_session` (tokens, nunca a senha). A do antigo (`barnabank_sb`) é ignorada: o
+  Supabase troca o refresh token a cada renovação, e renovar a sessão do antigo o desconectaria.
+- **Prioridade**: dados da conta (se houver) > `localStorage` > demonstração. Se a conta não tem dados ou a
+  rede falha, mostra os do aparelho e avisa na janela da conta. Sessão inválida (400/401/403) → sai da conta.
+- **Dados só na memória**: cada abertura baixa de novo (sem internet, ficam os do aparelho).
+- **Duvidoso**: se o app antigo deste aparelho tem mudanças ainda não enviadas, o novo mostra a versão da conta
+  (mais antiga). O antigo resolveria com "Qual versão manter?"; o novo não pergunta.
+- A chave publicável do Supabase está no código (como no antigo); o acesso depende do RLS da tabela.
 
 ## Antes de gravar dados
 
