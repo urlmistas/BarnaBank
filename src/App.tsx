@@ -1,9 +1,18 @@
+import { lazy, Suspense } from 'react'
 import { HashRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { MotionConfig } from 'motion/react'
 import { DataProvider } from '@/app/data-context'
 import { AppShell } from '@/app/AppShell'
 import { Inicio } from '@/pages/inicio/Inicio'
 import { Placeholder } from '@/pages/Placeholder'
+
+// Pessoas em chunk próprio (o Início continua no bundle principal)
+const Pessoas = lazy(() => import('@/pages/pessoas/Pessoas').then((m) => ({ default: m.Pessoas })))
+const pessoas = (
+  <Suspense fallback={null}>
+    <Pessoas />
+  </Suspense>
+)
 
 // HashRouter: no GitHub Pages, recarregar /barna-bank/#/pessoas não dá 404.
 export default function App() {
@@ -14,10 +23,8 @@ export default function App() {
           <Routes>
             <Route element={<AppShell />}>
               <Route index element={<Inicio />} />
-              <Route
-                path="pessoas"
-                element={<Placeholder title="Pessoas" description="Empréstimos e dívidas por pessoa e por grupo, com parcelas, histórico e registro de pagamento." />}
-              />
+              <Route path="pessoas" element={pessoas} />
+              <Route path="pessoas/:id" element={pessoas} />
               <Route
                 path="carteiras"
                 element={<Placeholder title="Carteiras" description="Saldo de cada carteira, lançamentos, transferências e recorrentes." />}

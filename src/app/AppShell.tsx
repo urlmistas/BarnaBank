@@ -34,6 +34,8 @@ export function AppShell() {
   const { theme, toggle } = useTheme()
   const { result } = useAppData()
   const isDemo = result?.source === 'demo'
+  // anima só ao trocar de seção: /pessoas → /pessoas/:id não refaz a página inteira
+  const section = '/' + (location.pathname.split('/')[1] ?? '')
 
   return (
     <div className="min-h-dvh bg-bg text-fg">
@@ -101,7 +103,7 @@ export function AppShell() {
       <AnimatePresence mode="wait" initial={false}>
         <motion.main
           id="conteudo"
-          key={location.pathname}
+          key={section}
           tabIndex={-1}
           className="mx-auto max-w-[1120px] px-4 pt-6 pb-28 outline-none md:px-6 md:pt-10 md:pb-16"
           initial={{ opacity: 0, y: 4 }}
