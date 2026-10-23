@@ -15,7 +15,7 @@ const debt = (over: Partial<Debt> = {}): Debt => ({
 })
 
 const api = (over: Partial<StoreApi> = {}): StoreApi => ({
-  debts: [], contacts: {}, wallets: [], transactions: [], groups: [], bills: [], cards: [], cardPurchases: [], cardPayments: [], ...over,
+  debts: [], contacts: {}, wallets: [], transactions: [], groups: [], bills: [], cards: [], cardPurchases: [], cardPayments: [], raw: {}, ...over,
 })
 
 describe('carteira', () => {
