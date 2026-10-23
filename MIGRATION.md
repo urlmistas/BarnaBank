@@ -16,6 +16,7 @@ Linhas aproximadas de `app.js`.
 | Pessoas (somente leitura) | `personRows` ~2049, `renderPeopleList` ~2120, `applyFilterSortSearch` ~928, `renderStats` ~824, `renderPersonPage` ~1929, `buildCard` ~1123 (parcelas/histórico), `debtLabel` ~1116, `initials` ~659, `monthEvents` ~5620, `renderChart` ~920 | `src/lib/finance/people.ts`, `src/pages/pessoas` |
 | Carteiras (somente leitura) | `renderWalletsPage` ~4061, `buildWalletCard` ~4077, `walletEvents` ~127, `cardUsed` ~3200, fatura do mês (aba Cartões ~3368), `walletIconKey` ~73 | `src/lib/finance/wallets.ts`, `cardUsed` em `bills-cards.ts`, `src/pages/carteiras` |
 | Relatórios (somente leitura) | `renderRelatorios` ~3948, `renderCategoryBars` ~3925, `monthSpending` ~4536, `renderSpendBars` ~4565, `renderMixChart` ~4666, `renderRelCards` ~4703, `renderCompare` ~7384, `renderEvoChart` ~4040, empréstimos no período ~3972 | `src/lib/finance/reports.ts`, `src/pages/relatorios` |
+| Configurações (só o que vale para o app novo) | `DEFAULT_SETTINGS` ~9, `#settingsOverlay` (index.html ~715) | `src/pages/configuracoes`, `src/lib/prefs.ts`, `src/app/theme.tsx` |
 | Conta na nuvem (somente leitura) | `sbFetch`/`sbToken` ~8266, login ~8340, `sbPull` ~8395, `SB_ERRS` ~8291 | `src/lib/cloud.ts`, `src/app/AccountDialog.tsx`, `data-context.tsx` |
 | Contas (somente leitura) | `renderContasPage` ~3327 (contas fixas, faturas, 4 medidas), `billTxOf` ~3059, `billStatus` ~3052, `cardInvoices` ~3160, `cardUsed` ~3200 | `src/lib/finance/contas.ts`, `src/pages/contas` |
 
@@ -45,7 +46,7 @@ O que falta:
 3. **Relatórios — ficou de fora**: orçamento do mês (precisa de `budgets`), "Assinaturas e gastos que se
    repetem" (`detectSubs` ~7766, heurística), "Resumo do mês" em imagem (`btnMonthImage`), alertas de
    gastos fora do padrão (`spendingAlerts` ~7404).
-4. **Transversais**: configurações (`SETTINGS_KEY`, ~9–40), busca geral, simulador, backup (`buildBackup`
+4. **Transversais**: campos de Configurações que só servem para escrever (abaixo), busca geral, simulador, backup (`buildBackup`
    ~367), PWA (manifest ~3884), **envio** para a nuvem (`sbPush` ~8410, conflito "Qual versão manter?" ~8440;
    a **leitura** já existe), criar conta/recuperar senha (~8350), nuvem do bot (`cloudPush` ~6353), links públicos (`shares`),
    bot do Telegram (`tgLog`), "olhinho" que esconde valores, atalhos de teclado (~3467).
@@ -201,6 +202,18 @@ O que falta:
 - **Duvidoso**: se o app antigo deste aparelho tem mudanças ainda não enviadas, o novo mostra a versão da conta
   (mais antiga). O antigo resolveria com "Qual versão manter?"; o novo não pergunta.
 - A chave publicável do Supabase está no código (como no antigo); o acesso depende do RLS da tabela.
+
+### Configurações: decisões
+
+- Ficou só o que o app novo usa: **conta na nuvem** (entrar/atualizar/sair; o ícone de nuvem do topo saiu,
+  a engrenagem leva para cá e ganha um ponto vermelho se a conta não respondeu), **tema** (Sistema/Claro/
+  Escuro), **moeda** e **formato de data**, **de onde vêm os dados** e link para o app atual, e a versão (commit).
+- Moeda e data: padrão "Como no BarnaBank" (lê `barnabank_settings_v1` ou o `settings` da conta). Escolher
+  outra grava só em `bbweb_prefs` e vale só no app novo; o antigo não muda.
+- **Não vieram** (só servem para criar/editar, e o app é só leitura): juros/multa/mora padrão, chave PIX/tipo/
+  cidade/nome, carteira padrão, confirmar antes de excluir, lembrete de backup, exportar/importar backup
+  (exportar daqui sairia incompleto: o leitor ainda não carrega `budgets`, `goals`, `recurring` etc.), dica
+  de "Adicionar à tela inicial" (sem PWA ainda).
 
 ## Antes de gravar dados
 

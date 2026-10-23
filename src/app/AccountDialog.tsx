@@ -1,26 +1,11 @@
-import { useEffect, useId, useRef, useState, type FormEvent } from 'react'
-import { Cloud, CloudOff, Eye, EyeOff, RefreshCw, X } from 'lucide-react'
+import { useEffect, useId, useState, type FormEvent } from 'react'
+import { Eye, EyeOff, RefreshCw, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
 import { useAppData } from './data-context'
 
-/** Botão do cabeçalho + janela da conta (login só para LER os dados da nuvem). */
-export function AccountButton() {
-  const { cloud } = useAppData()
-  const ref = useRef<HTMLDialogElement>(null)
-  const on = cloud.status !== 'off'
-  const label = on ? `Conta: ${cloud.email || 'conectada'}` : 'Entrar na conta'
-  return (
-    <>
-      <Button variant="ghost" size="icon" aria-label={label} title={label} aria-haspopup="dialog" onClick={() => ref.current?.showModal()}>
-        {on ? <Cloud className={cn(cloud.status === 'error' && 'text-neg')} /> : <CloudOff />}
-      </Button>
-      <AccountDialog dialogRef={ref} />
-    </>
-  )
-}
-
+/** Janela de login da conta (só para LER os dados da nuvem). Aberta por Configurações. */
 function fmtWhen(iso?: string) {
   if (!iso) return ''
   const d = new Date(iso)
@@ -28,7 +13,7 @@ function fmtWhen(iso?: string) {
   return d.toLocaleDateString('pt-BR') + ' às ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
 }
 
-function AccountDialog({ dialogRef }: { dialogRef: React.RefObject<HTMLDialogElement | null> }) {
+export function AccountDialog({ dialogRef }: { dialogRef: React.RefObject<HTMLDialogElement | null> }) {
   const { cloud, signIn, signOut, refreshCloud } = useAppData()
   const titleId = useId()
   const emailId = useId()

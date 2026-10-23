@@ -5,6 +5,8 @@ import {
 } from '@/lib/cloud'
 import { toISO } from '@/lib/finance/dates'
 import { makeDate, makeMoney } from '@/lib/format'
+import { applyPrefs, readPrefs, writePrefs, type DisplayPrefs } from '@/lib/prefs'
+import type { Settings } from '@/lib/types'
 
 export interface CloudState {
   status: 'off' | 'loading' | 'ok' | 'error'
@@ -22,6 +24,10 @@ interface DataState {
   today: string
   money: (v: number) => string
   date: (iso: string) => string
+  /** configurações vindas dos dados (app antigo ou conta), antes das preferências deste app */
+  baseSettings: Settings
+  prefs: DisplayPrefs
+  setPrefs: (p: DisplayPrefs) => void
   cloud: CloudState
   signIn: (email: string, password: string) => Promise<string | null>
   signOut: () => void
@@ -41,6 +47,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
     return s ? { status: 'loading', email: s.email } : { status: 'off' }
   })
   const session = useRef<CloudSession | null>(forced() ? null : readSession())
+  const [prefs, setPrefsState] = useState<DisplayPrefs>(() => readPrefs())
+  const setPrefs = useCallback((p: DisplayPrefs) => {
+    writePrefs(p)
+    setPrefsState(p)
+  }, [])
 
   // baixa os dados da conta (GET); erro de sessão → sai da conta e volta para os dados do aparelho
   const pull = useCallback(async () => {
@@ -115,19 +126,23 @@ export function DataProvider({ children }: { children: ReactNode }) {
     // ordem: ?dados= força demonstração/vazio > conta na nuvem > dados do aparelho > demonstração
     const waiting = !local || (cloud.status === 'loading' && !cloudResult && !forced())
     const result = forced() ? local : (cloudResult ?? local)
-    const settings = result?.settings ?? DEFAULT_SETTINGS
+    const baseSettings = result?.settings ?? DEFAULT_SETTINGS
+    const settings = applyPrefs(baseSettings, prefs)
     return {
       status: waiting ? 'loading' : 'ready',
       result: waiting ? null : result,
       today,
       money: makeMoney(settings),
       date: makeDate(settings),
+      baseSettings,
+      prefs,
+      setPrefs,
       cloud,
       signIn,
       signOut,
       refreshCloud: () => void pull(),
     }
-  }, [local, cloudResult, cloud, today, signIn, signOut, pull])
+  }, [local, cloudResult, cloud, today, signIn, signOut, pull, prefs, setPrefs])
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
 }

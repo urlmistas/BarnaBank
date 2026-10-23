@@ -24,6 +24,12 @@ const relatorios = (
     <Relatorios />
   </Suspense>
 )
+const Configuracoes = lazy(() => import('@/pages/configuracoes/Configuracoes').then((m) => ({ default: m.Configuracoes })))
+const configuracoes = (
+  <Suspense fallback={null}>
+    <Configuracoes />
+  </Suspense>
+)
 const Carteiras = lazy(() => import('@/pages/carteiras/Carteiras').then((m) => ({ default: m.Carteiras })))
 const carteiras = (
   <Suspense fallback={null}>
@@ -47,6 +53,7 @@ export default function App() {
               <Route path="contas" element={contas} />
               <Route path="contas/:id" element={contas} />
               <Route path="relatorios" element={relatorios} />
+              <Route path="configuracoes" element={configuracoes} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Route>
           </Routes>

@@ -1,12 +1,11 @@
 import { NavLink, useLocation, useOutlet } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
-import { ChartColumn, House, Moon, Receipt, Sun, Users, Wallet, type LucideIcon } from 'lucide-react'
+import { ChartColumn, House, Moon, Receipt, Settings, Sun, Users, Wallet, type LucideIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 import { useTheme } from './theme'
 import { useAppData } from './data-context'
-import { AccountButton } from './AccountDialog'
 
 const NAV: { to: string; label: string; icon: LucideIcon }[] = [
   { to: '/', label: 'Início', icon: House },
@@ -33,8 +32,10 @@ export function AppShell() {
   const location = useLocation()
   const outlet = useOutlet()
   const { theme, toggle } = useTheme()
-  const { result } = useAppData()
+  const { result, cloud } = useAppData()
   const isDemo = result?.source === 'demo'
+  // aviso discreto no ícone quando a conta não respondeu (detalhe em Configurações)
+  const cloudError = cloud.status === 'error'
   // anima só ao trocar de seção: /pessoas → /pessoas/:id não refaz a página inteira
   const section = '/' + (location.pathname.split('/')[1] ?? '')
 
@@ -88,7 +89,6 @@ export function AppShell() {
                 Demonstração
               </Badge>
             )}
-            <AccountButton />
             <Button
               variant="ghost"
               size="icon"
@@ -98,6 +98,20 @@ export function AppShell() {
             >
               {theme === 'dark' ? <Sun /> : <Moon />}
             </Button>
+            <NavLink
+              to="/configuracoes"
+              aria-label="Configurações"
+              title="Configurações"
+              className={({ isActive }) =>
+                cn(
+                  'relative inline-flex size-9 items-center justify-center rounded-sm transition-colors hover:bg-surface-2 hover:text-fg [&_svg]:size-4',
+                  isActive ? 'text-fg' : 'text-fg-muted',
+                )
+              }
+            >
+              <Settings aria-hidden="true" />
+              {cloudError && <span aria-hidden="true" className="absolute top-2 right-2 size-1.5 rounded-full bg-neg" />}
+            </NavLink>
           </div>
         </div>
       </header>

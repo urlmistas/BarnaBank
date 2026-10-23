@@ -11,6 +11,7 @@
       // aplica o tema antes de pintar, para não piscar
       try {
         var t = localStorage.getItem('bbweb_theme');
+        if (t === 'system') t = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
         if (t === 'light') document.documentElement.classList.remove('dark');
       } catch (e) {}
     </script>

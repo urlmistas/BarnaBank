@@ -1,7 +1,7 @@
 # BarnaBank — redesign (React)
 
 Nova interface do BarnaBank, feita em paralelo ao app atual. As cinco telas estão redesenhadas —
-**Início**, **Pessoas**, **Carteiras**, **Contas** e **Relatórios** — todas **só leitura**. Faltam as ações de
+**Início**, **Pessoas**, **Carteiras**, **Contas** e **Relatórios** — todas **só leitura** — além de **Configurações**. Faltam as ações de
 escrita, os campos `budgets`/`goals`/`recurring`/`shares` do armazenamento, PWA, sincronização na nuvem e o
 bot do Telegram — veja [MIGRATION.md](MIGRATION.md).
 
@@ -24,7 +24,7 @@ npm run preview    # serve o dist/ em http://localhost:4173/BarnaBank/
 Tudo é **somente leitura**. Ordem:
 
 1. `?dados=demo` / `?dados=vazio` na URL (revisão).
-2. **Conta na nuvem** (Supabase), se você entrou pelo ícone de nuvem no topo: o app baixa a linha da sua
+2. **Conta na nuvem** (Supabase), se você entrou em **Configurações** (engrenagem no topo): o app baixa a linha da sua
    conta na tabela `bb_user_state` — a mesma que o BarnaBank atual sincroniza — e mostra esses dados.
    Só faz `GET`; nunca grava na tabela. Os dados baixados ficam só na memória (somem ao recarregar e são
    baixados de novo). Login próprio: a sessão do app novo fica em `bbweb_session`; a do app antigo
@@ -39,7 +39,8 @@ Tudo é **somente leitura**. Ordem:
   demonstração.
 - Para revisar: `?dados=demo` força a demonstração e `?dados=vazio` força o estado vazio
   (ex.: `http://localhost:5173/BarnaBank/?dados=vazio#/`).
-- As únicas chaves que o app novo grava são `bbweb_theme` (tema) e `bbweb_session` (login na nuvem).
+- As únicas chaves que o app novo grava são `bbweb_theme` (tema), `bbweb_prefs` (moeda/data escolhidas em
+  Configurações) e `bbweb_session` (login na nuvem).
 - Se o app antigo mudar os dados em outra aba, o app novo relê automaticamente.
 - Pessoas guarda filtro e busca na URL (`#/pessoas?f=atrasados&q=ana`), não no `localStorage`.
 - Carteiras guarda o mês e o tipo de movimento do detalhe na URL
@@ -49,9 +50,11 @@ Tudo é **somente leitura**. Ordem:
 - Contas guarda mês, filtro e busca na URL (`#/contas?m=2026-09&f=atrasadas&q=luz`); o detalhe
   é `#/contas/fixa-<id>` (conta fixa) ou `#/contas/cartao-<id>` (fatura do cartão).
 
-## Tema
+## Tema e Configurações
 
-Escuro por padrão; botão no topo alterna para o claro. Tokens de cor, tipografia e raios
+Escuro por padrão; o botão no topo alterna claro/escuro e Configurações (`#/configuracoes`) também tem
+"Sistema" (segue o aparelho). Configurações tem só o que vale para este app: conta na nuvem, tema, moeda e
+formato de data (padrão = o do BarnaBank atual) e de onde vêm os dados. Tokens de cor, tipografia e raios
 ficam em `src/index.css` (variáveis CSS mapeadas no Tailwind via `@theme`).
 
 ## Publicar no GitHub Pages
