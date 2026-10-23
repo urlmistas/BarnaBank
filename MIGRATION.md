@@ -1,4 +1,4 @@
-# Migração — telas que faltam
+# Migração — estado e o que falta
 
 Referência: app antigo (`index.html`, `app.css`, `app.js` ES5 com ~8500 linhas).
 Linhas aproximadas de `app.js`.
@@ -15,6 +15,7 @@ Linhas aproximadas de `app.js`.
 | Início | `renderDashboard` ~4010, `renderWeek` ~2244, fontes da semana ~2211 e ~3438, `renderTodayBanner` ~4507, `renderHomeSide` ~5561 | `src/lib/finance/dashboard.ts`, `src/pages/inicio` |
 | Pessoas (somente leitura) | `personRows` ~2049, `renderPeopleList` ~2120, `applyFilterSortSearch` ~928, `renderStats` ~824, `renderPersonPage` ~1929, `buildCard` ~1123 (parcelas/histórico), `debtLabel` ~1116, `initials` ~659, `monthEvents` ~5620, `renderChart` ~920 | `src/lib/finance/people.ts`, `src/pages/pessoas` |
 | Carteiras (somente leitura) | `renderWalletsPage` ~4061, `buildWalletCard` ~4077, `walletEvents` ~127, `cardUsed` ~3200, fatura do mês (aba Cartões ~3368), `walletIconKey` ~73 | `src/lib/finance/wallets.ts`, `cardUsed` em `bills-cards.ts`, `src/pages/carteiras` |
+| Relatórios (somente leitura) | `renderRelatorios` ~3948, `renderCategoryBars` ~3925, `monthSpending` ~4536, `renderSpendBars` ~4565, `renderMixChart` ~4666, `renderRelCards` ~4703, `renderCompare` ~7384, `renderEvoChart` ~4040, empréstimos no período ~3972 | `src/lib/finance/reports.ts`, `src/pages/relatorios` |
 | Contas (somente leitura) | `renderContasPage` ~3327 (contas fixas, faturas, 4 medidas), `billTxOf` ~3059, `billStatus` ~3052, `cardInvoices` ~3160, `cardUsed` ~3200 | `src/lib/finance/contas.ts`, `src/pages/contas` |
 
 Ficaram de fora do Início (por decisão de redesenho): previsão do fim do mês
@@ -25,26 +26,27 @@ Podem voltar dentro de Relatórios/Pessoas.
 
 ## Falta portar
 
-1. **Pessoas — o que falta** (a lista e o detalhe já estão no app novo, só leitura):
-   ações de dívida (nova/editar/excluir, pagamento rápido/parcial `quickPay` ~1057, quitar com
-   desconto, mais prazo, renegociar, desfazer pagamento, comprovantes), cartão de grupo
-   (`groupStats` ~2456, `buildGroupCard`), cobrança por WhatsApp (`whatsappMessage` ~678),
-   links públicos, Telegram, etiquetas/notas da pessoa (`personExtraHtml` ~5463), confiança
-   (`trustInfo` ~7866), ordenação alternativa (`sortSel`), dividir conta, placar.
-2. **Carteiras — o que falta** (lista e detalhe já estão no app novo, só leitura): nova/editar/
-   excluir carteira (modal ~4173), novo/editar/excluir lançamento e transferência (~4221, desfazer),
-   importar extrato OFX/CSV, lançamentos recorrentes (`recurring`, ~5258/5271) e metas de economia
-   (`goals`, ~4792) — as duas últimas eram abas de Carteiras no antigo.
-3. **Contas — o que falta** (lista e detalhe já estão no app novo, só leitura): nova/editar/excluir
-   conta fixa (`billDialog` ~3102), marcar paga/recebida e desfazer (`payBillDialog` ~3063,
-   `markBillPaid`, `unmarkBill`), novo/editar/excluir cartão (`cardDialog` ~3206), nova/excluir compra
-   (`purchaseDialog` ~3240), pagar fatura (`payInvoiceDialog` ~3278), "Cabe no mês?" (`btnFits`) e a
-   aba Calendário (`monthEvents` ~5620, `renderCalendar` ~5659).
-4. **Relatórios** (`#pageRelatorios` ~245): `monthSpending` ~4536, `renderSpendBars` ~4565,
-   orçamentos, metas, placar (`boardData` ~7449), gráfico de evolução (`renderEvoChart` ~4040).
-5. **Transversais**: configurações (`SETTINGS_KEY`, ~9–40), busca geral, simulador, backup
-   (`buildBackup` ~367), sincronização na nuvem/Supabase (~6353, ~8415), links públicos
-   (`shares`), bot do Telegram (`tgLog`), atalhos de teclado (~3467).
+As **cinco telas** (Início, Pessoas, Carteiras, Contas, Relatórios) já estão no app novo, **só leitura**.
+O que falta:
+
+1. **Ações de escrita** (todas as telas). Pessoas: nova/editar/excluir dívida, pagamento rápido/parcial
+   (`quickPay` ~1057), quitar com desconto, mais prazo, renegociar, desfazer pagamento, comprovantes,
+   cartão de grupo (`groupStats` ~2456), cobrança por WhatsApp (`whatsappMessage` ~678), etiquetas/notas
+   (`personExtraHtml` ~5463), confiança (`trustInfo` ~7866), ordenação alternativa, dividir conta, placar.
+   Carteiras: nova/editar/excluir carteira (~4173), lançamento e transferência (~4221), importar extrato
+   OFX/CSV. Contas: conta fixa (`billDialog` ~3102), marcar paga/desfazer (`payBillDialog` ~3063), cartão
+   (`cardDialog` ~3206), compra (`purchaseDialog` ~3240), pagar fatura (`payInvoiceDialog` ~3278),
+   "Cabe no mês?" e aba Calendário (`renderCalendar` ~5659). Relatórios: definir orçamento (`budgetDialog` ~4630).
+2. **Campos do armazenamento ainda não lidos** por `src/lib/storage.ts`: `budgets` (orçamento do mês,
+   `budgetStatus` ~4590), `goals` (metas, `goalInfo` ~4735), `recurring` (lançamentos recorrentes ~5258),
+   `shares` (links públicos), `nudges`, `tgLog`, `catRules`, `invites`. Sem eles não há "Orçamento do mês"
+   nem metas no app novo.
+3. **Relatórios — ficou de fora**: orçamento do mês (precisa de `budgets`), "Assinaturas e gastos que se
+   repetem" (`detectSubs` ~7766, heurística), "Resumo do mês" em imagem (`btnMonthImage`), alertas de
+   gastos fora do padrão (`spendingAlerts` ~7404).
+4. **Transversais**: configurações (`SETTINGS_KEY`, ~9–40), busca geral, simulador, backup (`buildBackup`
+   ~367), PWA (manifest ~3884), sincronização na nuvem/Supabase (~6353, ~8415), links públicos (`shares`),
+   bot do Telegram (`tgLog`), "olhinho" que esconde valores, atalhos de teclado (~3467).
 
 ### Pessoas: decisões de redesenho e lógica duvidosa
 
@@ -144,6 +146,46 @@ Podem voltar dentro de Relatórios/Pessoas.
 - Demonstração: novas contas fixas (Aluguel paga pela transação t2, Energia atrasada, Salário como
   receita recebida), descrições nas compras, uma compra a mais e a fatura do mês passado paga. Isso
   muda um pouco os números do Início/Carteiras na demonstração.
+
+### Relatórios: decisões de redesenho e lógica duvidosa
+
+- **Um gráfico por vez** (o antigo empilhava ~8 cartões em 3 seções). Período no topo (Mês / 3 meses /
+  12 meses / Ano; as setas pulam o período inteiro; "Atual" volta ao de hoje) e três medidas: **Entradas**,
+  **Gastos**, **Saldo do período**, com as definições do antigo (Entradas = lançamentos de entrada;
+  Gastos = `monthSpending`). A variação vem em texto discreto ("+5% vs setembro"; no saldo, a diferença em
+  reais). Sem comparação quando o período anterior começa antes do primeiro dado.
+- **Ano** = janeiro a dezembro; no ano corrente, só até o mês de hoje, comparado aos mesmos meses do ano
+  anterior. Navegação: do mês do primeiro dado até o mês de hoje (o antigo andava mês a mês sem limite).
+- **Abas** (`?g=`), cada uma com tabela ("Ver tabela", `?ver=tabela`) e lista ordenada (8 linhas + "Ver todas"):
+
+  | Aba | Cartões antigos | Lista abaixo |
+  |---|---|---|
+  | Entrou × saiu | medidas do topo mês a mês (novo como gráfico) + **Entradas por categoria** | entradas por categoria |
+  | Saldo | Evolução do saldo em carteiras (`renderEvoChart`), recortada no período | carteiras no fim do período |
+  | Categorias | Gastos por categoria + **Comparando os meses** (juntados: variação em cada linha) | categorias |
+  | Fixas × cartão | Contas fixas, cartão e outros gastos (`renderMixChart`) | os três tipos |
+  | Empréstimos | Empréstimos no período (2 números) → por pessoa | pessoas (link para Pessoas) |
+  | Cartões | Faturas do mês por cartão (`renderRelCards`) + total por mês (novo) | cartões (link para a fatura) |
+
+  Abas sem dado de origem somem (sem carteira → sem Saldo; sem dívida → sem Empréstimos; sem cartão → sem Cartões).
+- **Barras por mês** mostram no mínimo 6 meses (como o `renderMixChart`): meses antes do período ficam
+  esmaecidos e fora das medidas. Cores: dourado + dois cinzas (`--chart-*`); verde/vermelho só em valores com
+  sinal. O validador do dataviz acusa "cinza sem croma" (é o pedido) e contraste < 3:1 do cinza claro;
+  compensado com legenda com valores, fresta de 2px entre segmentos e a tabela.
+- **Removidos**: orçamento (sem `budgets` no leitor), assinaturas (`detectSubs`, heurística), "Resumo do mês"
+  em imagem (sem exportar/imprimir nesta entrega).
+- **Lógica duvidosa (portada igual)**: a parcela do cartão conta no **mês da compra + n**, não no mês da
+  fatura (difere de Contas). Conta fixa marcada sem carteira (`'x'`) conta o valor cadastrado. Gastos de
+  Relatórios ≠ "Saiu" do Início: o Início soma movimentos das carteiras (inclui pagamentos de dívida e de
+  fatura, não as compras no cartão); Relatórios usa `monthSpending`. Entradas não incluem recebimentos de
+  empréstimo (ficam na aba Empréstimos). Gasto sem `auto` lançado à mão para pagar fatura conta duas vezes.
+- **Diferenças deliberadas**: entradas sem categoria viram "Outros" e categorias iguais sem acento/maiúsculas
+  se somam (o antigo mostrava "undefined" e separava); valor não numérico é ignorado (no antigo virava NaN).
+  Cartões: o valor do período é a soma das **compras** nas faturas, sem o saldo que rolou de uma fatura para
+  outra (o antigo mostrava o total da fatura do mês, com o saldo anterior).
+- Demonstração: 12 meses de histórico (salário, moradia, mercado, casa, transporte, lazer, investimentos);
+  `t1`/`t2` ganharam `auto: 'bill:…'` (como o antigo grava ao marcar conta paga); `t0b`/`t0d` viraram
+  "Investimentos" e `t2` virou "Moradia" (nota "Aluguel"). Saldos do Início/Carteiras mudam na demonstração.
 
 ## Antes de gravar dados
 

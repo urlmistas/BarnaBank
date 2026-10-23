@@ -1,5 +1,5 @@
-import type { AppData, Debt, ISODate } from '@/lib/types'
-import { addDaysISO, parseISO, ymAdd, ymOf } from '@/lib/finance/dates'
+import type { AppData, Debt, ISODate, Transaction } from '@/lib/types'
+import { addDaysISO, dayIn, parseISO, ymAdd, ymOf } from '@/lib/finance/dates'
 import { cardInvoices } from '@/lib/finance/bills-cards'
 
 // Dados fictícios para revisar a interface quando não há nada no localStorage.
@@ -12,6 +12,35 @@ function debt(p: Partial<Debt> & Pick<Debt, 'id' | 'name' | 'principal' | 'date'
     dueDay: parseISO(p.date).getDate(), payments: [], discount: 0, lateFeePct: 0, lateInterestPct: 0, notes: '',
     ...p,
   } as Debt
+}
+
+/**
+ * Histórico para os Relatórios: de 3 a 12 meses atrás, salário e gastos do dia a dia; nos 2 meses
+ * anteriores ao atual, só os gastos do dia a dia (salário, aluguel e academia já vêm de t0/t0c e das contas fixas).
+ */
+function history(ym: string): Transaction[] {
+  const out: Transaction[] = []
+  for (let i = 1; i <= 12; i++) {
+    const k = ymAdd(ym, -i)
+    const tx = (id: string, type: Transaction['type'], amount: number, day: number, category: string): Transaction => ({
+      id: 'h' + i + '-' + id, walletId: 'w1', type, amount, date: dayIn(k, day), category,
+    })
+    out.push(
+      tx('mer', 'gasto', 820 + ((i * 37) % 180) + 0.9, 9, 'Mercado'),
+      tx('tra', 'gasto', 260 + ((i * 17) % 120), 14, 'Transporte'),
+      tx('laz', 'gasto', 180 + ((i * 53) % 260) + 0.5, 20, 'Lazer'),
+    )
+    if (i <= 2) continue
+    out.push(
+      tx('sal', 'entrada', 6200, 5, 'Salário'),
+      tx('alu', 'gasto', 1850, 6, 'Moradia'),
+      tx('cas', 'gasto', 410 + ((i * 23) % 90) + 0.35, 11, 'Casa'),
+      tx('sau', 'gasto', 99, 12, 'Saúde'),
+      tx('inv', 'gasto', i % 2 ? 1200 : 1800, 25, 'Investimentos'),
+    )
+    if (i % 3 === 0) out.push(tx('fre', 'entrada', 400, 18, 'Freela'))
+  }
+  return out
 }
 
 export function buildDemoData(today: ISODate): AppData {
@@ -28,12 +57,13 @@ export function buildDemoData(today: ISODate): AppData {
       { id: 'w3', name: 'Dinheiro', icon: 'banknote' },
     ],
     transactions: [
+      ...history(ym),
       { id: 't0', walletId: 'w1', type: 'entrada', amount: 6200, date: d(-62), category: 'Salário' },
-      { id: 't0b', walletId: 'w1', type: 'gasto', amount: 2380.4, date: d(-50), category: 'Moradia' },
+      { id: 't0b', walletId: 'w1', type: 'gasto', amount: 2380.4, date: d(-50), category: 'Investimentos' },
       { id: 't0c', walletId: 'w1', type: 'entrada', amount: 6200, date: d(-32), category: 'Salário' },
-      { id: 't0d', walletId: 'w1', type: 'gasto', amount: 3150.9, date: d(-20), category: 'Moradia' },
-      { id: 't1', walletId: 'w1', type: 'entrada', amount: 6200, date: thisMonth(5), category: 'Salário' },
-      { id: 't2', walletId: 'w1', type: 'gasto', amount: 1850, date: thisMonth(6), category: 'Aluguel' },
+      { id: 't0d', walletId: 'w1', type: 'gasto', amount: 3150.9, date: d(-20), category: 'Investimentos' },
+      { id: 't1', walletId: 'w1', type: 'entrada', amount: 6200, date: thisMonth(5), category: 'Salário', auto: 'bill:b5:' + ym },
+      { id: 't2', walletId: 'w1', type: 'gasto', amount: 1850, date: thisMonth(6), category: 'Moradia', note: 'Aluguel', auto: 'bill:b3:' + ym },
       { id: 't3', walletId: 'w2', type: 'gasto', amount: 412.37, date: thisMonth(8), category: 'Mercado' },
       { id: 't4', walletId: 'w1', type: 'transferencia', toWalletId: 'w2', amount: 800, date: thisMonth(8), category: 'Transferência' },
       { id: 't5', walletId: 'w3', type: 'entrada', amount: 300, date: thisMonth(10), category: 'Freela' },

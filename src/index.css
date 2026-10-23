@@ -21,6 +21,11 @@
   --pos: #1d7f53;
   --neg: #c2363b;
   --ring: #7f6420;
+  /* gráficos: o dourado + dois cinzas (nunca arco-íris) */
+  --chart-accent: #a8852f;
+  --chart-gray: #5c5f67;
+  --chart-gray-2: #c4c6cb;
+  --chart-grid: #ecece8;
   color-scheme: light;
 }
 
@@ -39,6 +44,10 @@
   --pos: #4cc38a;
   --neg: #ec5d62;
   --ring: #d4b46a;
+  --chart-accent: #d4b46a;
+  --chart-gray: #8d9098;
+  --chart-gray-2: #4f5259;
+  --chart-grid: #1f2125;
   color-scheme: dark;
 }
 

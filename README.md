@@ -1,8 +1,9 @@
 # BarnaBank — redesign (React)
 
-Nova interface do BarnaBank, feita em paralelo ao app atual. Nesta entrega existem o esqueleto
-(navegação, temas, leitura dos dados), o **Início**, **Pessoas**, **Carteiras** e **Contas** (lista + detalhe, só leitura)
-redesenhados. A aba Relatórios é uma página provisória — veja [MIGRATION.md](MIGRATION.md).
+Nova interface do BarnaBank, feita em paralelo ao app atual. As cinco telas estão redesenhadas —
+**Início**, **Pessoas**, **Carteiras**, **Contas** e **Relatórios** — todas **só leitura**. Faltam as ações de
+escrita, os campos `budgets`/`goals`/`recurring`/`shares` do armazenamento, PWA, sincronização na nuvem e o
+bot do Telegram — veja [MIGRATION.md](MIGRATION.md).
 
 Stack: Vite + React + TypeScript, Tailwind CSS v4, componentes no estilo shadcn/ui
 (`src/components/ui`), Recharts, Motion, lucide-react, Inter (via `@fontsource-variable/inter`).
@@ -35,6 +36,8 @@ acontece só na memória (`src/lib/storage.ts`).
 - Pessoas guarda filtro e busca na URL (`#/pessoas?f=atrasados&q=ana`), não no `localStorage`.
 - Carteiras guarda o mês e o tipo de movimento do detalhe na URL
   (`#/carteiras/<id>?m=2026-09&t=saidas`).
+- Relatórios guarda período, mês, gráfico e modo tabela na URL
+  (`#/relatorios?p=3m&m=2026-09&g=categorias&ver=tabela`).
 - Contas guarda mês, filtro e busca na URL (`#/contas?m=2026-09&f=atrasadas&q=luz`); o detalhe
   é `#/contas/fixa-<id>` (conta fixa) ou `#/contas/cartao-<id>` (fatura do cartão).
 
@@ -62,11 +65,11 @@ origem (`<usuario>.github.io`) for a mesma, o que é o caso para repositórios d
 ```
 src/
   app/            shell (cabeçalho, abas, barra inferior), tema, contexto de dados
-  components/ui/  button, card, badge, skeleton (base shadcn/ui)
+  components/ui/  button, card, badge, skeleton, tabs, segmented, error-boundary (base shadcn/ui)
   lib/
     storage.ts    leitor somente leitura do localStorage + fallback de demonstração
     demo-data.ts  dados fictícios relativos à data de hoje
     finance/      lógica pura portada do app.js antigo, com testes
-  pages/          Início, Pessoas, Carteiras, Contas e página provisória
-screenshots/      capturas do Início, de Pessoas, de Carteiras e de Contas (desktop 1440 / celular 390, escuro e claro)
+  pages/          Início, Pessoas, Carteiras, Contas e Relatórios
+screenshots/      capturas das cinco telas (desktop 1440 / celular 390, escuro e claro)
 ```
