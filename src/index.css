@@ -1,0 +1,116 @@
+@import 'tailwindcss';
+@import '@fontsource-variable/inter';
+
+/* Tema escuro é o padrão (classe .dark no <html>). */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ---------- tokens: "fintech sóbria" ---------- */
+:root {
+  /* claro */
+  --bg: #f7f7f5;
+  --surface: #ffffff;
+  --surface-2: #f1f1ee;
+  --border: #e3e3df;
+  --border-strong: #cfcfca;
+  --fg: #16171a;
+  --fg-muted: #565961;
+  --fg-subtle: #6a6d75;
+  --accent: #d4b46a;
+  --accent-fg: #1a1608;
+  --accent-text: #7f6420; /* dourado legível sobre fundo claro */
+  --pos: #1d7f53;
+  --neg: #c2363b;
+  --ring: #7f6420;
+  color-scheme: light;
+}
+
+.dark {
+  --bg: #0d0e10;
+  --surface: #131417;
+  --surface-2: #191a1e;
+  --border: #25272c;
+  --border-strong: #34363c;
+  --fg: #ededef;
+  --fg-muted: #a1a3aa;
+  --fg-subtle: #80838b;
+  --accent: #d4b46a;
+  --accent-fg: #1a1608;
+  --accent-text: #d4b46a;
+  --pos: #4cc38a;
+  --neg: #ec5d62;
+  --ring: #d4b46a;
+  color-scheme: dark;
+}
+
+@theme inline {
+  --font-sans: 'Inter Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-fg: var(--fg);
+  --color-fg-muted: var(--fg-muted);
+  --color-fg-subtle: var(--fg-subtle);
+  --color-accent: var(--accent);
+  --color-accent-fg: var(--accent-fg);
+  --color-accent-text: var(--accent-text);
+  --color-pos: var(--pos);
+  --color-neg: var(--neg);
+  --color-ring: var(--ring);
+
+  /* escala tipográfica única: 12 / 14 / 16 / 20 / 28 / 40 */
+  --text-xs: 12px;
+  --text-xs--line-height: 16px;
+  --text-sm: 14px;
+  --text-sm--line-height: 20px;
+  --text-base: 16px;
+  --text-base--line-height: 24px;
+  --text-lg: 20px;
+  --text-lg--line-height: 28px;
+  --text-2xl: 28px;
+  --text-2xl--line-height: 34px;
+  --text-4xl: 40px;
+  --text-4xl--line-height: 44px;
+
+  /* raios: 6 / 10 / 14 */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+  html {
+    background: var(--bg);
+  }
+  body {
+    margin: 0;
+    min-height: 100dvh;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: var(--font-sans);
+    font-size: 14px;
+    line-height: 20px;
+    font-weight: 400;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    font-feature-settings: 'cv11', 'ss01';
+  }
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+    border-radius: 6px;
+  }
+  ::selection {
+    background: color-mix(in srgb, var(--accent) 35%, transparent);
+  }
+}
+
+@utility num {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum', 'cv11';
+}
