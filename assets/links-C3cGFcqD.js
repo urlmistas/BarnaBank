@@ -1,0 +1,1 @@
+function e(e,t){return`/pessoas/`+encodeURIComponent(e)+(t?`?`+t:``)}export{e as t};

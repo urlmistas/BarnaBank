@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="pt-BR" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/BarnaBank/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="color-scheme" content="dark light" />
+    <meta name="theme-color" content="#0d0e10" />
+    <title>BarnaBank</title>
+    <script>
+      // aplica o tema antes de pintar, para não piscar
+      try {
+        var t = localStorage.getItem('bbweb_theme');
+        if (t === 'light') document.documentElement.classList.remove('dark');
+      } catch (e) {}
+    </script>
+    <script type="module" crossorigin src="/BarnaBank/assets/index-BJwDSYG_.js"></script>
+    <link rel="modulepreload" crossorigin href="/BarnaBank/assets/clsx-DiOevU1W.js">
+    <link rel="stylesheet" crossorigin href="/BarnaBank/assets/index-BsSLdbVk.css">
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>
