@@ -13,6 +13,12 @@ const pessoas = (
     <Pessoas />
   </Suspense>
 )
+const Contas = lazy(() => import('@/pages/contas/Contas').then((m) => ({ default: m.Contas })))
+const contas = (
+  <Suspense fallback={null}>
+    <Contas />
+  </Suspense>
+)
 const Carteiras = lazy(() => import('@/pages/carteiras/Carteiras').then((m) => ({ default: m.Carteiras })))
 const carteiras = (
   <Suspense fallback={null}>
@@ -33,10 +39,8 @@ export default function App() {
               <Route path="pessoas/:id" element={pessoas} />
               <Route path="carteiras" element={carteiras} />
               <Route path="carteiras/:id" element={carteiras} />
-              <Route
-                path="contas"
-                element={<Placeholder title="Contas" description="Contas fixas, cartões de crédito e faturas, com calendário do mês." />}
-              />
+              <Route path="contas" element={contas} />
+              <Route path="contas/:id" element={contas} />
               <Route
                 path="relatorios"
                 element={<Placeholder title="Relatórios" description="Gastos por categoria, orçamento, metas e evolução do saldo." />}

@@ -110,6 +110,8 @@ export interface CardPurchase {
   amount: number
   date: ISODate
   installments?: number | string
+  /** descrição (purchaseDialog ~l.3263 grava `desc`) */
+  desc?: string
   category?: string
   note?: string
 }

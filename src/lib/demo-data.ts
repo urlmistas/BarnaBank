@@ -1,5 +1,6 @@
 import type { AppData, Debt, ISODate } from '@/lib/types'
 import { addDaysISO, parseISO, ymAdd, ymOf } from '@/lib/finance/dates'
+import { cardInvoices } from '@/lib/finance/bills-cards'
 
 // Dados fictícios para revisar a interface quando não há nada no localStorage.
 // Datas relativas a `today`, para sempre haver atrasados, vencimentos próximos etc.
@@ -19,7 +20,7 @@ export function buildDemoData(today: ISODate): AppData {
   const dayOfMonth = parseISO(today).getDate()
   const thisMonth = (day: number) => ym + '-' + String(Math.min(day, dayOfMonth)).padStart(2, '0')
 
-  return {
+  const data: AppData = {
     contacts: {},
     wallets: [
       { id: 'w1', name: 'Nubank', icon: 'landmark' },
@@ -51,14 +52,25 @@ export function buildDemoData(today: ISODate): AppData {
         payments: [{ id: 'p2', date: d(-30), amount: 250, walletId: 'w3' }] }),
     ],
     bills: [
-      { id: 'b1', name: 'Internet', amount: 119.9, kind: 'gasto', dueDay: parseISO(d(3)).getDate(), paid: { [ymAdd(ym, -1)]: 'x', [ymAdd(ym, -2)]: 'x' }, active: true, startMonth: ymAdd(ym, -2) },
-      { id: 'b2', name: 'Academia', amount: 99, kind: 'gasto', dueDay: parseISO(d(6)).getDate(), paid: { [ymAdd(ym, -1)]: 'x', [ymAdd(ym, -2)]: 'x' }, active: true, startMonth: ymAdd(ym, -2) },
+      { id: 'b1', name: 'Internet', amount: 119.9, kind: 'gasto', dueDay: parseISO(d(3)).getDate(), paid: { [ymAdd(ym, -1)]: 'x', [ymAdd(ym, -2)]: 'x' }, active: true, startMonth: ymAdd(ym, -2), category: 'Casa' },
+      { id: 'b2', name: 'Academia', amount: 99, kind: 'gasto', dueDay: parseISO(d(6)).getDate(), paid: { [ymAdd(ym, -1)]: 'x', [ymAdd(ym, -2)]: 'x' }, active: true, startMonth: ymAdd(ym, -2), category: 'Saúde' },
+      { id: 'b3', name: 'Aluguel', amount: 1850, kind: 'gasto', dueDay: 6, paid: { [ym]: 't2', [ymAdd(ym, -1)]: 'x', [ymAdd(ym, -2)]: 'x' }, active: true, startMonth: ymAdd(ym, -2), category: 'Moradia', walletId: 'w1' },
+      { id: 'b4', name: 'Energia', amount: 187.45, kind: 'gasto', dueDay: parseISO(d(-4)).getDate(), paid: { [ymAdd(ym, -1)]: 'x' }, active: true, startMonth: ymAdd(ym, -1), category: 'Casa' },
+      { id: 'b5', name: 'Salário', amount: 6200, kind: 'entrada', dueDay: 5, paid: { [ym]: 't1' }, active: true, startMonth: ym, walletId: 'w1' },
     ],
     cards: [{ id: 'c1', name: 'Nubank', closingDay: parseISO(d(-3)).getDate(), dueDay: parseISO(d(4)).getDate(), limit: 5000, walletId: 'w1' }],
     cardPurchases: [
-      { id: 'cp1', cardId: 'c1', amount: 640, date: d(-25), installments: 1, category: 'Compras' },
-      { id: 'cp2', cardId: 'c1', amount: 1200, date: d(-40), installments: 4, category: 'Eletrônicos' },
+      { id: 'cp1', cardId: 'c1', amount: 640, date: d(-25), installments: 1, category: 'Compras', desc: 'Supermercado do mês' },
+      { id: 'cp2', cardId: 'c1', amount: 1200, date: d(-40), installments: 4, category: 'Eletrônicos', desc: 'Fone de ouvido' },
+      { id: 'cp3', cardId: 'c1', amount: 89.9, date: d(-12), installments: 1, category: 'Lazer', desc: 'Cinema' },
     ],
     cardPayments: [],
   }
+  // fatura do mês passado paga no vencimento (para o histórico do cartão ter "paga")
+  const prevKey = ymAdd(ym, -1)
+  const prev = cardInvoices(data, data.cards[0], today).get(prevKey)
+  if ((prev.total ?? 0) > 0.005 && prev.due! <= today) {
+    data.cardPayments.push({ id: 'cpay1', cardId: 'c1', amount: prev.total!, invoice: prevKey, date: prev.due })
+  }
+  return data
 }

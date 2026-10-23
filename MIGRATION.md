@@ -15,6 +15,7 @@ Linhas aproximadas de `app.js`.
 | Início | `renderDashboard` ~4010, `renderWeek` ~2244, fontes da semana ~2211 e ~3438, `renderTodayBanner` ~4507, `renderHomeSide` ~5561 | `src/lib/finance/dashboard.ts`, `src/pages/inicio` |
 | Pessoas (somente leitura) | `personRows` ~2049, `renderPeopleList` ~2120, `applyFilterSortSearch` ~928, `renderStats` ~824, `renderPersonPage` ~1929, `buildCard` ~1123 (parcelas/histórico), `debtLabel` ~1116, `initials` ~659, `monthEvents` ~5620, `renderChart` ~920 | `src/lib/finance/people.ts`, `src/pages/pessoas` |
 | Carteiras (somente leitura) | `renderWalletsPage` ~4061, `buildWalletCard` ~4077, `walletEvents` ~127, `cardUsed` ~3200, fatura do mês (aba Cartões ~3368), `walletIconKey` ~73 | `src/lib/finance/wallets.ts`, `cardUsed` em `bills-cards.ts`, `src/pages/carteiras` |
+| Contas (somente leitura) | `renderContasPage` ~3327 (contas fixas, faturas, 4 medidas), `billTxOf` ~3059, `billStatus` ~3052, `cardInvoices` ~3160, `cardUsed` ~3200 | `src/lib/finance/contas.ts`, `src/pages/contas` |
 
 Ficaram de fora do Início (por decisão de redesenho): previsão do fim do mês
 (`monthForecast` ~5490), alertas de gastos (`renderAlerts` ~7423), cobranças/claims
@@ -34,8 +35,11 @@ Podem voltar dentro de Relatórios/Pessoas.
    excluir carteira (modal ~4173), novo/editar/excluir lançamento e transferência (~4221, desfazer),
    importar extrato OFX/CSV, lançamentos recorrentes (`recurring`, ~5258/5271) e metas de economia
    (`goals`, ~4792) — as duas últimas eram abas de Carteiras no antigo.
-3. **Contas** (`#pageContas` ~211): contas fixas (`billDialog` ~3102, `payBillDialog` ~3063),
-   cartões (`cardDialog` ~3206, `payInvoiceDialog`), calendário (`monthEvents` ~5620).
+3. **Contas — o que falta** (lista e detalhe já estão no app novo, só leitura): nova/editar/excluir
+   conta fixa (`billDialog` ~3102), marcar paga/recebida e desfazer (`payBillDialog` ~3063,
+   `markBillPaid`, `unmarkBill`), novo/editar/excluir cartão (`cardDialog` ~3206), nova/excluir compra
+   (`purchaseDialog` ~3240), pagar fatura (`payInvoiceDialog` ~3278), "Cabe no mês?" (`btnFits`) e a
+   aba Calendário (`monthEvents` ~5620, `renderCalendar` ~5659).
 4. **Relatórios** (`#pageRelatorios` ~245): `monthSpending` ~4536, `renderSpendBars` ~4565,
    orçamentos, metas, placar (`boardData` ~7449), gráfico de evolução (`renderEvoChart` ~4040).
 5. **Transversais**: configurações (`SETTINGS_KEY`, ~9–40), busca geral, simulador, backup
@@ -99,6 +103,47 @@ Podem voltar dentro de Relatórios/Pessoas.
   texto. `card.walletId` só é mantido se for texto não vazio. Tudo na memória, nada é gravado.
 - `transactions` continuam sem validação (como o antigo): valor não numérico quebraria a soma.
 - Demonstração: o cartão Nubank agora é pago pela carteira Nubank (`walletId: 'w1'`).
+
+### Contas: decisões de redesenho e lógica duvidosa
+
+- **Uma lista só** por mês: contas fixas vigentes (`billApplies`) e **um item por cartão** (a fatura com a
+  chave do mês, como a aba Cartões do antigo). Fatura tem o rótulo discreto "Fatura"; receita fixa
+  (`kind: 'entrada'`), "Receita" e valor +verde. Ordem: vencimento, depois nome (o antigo ordenava contas
+  por `dueDay` e mostrava cartões num bloco à parte).
+- **Status** em texto: pendente / vence hoje / atrasada / paga (recebida) / sem compras. O "embreve"
+  (≤ 7 dias) do antigo virou texto ("vence em 3 dias"). Fatura: `paga` e `atrasada` como no antigo;
+  `aberta` e `fechada` viram "pendente" (o fechamento aparece no detalhe). Cartão sem nada no mês fica
+  como "sem compras", R$ 0, só no filtro Todas. Duvidoso: talvez devesse sumir da lista.
+- **Filtros**: Todas (padrão) / Pendentes (**tudo que falta pagar, inclusive atrasadas**) / Pagas /
+  Atrasadas. A busca (sem acento) olha nome e categoria; "fatura" ou "cartão" acham os cartões.
+- **Três medidas** (só gastos; antes eram quatro): **A pagar** = gastos fixos não pagos + saldo em
+  aberto das faturas do mês (inclui atrasadas; o antigo separava "Contas a pagar" e "Faturas em
+  aberto"); **Pago** = gastos fixos pagos + pagamentos lançados nas faturas do mês (o antigo não somava
+  os pagamentos de fatura); **Em atraso** = parte de "A pagar" já vencida (novo). As receitas fixas
+  saíram das medidas e viraram uma linha discreta ("Receitas fixas no mês … · falta receber …").
+- **Valor de conta paga** = valor da transação lançada (`billTxOf`), como o antigo; marcada sem carteira
+  (`'x'`) usa o valor cadastrado e não tem data de pagamento ("paga · venceu …").
+- **Fatura que rolou** (não paga até o vencimento): no mês dela continua "atrasada" com o saldo, e o
+  mesmo saldo aparece de novo dentro da fatura seguinte (`carry`). Olhando meses diferentes o valor
+  aparece duas vezes — igual ao antigo ("Faturas em aberto" também somava). Duvidoso.
+- **Mês**: padrão = mês de hoje (sai da URL). Navegação do primeiro dado (início de conta, mês pago,
+  primeira fatura) até 12 meses à frente (ou a última parcela futura). Botão "Hoje" fora do mês atual.
+- **Detalhe da conta fixa**: valor e status do mês aberto, carteira (a da transação, senão a padrão,
+  com link para `/carteiras/:id`), recorrência (dia, valor cadastrado, desde/até, ativa) e histórico mês a
+  mês do `startMonth` (ou do mês pago mais antigo; sem nenhum dos dois, 12 meses) até o mais tardio entre
+  hoje e o mês aberto, no máximo 36 meses. Conta inativa (`active: false`) some da lista como no
+  antigo, mas o link direto mostra os meses pagos. Clicar num mês do histórico troca o mês da tela.
+- **Detalhe da fatura**: total, fechamento/vencimento, compras do mês, pago, falta/crédito, avisos de
+  saldo anterior e de saldo que rolou (textos do antigo), limite usado (`cardUsed`: compra parcelada
+  inteira, igual ao antigo) com disponível, carteira que paga (`card.walletId`, link), aba **Compras**
+  (descrição `desc` → nota → categoria, data, "parcela 2/4 de R$ …") com os pagamentos e aba **Faturas**
+  (todas as faturas não vazias, inclusive futuras com parcelas). Setas trocam a fatura/mês.
+- **Sem gráficos** nesta tela. Sem botões de pagar/marcar/novo/editar (o app é só leitura).
+- Tipo `CardPurchase` ganhou `desc` (o antigo grava a descrição nesse campo). O leitor já copiava o
+  campo; nada mudou em `storage.ts`.
+- Demonstração: novas contas fixas (Aluguel paga pela transação t2, Energia atrasada, Salário como
+  receita recebida), descrições nas compras, uma compra a mais e a fatura do mês passado paga. Isso
+  muda um pouco os números do Início/Carteiras na demonstração.
 
 ## Antes de gravar dados
 
