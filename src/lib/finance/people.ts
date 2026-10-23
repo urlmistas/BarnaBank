@@ -237,6 +237,8 @@ export interface HistoryItem {
   amount: number
   dir: 'in' | 'out'
   debtId: string
+  /** posição do pagamento em `debt.payments` (para editar/remover) */
+  index: number
   debtLabel: string
   note?: string
   walletName?: string
@@ -320,7 +322,7 @@ export function personDetail(
     ;(v.debt.payments || []).forEach((p, idx) => {
       history.push({
         key: v.debt.id + ':' + (p.id ?? idx), date: p.date, amount: p.amount || 0,
-        dir: v.kind === 'payable' ? 'out' : 'in', debtId: v.debt.id, debtLabel: v.label,
+        dir: v.kind === 'payable' ? 'out' : 'in', debtId: v.debt.id, index: idx, debtLabel: v.label,
         note: p.note || undefined,
         walletName: p.walletId ? data.wallets.find((w) => w.id === p.walletId)?.name : undefined,
         target: p.mode === 'target' && typeof p.target === 'number' ? p.target + 1 : undefined,

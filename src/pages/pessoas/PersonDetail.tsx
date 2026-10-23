@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
-import { ArrowLeft, Check, ChevronDown, Circle, CircleAlert, CircleDashed, Inbox, UserRound, X } from 'lucide-react'
+import { ArrowLeft, Check, ChevronDown, Circle, CircleAlert, CircleDashed, Inbox, Pencil, Trash2, UserRound, X } from 'lucide-react'
 import { useAppData } from '@/app/data-context'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -11,8 +11,11 @@ import { personDetail, type DebtView, type HistoryItem, type InstView, type Pers
 import type { DebtCalc } from '@/lib/finance/debts'
 import { plural } from '@/lib/format'
 import { cn } from '@/lib/utils'
-import type { AppData } from '@/lib/types'
+import type { AppData, Debt } from '@/lib/types'
 import { Avatar, SignedMoney } from './parts'
+import { DebtActions } from './DebtActions'
+import { ConfirmDialog, EditPaymentDialog } from './dialogs'
+import { useDebtActions } from './use-debt-actions'
 
 const PersonCalendar = lazy(() => import('./PersonCalendar').then((m) => ({ default: m.PersonCalendar })))
 
@@ -144,7 +147,7 @@ function PersonTabs({ p, padded }: { p: PersonDetail; padded: boolean }) {
                 ))}
               </div>
             )}
-            {tab === 'historico' && <History items={p.history} />}
+            {tab === 'historico' && <History items={p.history} debts={p.debts.map((v) => v.debt)} />}
             {tab === 'calendario' && (
               <Suspense fallback={<div className="h-80" />}>
                 <PersonCalendar p={p} />
@@ -252,6 +255,8 @@ function DebtCard({ v }: { v: DebtView }) {
         )}
       </div>
 
+      <DebtActions debt={d} paid={v.paid} />
+
       <button
         type="button"
         aria-expanded={open}
@@ -330,8 +335,11 @@ function InstRow({ it, pay }: { it: InstView; pay: boolean }) {
 
 // ---------------------------------------------------------------- histórico
 
-function History({ items }: { items: HistoryItem[] }) {
-  const { date } = useAppData()
+function History({ items, debts }: { items: HistoryItem[]; debts: Debt[] }) {
+  const { date, canEdit } = useAppData()
+  const [editing, setEditing] = useState<{ debtId: string; index: number } | null>(null)
+  const [removing, setRemoving] = useState<{ debtId: string; index: number } | null>(null)
+  const debtOf = (id: string) => debts.find((d) => d.id === id)
   if (!items.length) {
     return (
       <div className="flex items-center gap-3 rounded-md border border-dashed border-border px-4 py-6 text-sm text-fg-muted">
@@ -340,21 +348,54 @@ function History({ items }: { items: HistoryItem[] }) {
       </div>
     )
   }
+  const editDebt = editing ? debtOf(editing.debtId) : undefined
+  const removeDebtOf = removing ? debtOf(removing.debtId) : undefined
   return (
-    <ul aria-label="Pagamentos" className="rounded-md border border-border">
-      {items.map((h) => (
-        <li key={h.key} className="flex items-center gap-3 border-b border-border px-4 py-2.5 last:border-b-0">
-          <span className="num w-16 shrink-0 text-sm text-fg-muted">{date(h.date)}</span>
-          <span className="min-w-0 flex-1">
-            <span className="block truncate text-sm">{h.dir === 'in' ? 'Recebi' : 'Paguei'}</span>
-            <span className="block truncate text-xs text-fg-subtle">
-              {[h.debtLabel, h.target ? `parcela ${h.target}` : '', h.walletName, h.note].filter(Boolean).join(' · ')}
+    <>
+      <ul aria-label="Pagamentos" className="rounded-md border border-border">
+        {items.map((h) => (
+          <li key={h.key} className="flex items-center gap-3 border-b border-border px-4 py-2.5 last:border-b-0">
+            <span className="num w-16 shrink-0 text-sm text-fg-muted">{date(h.date)}</span>
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-sm">{h.dir === 'in' ? 'Recebi' : 'Paguei'}</span>
+              <span className="block truncate text-xs text-fg-subtle">
+                {[h.debtLabel, h.target ? `parcela ${h.target}` : '', h.walletName, h.note].filter(Boolean).join(' · ')}
+              </span>
             </span>
-          </span>
-          <SignedMoney value={h.dir === 'in' ? h.amount : -h.amount} className="text-sm" />
-        </li>
-      ))}
-    </ul>
+            <SignedMoney value={h.dir === 'in' ? h.amount : -h.amount} className="text-sm" />
+            {canEdit && (
+              <span className="-mr-2 flex">
+                <Button size="icon" variant="ghost" className="size-8" aria-label="Editar pagamento" title="Editar" onClick={() => setEditing({ debtId: h.debtId, index: h.index })}>
+                  <Pencil />
+                </Button>
+                <Button size="icon" variant="ghost" className="size-8" aria-label="Remover pagamento" title="Remover" onClick={() => setRemoving({ debtId: h.debtId, index: h.index })}>
+                  <Trash2 />
+                </Button>
+              </span>
+            )}
+          </li>
+        ))}
+      </ul>
+      {editDebt && editing && <EditPaymentDialog open onClose={() => setEditing(null)} debt={editDebt} index={editing.index} />}
+      {removeDebtOf && removing && <RemovePayment debt={removeDebtOf} index={removing.index} onClose={() => setRemoving(null)} />}
+    </>
+  )
+}
+
+function RemovePayment({ debt, index, onClose }: { debt: Debt; index: number; onClose: () => void }) {
+  const { money, date } = useAppData()
+  const { removePayment } = useDebtActions(debt)
+  const p = debt.payments[index]
+  return (
+    <ConfirmDialog open onClose={onClose} title="Remover pagamento" okLabel="Remover" onOk={() => removePayment(index)}>
+      {p ? (
+        <>
+          Remover o pagamento de <b className="num text-fg">{money(p.amount)}</b> em <span className="num">{date(p.date)}</span>? Dá para desfazer logo depois.
+        </>
+      ) : (
+        'Pagamento não encontrado.'
+      )}
+    </ConfirmDialog>
   )
 }
 

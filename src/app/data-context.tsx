@@ -6,6 +6,7 @@ import {
 import { toISO } from '@/lib/finance/dates'
 import { makeDate, makeMoney } from '@/lib/format'
 import { applyPrefs, PREFS_KEY, readPrefs, writePrefs, type DisplayPrefs } from '@/lib/prefs'
+import { STORE_EVENT } from '@/lib/store'
 import type { Settings } from '@/lib/types'
 
 export interface CloudState {
@@ -28,6 +29,12 @@ interface DataState {
   baseSettings: Settings
   prefs: DisplayPrefs
   setPrefs: (p: DisplayPrefs) => void
+  /** edita/paga/exclui: só com os dados deste aparelho */
+  canEdit: boolean
+  /** cria dívida: aparelho, vazio ou demonstração */
+  canCreate: boolean
+  /** por que não dá para editar (para explicar na tela) */
+  readOnlyReason: string | null
   cloud: CloudState
   signIn: (email: string, password: string) => Promise<string | null>
   signOut: () => void
@@ -93,10 +100,14 @@ export function DataProvider({ children }: { children: ReactNode }) {
       if (e.key === null || e.key.startsWith('barnabank_')) setLocal(loadAppData(today))
       if (e.key === null || e.key === PREFS_KEY) setPrefsState(readPrefs())
     }
+    // gravação feita por este app (o evento `storage` só chega nas outras abas)
+    const onStore = () => setLocal(loadAppData(today))
     window.addEventListener('storage', onStorage)
+    window.addEventListener(STORE_EVENT, onStore)
     return () => {
       window.clearTimeout(id)
       window.removeEventListener('storage', onStorage)
+      window.removeEventListener(STORE_EVENT, onStore)
     }
   }, [today, pull])
 
@@ -129,6 +140,18 @@ export function DataProvider({ children }: { children: ReactNode }) {
     const result = forced() ? local : (cloudResult ?? local)
     const baseSettings = result?.settings ?? DEFAULT_SETTINGS
     const settings = applyPrefs(baseSettings, prefs)
+    const src = waiting ? null : result?.source
+    const canEdit = src === 'local'
+    const canCreate = !forced() && (src === 'local' || src === 'empty' || src === 'demo')
+    const readOnlyReason = waiting
+      ? null
+      : forced()
+        ? 'Visualização de revisão (?dados=): nada é gravado.'
+        : src === 'cloud'
+          ? 'Os dados vêm da conta na nuvem. Para editar neste aparelho, saia da conta em Configurações.'
+          : src === 'demo'
+            ? 'Estes são dados de demonstração.'
+            : null
     return {
       status: waiting ? 'loading' : 'ready',
       result: waiting ? null : result,
@@ -137,6 +160,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
       date: makeDate(settings),
       baseSettings,
       prefs,
+      canEdit,
+      canCreate,
+      readOnlyReason,
       setPrefs,
       cloud,
       signIn,

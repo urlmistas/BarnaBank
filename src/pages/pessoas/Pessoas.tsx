@@ -1,8 +1,9 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
-import { UserRound } from 'lucide-react'
+import { Plus, UserRound } from 'lucide-react'
 import { useAppData } from '@/app/data-context'
+import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { buildPersonRows, peopleTotals, PEOPLE_FILTERS, type PeopleFilter, type PeopleTotals } from '@/lib/finance/people'
 import { makeDebtCalc } from '@/lib/finance/debts'
@@ -12,6 +13,7 @@ import { cn } from '@/lib/utils'
 import type { AppData } from '@/lib/types'
 import { PeopleList } from './PeopleList'
 import { PersonDetailView } from './PersonDetail'
+import { DebtFormDialog } from './dialogs'
 
 // Pessoas: lista primeiro. No PC (≥1024px) a pessoa abre num painel ao lado;
 // no celular /pessoas/:id é uma página inteira. Filtro e busca ficam na URL (?f=&q=),
@@ -29,6 +31,8 @@ function PessoasReady({ data, today }: { data: AppData; today: string }) {
   const { id } = useParams()
   const wide = useMediaQuery('(min-width: 1024px)')
   const [params, setParams] = useSearchParams()
+  const { canCreate, readOnlyReason, result } = useAppData()
+  const [creating, setCreating] = useState(false)
   const rawF = params.get('f') as PeopleFilter | null
   const filter: PeopleFilter = rawF && PEOPLE_FILTERS.includes(rawF) ? rawF : 'abertos'
   const query = params.get('q') ?? ''
@@ -61,15 +65,24 @@ function PessoasReady({ data, today }: { data: AppData; today: string }) {
   return (
     <div>
       <header className="flex flex-col gap-4">
-        <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-          <h1 className="text-2xl font-semibold tracking-tight">Pessoas</h1>
-          {hasPeople && (
-            <p className="num text-sm text-fg-muted">
-              {plural(view.rows.length, 'pessoa', 'pessoas')}
-              {view.totals.toPay > 0.005 && <MoneyNote label="eu devo" value={view.totals.toPay} />}
-            </p>
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+          <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
+            <h1 className="text-2xl font-semibold tracking-tight">Pessoas</h1>
+            {hasPeople && (
+              <p className="num text-sm text-fg-muted">
+                {plural(view.rows.length, 'pessoa', 'pessoas')}
+                {view.totals.toPay > 0.005 && <MoneyNote label="eu devo" value={view.totals.toPay} />}
+              </p>
+            )}
+          </div>
+          {canCreate && (
+            <Button size="sm" onClick={() => setCreating(true)}>
+              <Plus aria-hidden="true" />
+              Nova dívida
+            </Button>
           )}
         </div>
+        {result?.source === 'cloud' && readOnlyReason && <p className="text-xs text-fg-subtle">{readOnlyReason}</p>}
         {hasPeople && <Metrics totals={view.totals} />}
       </header>
 
@@ -103,6 +116,7 @@ function PessoasReady({ data, today }: { data: AppData; today: string }) {
           </aside>
         )}
       </div>
+      <DebtFormDialog open={creating} onClose={() => setCreating(false)} />
     </div>
   )
 }

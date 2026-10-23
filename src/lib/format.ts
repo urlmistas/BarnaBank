@@ -39,3 +39,6 @@ export function lateLabel(iso: ISODate, today: ISODate): string {
 }
 
 export const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
+
+/** primeiro nome ("Ana Souza" → "Ana") */
+export const firstName = (name: string) => name.trim().split(/\s+/)[0] || name
