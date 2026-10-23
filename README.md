@@ -1,8 +1,8 @@
 # BarnaBank — redesign (React)
 
 Nova interface do BarnaBank, feita em paralelo ao app atual. Nesta entrega existem o esqueleto
-(navegação, temas, leitura dos dados), o **Início** e **Pessoas** (lista + detalhe, só leitura)
-redesenhados. As abas Carteiras, Contas e Relatórios são páginas provisórias — veja [MIGRATION.md](MIGRATION.md).
+(navegação, temas, leitura dos dados), o **Início**, **Pessoas** e **Carteiras** (lista + detalhe, só leitura)
+redesenhados. As abas Contas e Relatórios são páginas provisórias — veja [MIGRATION.md](MIGRATION.md).
 
 Stack: Vite + React + TypeScript, Tailwind CSS v4, componentes no estilo shadcn/ui
 (`src/components/ui`), Recharts, Motion, lucide-react, Inter (via `@fontsource-variable/inter`).
@@ -33,6 +33,8 @@ acontece só na memória (`src/lib/storage.ts`).
 - A única chave que o app novo grava é `bbweb_theme` (tema claro/escuro).
 - Se o app antigo mudar os dados em outra aba, o app novo relê automaticamente.
 - Pessoas guarda filtro e busca na URL (`#/pessoas?f=atrasados&q=ana`), não no `localStorage`.
+- Carteiras guarda o mês e o tipo de movimento do detalhe na URL
+  (`#/carteiras/<id>?m=2026-09&t=saidas`).
 
 ## Tema
 
@@ -63,6 +65,6 @@ src/
     storage.ts    leitor somente leitura do localStorage + fallback de demonstração
     demo-data.ts  dados fictícios relativos à data de hoje
     finance/      lógica pura portada do app.js antigo, com testes
-  pages/          Início, Pessoas e páginas provisórias
-screenshots/      capturas do Início e de Pessoas (desktop 1440 / celular 390, escuro e claro)
+  pages/          Início, Pessoas, Carteiras e páginas provisórias
+screenshots/      capturas do Início, de Pessoas e de Carteiras (desktop 1440 / celular 390, escuro e claro)
 ```

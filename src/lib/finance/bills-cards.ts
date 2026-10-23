@@ -36,6 +36,18 @@ export function invoiceDates(card: Card, key: YearMonth) {
   return { close: dayIn(key, card.closingDay), due: dayIn(dueKey, card.dueDay) }
 }
 
+/**
+ * Limite usado (cardUsed, app.js ~l.3200): todas as compras menos todos os pagamentos, nunca
+ * negativo. Conta a compra parcelada inteira, inclusive parcelas de faturas futuras.
+ */
+export function cardUsed(data: Pick<AppData, 'cardPurchases' | 'cardPayments'>, card: Card): number {
+  let pur = 0
+  let pay = 0
+  for (const p of data.cardPurchases) if (p.cardId === card.id) pur += p.amount
+  for (const x of data.cardPayments) if (x.cardId === card.id) pay += x.amount
+  return Math.max(0, round2(pur - pay))
+}
+
 export type InvoiceStatus = 'vazia' | 'paga' | 'atrasada' | 'fechada' | 'aberta'
 
 export interface Invoice {

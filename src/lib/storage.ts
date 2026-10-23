@@ -117,6 +117,33 @@ function normalizeGroups(arr: unknown): Group[] {
   })
 }
 
+// Ícones de carteira do antigo (WALLET_ICONS ~l.69) e emojis legados (EMOJI_TO_ICON ~l.70)
+export const WALLET_ICONS = ['wallet', 'credit-card', 'landmark', 'banknote', 'piggy-bank', 'coins', 'vault', 'smartphone', 'building', 'briefcase', 'gem', 'gift', 'shopping-bag', 'house', 'car', 'plane']
+const EMOJI_TO_ICON: Record<string, string> = {
+  '💳': 'credit-card', '🏦': 'landmark', '🏛': 'landmark', '💵': 'banknote', '💴': 'banknote', '💶': 'banknote', '💷': 'banknote', '💸': 'banknote',
+  '👛': 'wallet', '👜': 'shopping-bag', '💰': 'coins', '🪙': 'coins', '🐷': 'piggy-bank', '🐖': 'piggy-bank', '📱': 'smartphone', '🏠': 'house', '🏡': 'house',
+  '🏢': 'building', '💼': 'briefcase', '💎': 'gem', '🎁': 'gift', '🛍': 'shopping-bag', '🚗': 'car', '✈': 'plane',
+}
+
+/** walletIconKey (app.js ~l.73): emoji antigo → nome do ícone; sem ícone → 'wallet'; texto livre fica. */
+export function walletIconKey(icon: unknown): string {
+  if (!icon) return 'wallet'
+  const s = String(icon)
+  if (WALLET_ICONS.includes(s)) return s
+  const bare = s.replace(/️/g, '').trim()
+  return EMOJI_TO_ICON[bare] || s
+}
+
+/** carteiras (loadData ~l.238): normaliza o ícone; descarta itens sem id (o antigo os mantinha) */
+function normalizeWallets(arr: unknown): Wallet[] {
+  return asArr(arr).filter((w) => w && w.id != null && w.id !== '').map((w) => ({
+    ...w,
+    id: String(w.id),
+    name: typeof w.name === 'string' ? w.name : String(w.name ?? ''),
+    icon: walletIconKey(w.icon),
+  })) as unknown as Wallet[]
+}
+
 /** migrateFinance (app.js ~l.250) — só bills/cards/cardPurchases/cardPayments, que o Início usa */
 function normalizeFinance(p: Raw) {
   const bills = asArr(p.bills).filter((b) => b && b.id && typeof b.name === 'string' && isNum(b.amount)).map((b) => ({
@@ -127,6 +154,8 @@ function normalizeFinance(p: Raw) {
   })) as unknown as Bill[]
   const cards = asArr(p.cards).filter((c) => c && c.id && typeof c.name === 'string').map((c) => ({
     ...c, closingDay: dayOf(c.closingDay), dueDay: dayOf(c.dueDay), limit: isNum(c.limit) ? c.limit : 0,
+    // carteira que paga a fatura (cardDialog ~l.3224); vazio = "escolher na hora"
+    walletId: typeof c.walletId === 'string' && c.walletId ? c.walletId : undefined,
   })) as unknown as Card[]
   const ids = new Set(cards.map((c) => c.id))
   const cardPurchases = asArr(p.cardPurchases).filter((x) =>
@@ -151,7 +180,7 @@ export function parseAppData(raw: string | null, today: string): AppData | null 
   if (Array.isArray(parsed)) return { ...emptyData(), debts: normalizeDebts(parsed).map((d) => syncRecurringDebt(d, today)) }
   const p = parsed as Raw
   const contacts = (p.contacts && typeof p.contacts === 'object' ? p.contacts : {}) as AppData['contacts']
-  const wallets = asArr(p.wallets).filter(Boolean).map((w) => ({ ...w })) as unknown as Wallet[]
+  const wallets = normalizeWallets(p.wallets)
   const transactions = asArr(p.transactions).filter(Boolean).map((t) => ({ ...t })) as unknown as Transaction[]
   const groups = normalizeGroups(p.groups)
   const groupIds = new Set(groups.map((g) => g.id))

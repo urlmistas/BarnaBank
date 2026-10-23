@@ -1,6 +1,7 @@
 import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis, type TooltipContentProps } from 'recharts'
 import { useAppData } from '@/app/data-context'
 import { relativeDay } from '@/lib/format'
+import { cn } from '@/lib/utils'
 
 interface Point {
   date: string
@@ -20,13 +21,13 @@ function ChartTip({ active, payload }: Partial<TooltipContentProps<number, strin
 }
 
 /** Uma série só (saldo acumulado); sem legenda — o título do cartão nomeia a série. */
-export function BalanceChart({ points, label }: { points: Point[]; label: string }) {
+export function BalanceChart({ points, label, className = 'h-24' }: { points: Point[]; label: string; className?: string }) {
   const values = points.map((p) => p.total)
   const min = Math.min(...values)
   const max = Math.max(...values)
   const pad = (max - min) * 0.12 || 1
   return (
-    <div role="img" aria-label={label} className="h-24 w-full">
+    <div role="img" aria-label={label} className={cn('w-full', className)}>
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={points} margin={{ top: 6, right: 2, bottom: 2, left: 2 }}>
           <XAxis dataKey="date" hide />

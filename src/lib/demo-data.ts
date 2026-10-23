@@ -54,7 +54,7 @@ export function buildDemoData(today: ISODate): AppData {
       { id: 'b1', name: 'Internet', amount: 119.9, kind: 'gasto', dueDay: parseISO(d(3)).getDate(), paid: { [ymAdd(ym, -1)]: 'x', [ymAdd(ym, -2)]: 'x' }, active: true, startMonth: ymAdd(ym, -2) },
       { id: 'b2', name: 'Academia', amount: 99, kind: 'gasto', dueDay: parseISO(d(6)).getDate(), paid: { [ymAdd(ym, -1)]: 'x', [ymAdd(ym, -2)]: 'x' }, active: true, startMonth: ymAdd(ym, -2) },
     ],
-    cards: [{ id: 'c1', name: 'Nubank', closingDay: parseISO(d(-3)).getDate(), dueDay: parseISO(d(4)).getDate(), limit: 5000 }],
+    cards: [{ id: 'c1', name: 'Nubank', closingDay: parseISO(d(-3)).getDate(), dueDay: parseISO(d(4)).getDate(), limit: 5000, walletId: 'w1' }],
     cardPurchases: [
       { id: 'cp1', cardId: 'c1', amount: 640, date: d(-25), installments: 1, category: 'Compras' },
       { id: 'cp2', cardId: 'c1', amount: 1200, date: d(-40), installments: 4, category: 'Eletrônicos' },

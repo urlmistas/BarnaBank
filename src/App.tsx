@@ -13,6 +13,12 @@ const pessoas = (
     <Pessoas />
   </Suspense>
 )
+const Carteiras = lazy(() => import('@/pages/carteiras/Carteiras').then((m) => ({ default: m.Carteiras })))
+const carteiras = (
+  <Suspense fallback={null}>
+    <Carteiras />
+  </Suspense>
+)
 
 // HashRouter: no GitHub Pages, recarregar /barna-bank/#/pessoas não dá 404.
 export default function App() {
@@ -25,10 +31,8 @@ export default function App() {
               <Route index element={<Inicio />} />
               <Route path="pessoas" element={pessoas} />
               <Route path="pessoas/:id" element={pessoas} />
-              <Route
-                path="carteiras"
-                element={<Placeholder title="Carteiras" description="Saldo de cada carteira, lançamentos, transferências e recorrentes." />}
-              />
+              <Route path="carteiras" element={carteiras} />
+              <Route path="carteiras/:id" element={carteiras} />
               <Route
                 path="contas"
                 element={<Placeholder title="Contas" description="Contas fixas, cartões de crédito e faturas, com calendário do mês." />}
