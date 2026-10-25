@@ -26,43 +26,46 @@ const typeLabel = (t: string) => (t === 'simples' ? 'simples' : t === 'price' ? 
 // ---------------------------------------------------------------- estilo comum das folhas claras
 
 const SHEET_CSS = `
-.sheet{max-width:680px;margin:0 auto;background:#fbf8f0;border:1px solid #d8d0ba;position:relative;padding:56px 56px 44px;box-shadow:0 18px 50px rgba(30,25,10,.18)}
-.sheet::before{content:"";position:absolute;inset:14px;border:1px solid #cbbf9c;pointer-events:none}
-.s-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px}
-.s-brand{display:flex;align-items:center;gap:12px}
-.s-mark{width:38px;height:38px;border-radius:9px;background:linear-gradient(155deg,#e8cd8a,#c9a24a 65%,#8a6c25);display:flex;align-items:center;justify-content:center;font-weight:700;color:#241a04;font-size:18px}
-.s-brandname{font-weight:600;font-size:19px}
-.s-doctype{text-align:right;font-style:italic;color:#8a7a4e;font-size:15px}
-.s-rule{height:1px;background:linear-gradient(90deg,transparent,#c9a24a,transparent);margin:22px 0 26px}
-.s-title{font-weight:600;font-size:28px;margin:0 0 4px}
-.s-sub{font-size:16px;color:#6b6248;margin-bottom:28px}
+.sheet{max-width:680px;margin:0 auto;background:#fff;border:1px solid #e3e3df;border-radius:14px;padding:48px 52px 36px}
+.s-top{display:flex;justify-content:space-between;align-items:center}
+.s-brand{display:flex;align-items:center;gap:10px}
+.s-mark{width:32px;height:32px;border-radius:8px;background:#d4b46a;display:flex;align-items:center;justify-content:center;font-family:"Geist","Inter",sans-serif;font-weight:600;color:#1a1608;font-size:18px}
+.s-brandname{font-family:"Geist","Inter",sans-serif;font-weight:600;font-size:17px;letter-spacing:-.02em}
+.s-doctype{text-align:right;color:#7f6420;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.08em}
+.s-rule{height:1px;background:#e3e3df;margin:22px 0 28px}
+.s-title{font-family:"Geist","Inter",sans-serif;font-weight:600;font-size:28px;line-height:34px;letter-spacing:-.03em;margin:0 0 4px}
+.s-sub{font-size:14px;color:#565961;margin-bottom:28px}
 .s-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px;margin-bottom:28px}
-.s-label{font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:#9a8f6a;margin-bottom:5px;font-weight:600}
-.s-val{font-size:16px;font-weight:600;color:#2a2410}
-.s-val.accent{color:#a5822b}
-.s-summary{background:#f3ecda;border:1px solid #e2d6b1;border-radius:2px;padding:20px 24px;margin-bottom:28px;display:grid;grid-template-columns:1fr 1fr;gap:16px}
-.s-summary .row{display:flex;justify-content:space-between;gap:12px;font-size:14px;padding:4px 0;border-bottom:1px dotted #d6c99b}
+.s-label{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:#6a6d75;margin-bottom:5px;font-weight:600}
+.s-val{font-family:"Geist","Inter",sans-serif;font-variant-numeric:tabular-nums;font-size:18px;font-weight:600;letter-spacing:-.02em;color:#16171a}
+.s-val.accent{color:#7f6420}
+.s-summary{background:#f1f1ee;border:1px solid #e3e3df;border-radius:10px;padding:16px 20px;margin-bottom:28px;display:grid;grid-template-columns:1fr 1fr;gap:4px 28px}
+.s-summary .row{display:flex;justify-content:space-between;gap:12px;font-size:13px;padding:7px 0;border-bottom:1px solid #e3e3df;color:#565961}
+.s-summary .row b{font-family:"Geist","Inter",sans-serif;font-variant-numeric:tabular-nums;color:#16171a;font-weight:600}
 table{width:100%;border-collapse:collapse;margin-bottom:24px}
-thead th{text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.6px;color:#9a8f6a;font-weight:600;padding:0 0 8px;border-bottom:1px solid #cbbf9c}
-tbody td{padding:9px 0;border-bottom:1px solid #ece4cc;font-size:13.5px}
+thead th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:#6a6d75;font-weight:600;padding:0 0 8px;border-bottom:1px solid #cfcfca}
+tbody td{padding:10px 0;border-bottom:1px solid #e3e3df;font-size:13px}
 tbody tr:last-child td{border-bottom:0}
-td.num,th.num{text-align:right;white-space:nowrap}
+td+td,th+th{padding-left:14px}
+td.num,th.num{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+td.num{font-family:"Geist","Inter",sans-serif;font-weight:500}
 .pill{font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px}
-.pill-paid{background:#dfeee3;color:#3f7d57}
-.pill-pending{background:#f2e6cf;color:#a5822b}
+.pill-paid{background:#e3f1ea;color:#1d7f53}
+.pill-pending{background:#f4ecd6;color:#7f6420}
 .s-notes{margin-bottom:24px}
-.s-notes p{font-size:15px;line-height:1.5;color:#3a3320;margin:4px 0 0;white-space:pre-wrap}
-.s-footer{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;margin-top:36px;padding-top:18px;border-top:1px solid #d8d0ba}
-.s-footer .issued{font-size:11px;color:#9a8f6a}
-.s-seal{width:56px;height:56px;flex:none;border-radius:50%;border:1.5px solid #c9a24a;display:flex;align-items:center;justify-content:center;font-size:11px;color:#a5822b;text-align:center;line-height:1.2;transform:rotate(-8deg)}
-@media print{.sheet{box-shadow:none;border:0;margin:0;max-width:none}}
+.s-notes p{font-size:14px;line-height:1.5;color:#16171a;margin:4px 0 0;white-space:pre-wrap}
+.s-footer{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;margin-top:32px;padding-top:16px;border-top:1px solid #e3e3df}
+.s-footer .issued{font-size:11px;color:#6a6d75}
+.s-seal{width:44px;height:44px;flex:none;border-radius:10px;border:1px solid #d4b46a;display:flex;align-items:center;justify-content:center;font-family:"Geist","Inter",sans-serif;font-size:11px;font-weight:600;letter-spacing:.06em;color:#7f6420;text-align:center;line-height:1.2}
+tr,.s-summary,.s-grid{break-inside:avoid}
+@media print{.sheet{border:0;border-radius:0;margin:0;max-width:none;padding:6px 4px 0}}
 `
 
 const top = (docType: string) =>
   `<div class="s-top"><div class="s-brand"><div class="s-mark">B</div><div class="s-brandname">BarnaBank</div></div><div class="s-doctype">${esc(docType)}</div></div><div class="s-rule"></div>`
 
 const footer = (ctx: DocCtx, extra = '') =>
-  `<div class="s-footer"><div class="issued">Documento gerado por BarnaBank em ${esc(stamp(ctx.issuedAt))}${extra}<br>Caráter informativo, uso pessoal entre as partes.</div><div class="s-seal">BARNA<br>BANK</div></div>`
+  `<div class="s-footer"><div class="issued">Documento gerado por BarnaBank em ${esc(stamp(ctx.issuedAt))}${extra}<br>Caráter informativo, uso pessoal entre as partes.</div><div class="s-seal">BB</div></div>`
 
 // ---------------------------------------------------------------- extrato da dívida
 
@@ -80,7 +83,7 @@ export function statementHtml(d: Debt, ctx: DocCtx): string {
             `<td><span class="pill pill-paid">${pay ? 'Pago' : 'Recebido'}</span></td></tr>`,
         )
         .join('')
-    : '<tr><td colspan="4" style="color:#9a8f6a;font-style:italic">Nenhum pagamento registrado ainda.</td></tr>'
+    : '<tr><td colspan="4" style="color:#6a6d75;font-style:italic">Nenhum pagamento registrado ainda.</td></tr>'
   if (!paid) {
     for (const it of calc.schedule(d).insts) {
       if (it.open <= 0) continue
@@ -139,27 +142,25 @@ export function canIssueReceipt(d: Debt, today: ISODate): boolean {
 
 const RECEIPT_CSS = `
 .sheet{padding:0 0 28px;overflow:hidden}
-.sheet::before{display:none}
-.r-bar{display:flex;justify-content:space-between;align-items:center;background:#14161c;color:#e8cd8a;padding:9px 56px;font-size:12px;font-weight:700;border-bottom:3px solid #b08a32}
-.r-bar span{color:#c8c8cd;font-weight:400;font-size:10px}
-.r-in{padding:36px 56px 0}
-.r-h{font-size:24px;font-weight:700;margin:0}
-.r-sm{color:#6e7280;font-size:12px;margin:6px 0 28px}
-.r-total{background:#f6f1e4;border-left:4px solid #b08a32;padding:16px 18px;display:flex;justify-content:space-between;gap:16px;margin-bottom:28px}
-.r-total .k{font-size:10px;font-weight:700;color:#6e7280;letter-spacing:.5px}
-.r-total .v{font-size:20px;font-weight:700;margin-top:4px}
-.r-total .v2{font-size:15px;font-weight:700;margin-top:4px;text-align:right}
+.r-bar{display:flex;justify-content:space-between;align-items:center;background:#0d0e10;color:#d4b46a;padding:12px 52px;font-family:"Geist","Inter",sans-serif;font-size:13px;font-weight:600;letter-spacing:-.01em;border-bottom:3px solid #d4b46a}
+.r-bar span{color:#a1a3aa;font-weight:500;font-size:11px;font-variant-numeric:tabular-nums;letter-spacing:.04em}
+.r-in{padding:36px 52px 0}
+.r-h{font-size:24px;font-weight:600;margin:0;letter-spacing:-.03em}
+.r-sm{color:#565961;font-size:13px;margin:6px 0 28px}
+.r-total{background:#f1f1ee;border-left:3px solid #d4b46a;border-radius:0 10px 10px 0;padding:16px 18px;display:flex;justify-content:space-between;gap:16px;margin-bottom:28px}
+.r-total .k{font-size:11px;font-weight:600;color:#6a6d75;letter-spacing:.08em}
+.r-total .v{font-family:"Geist","Inter",sans-serif;font-variant-numeric:tabular-nums;font-size:22px;font-weight:600;letter-spacing:-.02em;margin-top:4px}
+.r-total .v2{font-family:"Geist","Inter",sans-serif;font-size:15px;font-weight:600;margin-top:4px;text-align:right}
 .r-text{font-size:14px;line-height:1.65;margin:0 0 14px}
-.r-note{font-size:12px;color:#6e7280;margin:0 0 14px}
-.r-h2{font-size:10px;font-weight:700;color:#6e7280;letter-spacing:.6px;margin:22px 0 6px;padding-bottom:6px;border-bottom:1px solid #dcd6c8}
-.r-tbl td{padding:7px 10px;font-size:13px}
-.r-tbl tr:nth-child(odd) td{background:#faf8f3}
-.r-tbl td.w{color:#6e7280;font-size:12px}
-.r-sum td{font-weight:700;border-top:1px solid #dcd6c8}
+.r-note{font-size:12px;color:#565961;margin:0 0 14px}
+.r-h2{font-size:11px;font-weight:600;color:#6a6d75;letter-spacing:.08em;margin:22px 0 6px;padding-bottom:6px;border-bottom:1px solid #cfcfca}
+.r-tbl td{padding:8px 10px;font-size:13px}
+.r-tbl tr:nth-child(odd) td{background:#f7f7f5}
+.r-tbl td.w{color:#565961;font-size:12px}
+.r-sum td{font-weight:600;border-top:1px solid #cfcfca}
 .r-place{margin:40px 0 0;font-size:13px}
-.r-sign{margin-top:56px;width:250px;border-top:1px solid #3c3c3c;padding-top:6px;font-size:13px}
-.r-foot{margin:36px 56px 0;font-size:10px;color:#6e7280}
-@media print{.r-bar{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+.r-sign{margin-top:56px;width:250px;border-top:1px solid #16171a;padding-top:6px;font-size:13px}
+.r-foot{margin:36px 52px 0;font-size:11px;color:#6a6d75}
 `
 
 export function receiptHtml(d: Debt, ctx: DocCtx, groupTitle?: string): string {
@@ -227,36 +228,38 @@ export function rankingRows(debts: Debt[], today: ISODate): RankingRow[] {
 const TITLES = ['Lenda Suprema', 'Herói de Ouro', 'Guardião Brilhante']
 
 const RANK_CSS = `
-body{color:#fff3d6;background:linear-gradient(180deg,#1b1240,#0c0a24 60%,#070613);font-family:"Nunito",Inter,system-ui,sans-serif;padding:32px 16px}
+html,body{background:#0d0e10}
+body{color:#ededef;padding:32px 16px}
 .no-print{max-width:720px}
+.no-print button{background:#d4b46a;color:#1a1608}
 .sheet{max-width:720px;margin:0 auto}
-.r-top{text-align:center;margin-bottom:6px}
-.r-eyebrow{font-size:12px;letter-spacing:3px;text-transform:uppercase;color:#ffd67a;font-weight:700}
-.r-title{font-size:38px;font-weight:800;margin:6px 0 2px;color:#ffd67a}
-.r-sub{color:#b9aee0;font-size:13.5px;margin-bottom:26px}
-.podium{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:30px;align-items:end}
-.pc{background:rgba(255,255,255,.06);border:1px solid rgba(255,214,120,.3);border-radius:16px;padding:18px 10px;text-align:center}
-.pc.rank-1{padding-top:28px;padding-bottom:28px;border-color:#ffd67a}
-.pc-pos{font-size:12px;color:#c9a24a;font-weight:700}
-.pc-avatar{width:54px;height:54px;border-radius:50%;margin:8px auto 10px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:19px;color:#2a1a02;background:linear-gradient(155deg,#ffe9ad,#ffd67a 60%,#e0a83f)}
-.pc-name{font-weight:700;font-size:16px}
-.pc-title{font-size:10.5px;color:#c9a24a;text-transform:uppercase;letter-spacing:.6px;margin:2px 0 10px}
-.pc-val{font-weight:800;font-size:18px;color:#ffe9ad}
-.pc-sub{font-size:10.5px;color:#a599c9;margin-top:2px}
-.rank-list{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:16px;padding:8px;margin-bottom:22px}
-.rank-row{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:12px}
-.rank-row:nth-child(even){background:rgba(255,255,255,.03)}
-.rr-pos{font-weight:700;color:#a599c9;width:28px}
-.rr-avatar{width:34px;height:34px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12.5px;color:#2a1a02;background:linear-gradient(155deg,#e7d9ff,#b9a2f0)}
-.rr-name{flex:1;font-weight:700;font-size:13.5px}
-.rr-sub{display:block;font-weight:500;font-size:11px;color:#a599c9;margin-top:2px}
-.rr-val{font-weight:700;font-size:14px;color:#ffe9ad}
+.r-top{text-align:center;margin-bottom:8px}
+.r-eyebrow{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:#d4b46a;font-weight:600}
+.r-title{font-family:"Geist","Inter",sans-serif;font-size:40px;line-height:44px;font-weight:600;letter-spacing:-.035em;margin:8px 0 4px;color:#ededef}
+.r-sub{color:#a1a3aa;font-size:13px;margin-bottom:28px}
+.podium{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:28px;align-items:end}
+.pc{background:#131417;border:1px solid #25272c;border-radius:14px;padding:18px 10px;text-align:center}
+.pc.rank-1{padding-top:28px;padding-bottom:28px;border-color:#d4b46a}
+.pc-pos{font-family:"Geist","Inter",sans-serif;font-size:12px;color:#d4b46a;font-weight:600}
+.pc-avatar{width:52px;height:52px;border-radius:50%;margin:8px auto 10px;display:flex;align-items:center;justify-content:center;font-family:"Geist","Inter",sans-serif;font-weight:600;font-size:18px;color:#1a1608;background:#d4b46a}
+.pc-name{font-family:"Geist","Inter",sans-serif;font-weight:600;font-size:16px;letter-spacing:-.01em}
+.pc-title{font-size:11px;color:#d4b46a;text-transform:uppercase;letter-spacing:.08em;margin:3px 0 10px;font-weight:600}
+.pc-val{font-family:"Geist","Inter",sans-serif;font-variant-numeric:tabular-nums;font-weight:600;font-size:20px;letter-spacing:-.02em;color:#ededef}
+.pc-sub{font-size:11px;color:#80838b;margin-top:3px}
+.rank-list{background:#131417;border:1px solid #25272c;border-radius:14px;padding:8px;margin-bottom:22px}
+.rank-row{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:10px;break-inside:avoid}
+.rank-row:nth-child(even){background:#191a1e}
+.rr-pos{font-family:"Geist","Inter",sans-serif;font-weight:600;color:#80838b;width:28px;font-size:13px}
+.rr-avatar{width:34px;height:34px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;font-family:"Geist","Inter",sans-serif;font-weight:600;font-size:12px;color:#ededef;background:#34363c}
+.rr-name{flex:1;font-weight:600;font-size:14px}
+.rr-sub{display:block;font-weight:400;font-size:11px;color:#80838b;margin-top:2px}
+.rr-val{font-family:"Geist","Inter",sans-serif;font-variant-numeric:tabular-nums;font-weight:600;font-size:14px;color:#ededef}
 .fs{text-align:center;margin-bottom:24px}
-.fs-label{font-size:10.5px;letter-spacing:1px;text-transform:uppercase;color:#a599c9;margin-bottom:6px}
-.fs-val{font-size:26px;font-weight:800;color:#ffe9ad}
-.r-footer{text-align:center;font-size:11px;color:#7a70a0;padding-top:14px;border-top:1px dashed rgba(255,255,255,.12)}
-.no-print button{background:#ffd67a;color:#2a1a02;border-radius:20px}
-@media print{body{background:#1b1240;-webkit-print-color-adjust:exact;print-color-adjust:exact;padding:0}}
+.fs-label{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#a1a3aa;margin-bottom:6px;font-weight:600}
+.fs-val{font-family:"Geist","Inter",sans-serif;font-variant-numeric:tabular-nums;font-size:28px;font-weight:600;letter-spacing:-.03em;color:#d4b46a}
+.r-footer{text-align:center;font-size:11px;color:#80838b;padding-top:14px;border-top:1px solid #25272c}
+@page{margin:0}
+@media print{body{background:#0d0e10;padding:14mm 12mm}}
 @media (max-width:560px){.podium{grid-template-columns:1fr}}
 `
 
@@ -305,7 +308,7 @@ export function reportHtml(r: ReportDoc, ctx: DocCtx): string {
   const rows = r.rows
     .map(
       (x) =>
-        `<tr${x.muted ? ' style="color:#9a8f6a"' : ''}><td>${esc(x.label)}</td>${x.cells.map((v) => `<td class="num">${esc(ctx.money(v))}</td>`).join('')}</tr>`,
+        `<tr${x.muted ? ' style="color:#6a6d75"' : ''}><td>${esc(x.label)}</td>${x.cells.map((v) => `<td class="num">${esc(ctx.money(v))}</td>`).join('')}</tr>`,
     )
     .join('')
   const body =

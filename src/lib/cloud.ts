@@ -26,6 +26,8 @@ export interface CloudSession {
   rev?: string
   /** hash dos dados deste aparelho na última sincronização */
   synced?: string
+  /** o que a pessoa escolheu no "Qual versão manter?": vale dali em diante, sem perguntar de novo */
+  pref?: 'cloud' | 'local'
 }
 
 export interface CloudPull {
@@ -81,6 +83,7 @@ export function toSession(j: TokenResponse, now: number, keep?: CloudSession): C
     // renovar o token não muda o que já foi sincronizado
     ...(keep?.rev ? { rev: keep.rev } : {}),
     ...(keep?.synced ? { synced: keep.synced } : {}),
+    ...(keep?.pref ? { pref: keep.pref } : {}),
     access: j.access_token,
     refresh: j.refresh_token,
     exp: Math.floor(now / 1000) + (j.expires_in || 3600),

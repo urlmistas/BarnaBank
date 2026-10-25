@@ -38,8 +38,9 @@ function server(initial: { data: Record<string, unknown>; updated_at: string } |
       return json(out)
     }
     if (method === 'PATCH') {
-      const want = decodeURIComponent(url.split('updated_at=eq.')[1])
-      if (!st.row || st.row.updated_at !== want) return json([])
+      // sem condição (`updated_at=eq.`): sobrescreve a linha, como no "manter deste aparelho"
+      const cond = url.split('updated_at=eq.')[1]
+      if (!st.row || (cond !== undefined && st.row.updated_at !== decodeURIComponent(cond))) return json([])
       st.row = { data: body!.data as Record<string, unknown>, updated_at: stamp() }
       return json([st.row])
     }
@@ -209,15 +210,41 @@ describe('sbResolve', () => {
     expect(box.s).toMatchObject({ rev: 'T2', synced: localHash() })
   })
 
-  it('manter o do aparelho: assume a versão da conta como lida e sobe por cima', async () => {
+  it('manter o do aparelho: sobe por cima da conta, sem condição, e lembra a escolha', async () => {
     putLocal('a')
     const { st, f } = server({ data: cloudData('nuvem'), updated_at: 'T2' })
-    const { e } = env(f, { rev: 'T1', synced: 'x' })
+    const { e, box } = env(f, { rev: 'T1', synced: 'x' })
     const r = await sbResolve(e, { data: cloudData('nuvem'), updated_at: 'T2' }, false)
     expect(r).toEqual({ kind: 'pushed' })
-    expect(st.calls[0].url).toContain('updated_at=eq.T2')
+    expect(st.calls[0].url).not.toContain('updated_at=eq.')
     expect((st.row!.data.debts as { id: string }[])[0].id).toBe('a')
     expect(localIds()).toEqual(['a'])
+    expect(box.s).toMatchObject({ pref: 'local', rev: st.row!.updated_at, synced: localHash() })
+  })
+
+  it('manter o do aparelho vale mesmo se a conta mudou de novo no meio do caminho', async () => {
+    putLocal('a')
+    const { st, f } = server({ data: cloudData('outro'), updated_at: 'T9' })
+    const { e } = env(f, { rev: 'T1', synced: 'x' })
+    expect(await sbResolve(e, { data: cloudData('nuvem'), updated_at: 'T2' }, false)).toEqual({ kind: 'pushed' })
+    expect((st.row!.data.debts as { id: string }[])[0].id).toBe('a')
+  })
+
+  it('depois de escolher a conta, um novo conflito segue a escolha, sem perguntar', async () => {
+    putLocal('a')
+    const { f } = server({ data: cloudData('nuvem2'), updated_at: 'T5' })
+    const { e, box } = env(f, { rev: 'T1', synced: 'antigo', pref: 'cloud' })
+    expect(await sbSync(e)).toEqual({ kind: 'adopted' })
+    expect(localIds()).toEqual(['nuvem2'])
+    expect(box.s).toMatchObject({ pref: 'cloud', rev: 'T5', synced: localHash() })
+  })
+
+  it('depois de escolher o aparelho, um novo conflito sobe o aparelho, sem perguntar', async () => {
+    putLocal('a')
+    const { st, f } = server({ data: cloudData('nuvem2'), updated_at: 'T5' })
+    const { e } = env(f, { rev: 'T1', synced: 'antigo', pref: 'local' })
+    expect(await sbSync(e)).toEqual({ kind: 'pushed' })
+    expect((st.row!.data.debts as { id: string }[])[0].id).toBe('a')
   })
 })
 

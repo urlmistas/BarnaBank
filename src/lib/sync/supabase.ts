@@ -64,22 +64,24 @@ export async function sbPull(env: SyncEnv): Promise<SbRow | null> {
 }
 
 /** sobe a foto atual. 'conflict' = a conta mudou em outro aparelho desde `rev` (ou a linha já existia sem rev) */
-async function push(env: SyncEnv): Promise<'ok' | 'conflict'> {
+async function push(env: SyncEnv, force = false): Promise<'ok' | 'conflict'> {
   const s = await active(env)
   const snapshot = buildSnapshot(now(env))
   const hashAtBuild = localHash()
   const stamp = now(env).toISOString()
   let row: SbRow | undefined
-  if (s.rev) {
+  // `force`: a pessoa escolheu os dados deste aparelho, então a linha é sobrescrita mesmo que tenha mudado
+  if (s.rev || force) {
     const rows = await sbFetch<SbRow[]>(
       env.fetcher,
-      '/rest/v1/bb_user_state?user_id=eq.' + encodeURIComponent(s.uid) + '&updated_at=eq.' + encodeURIComponent(s.rev),
+      '/rest/v1/bb_user_state?user_id=eq.' + encodeURIComponent(s.uid) + (force || !s.rev ? '' : '&updated_at=eq.' + encodeURIComponent(s.rev)),
       { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ data: snapshot, updated_at: stamp }) },
       s.access,
     )
-    if (!rows?.length) return 'conflict'
-    row = rows[0]
-  } else {
+    if (rows?.length) row = rows[0]
+    else if (!force) return 'conflict'
+  }
+  if (!row) {
     try {
       const rows = await sbFetch<SbRow[]>(
         env.fetcher,
@@ -128,6 +130,8 @@ export async function sbSync(env: SyncEnv, opts: { initial?: boolean; retried?: 
     return (await push(env)) === 'ok' ? { kind: 'pushed' } : retry(env, opts)
   }
   if (!localChanged || isLocalEmpty()) return adopt(env, row) ? { kind: 'adopted' } : { kind: 'noop' }
+  // já escolheu uma vez: segue a escolha, sem perguntar de novo
+  if (s.pref) return sbResolve(env, row, s.pref === 'cloud')
   return { kind: 'conflict', row }
 }
 
@@ -145,12 +149,15 @@ async function retry(env: SyncEnv, opts: { initial?: boolean; retried?: boolean 
 
 /** resposta da pessoa ao "Qual versão manter?" */
 export async function sbResolve(env: SyncEnv, row: SbRow, useCloud: boolean): Promise<SbResult> {
-  if (useCloud) return adopt(env, row) ? { kind: 'adopted' } : { kind: 'noop' }
   const s = env.session()
   if (!s) return { kind: 'off' }
-  // mantém o do aparelho: passa a tratar a versão da conta como a "última lida" e sobe por cima
-  env.save({ ...s, rev: row.updated_at })
-  return (await push(env)) === 'ok' ? { kind: 'pushed' } : { kind: 'noop' }
+  if (useCloud) {
+    env.save({ ...s, pref: 'cloud' })
+    return adopt(env, row) ? { kind: 'adopted' } : { kind: 'noop' }
+  }
+  // mantém o do aparelho: sobe por cima da conta, sem condição, e os dois ficam iguais
+  env.save({ ...s, pref: 'local', rev: row.updated_at })
+  return (await push(env, true)) === 'ok' ? { kind: 'pushed' } : { kind: 'noop' }
 }
 
 /** envia só se algo mudou aqui desde a última sincronização (usado depois de cada gravação) */

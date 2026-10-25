@@ -86,7 +86,7 @@ describe('Qual versão manter?', () => {
     await waitFor(() => expect(srv.row?.updated_at).toBe('T3'))
     expect((srv.row!.data.debts as { id: string }[]).map((d) => d.id)).toEqual(['do-aparelho'])
     expect(srv.row!.data.budgets).toEqual({ Mercado: 1 })
-    expect(srv.calls.some((c) => c.method === 'PATCH' && c.url.includes('updated_at=eq.T2'))).toBe(true)
+    expect(srv.calls.some((c) => c.method === 'PATCH' && !c.url.includes('updated_at=eq.'))).toBe(true)
     expect(ids()).toEqual(['do-aparelho'])
   })
 
