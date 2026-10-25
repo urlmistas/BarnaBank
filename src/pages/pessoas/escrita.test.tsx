@@ -6,6 +6,7 @@ import { DataProvider } from '@/app/data-context'
 import { ToastProvider } from '@/components/ui/toast'
 import { STORAGE_KEY } from '@/lib/storage'
 import { Pessoas } from './Pessoas'
+import { clickAction } from '@/test-menu'
 
 const cloud = vi.hoisted(() => ({ session: null as null | Record<string, unknown> }))
 vi.mock('@/lib/cloud', async (orig) => ({
@@ -102,7 +103,7 @@ describe('Pessoas: escrita', () => {
   it('excluir dívida pede confirmação', async () => {
     seed()
     mount()
-    fireEvent.click(await screen.findByRole('button', { name: /Excluir dívida de Ana Souza/ }))
+    await clickAction('Excluir')
     const dlg = document.querySelector<HTMLElement>('dialog[open]')!
     expect(stored().debts).toHaveLength(1)
     fireEvent.click(within(dlg).getByRole('button', { name: 'Excluir' }))

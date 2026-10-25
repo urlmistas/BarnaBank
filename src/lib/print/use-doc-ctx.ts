@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 import { useAppData } from '@/app/data-context'
+import { useTheme } from '@/app/theme'
 import type { DocCtx } from './documents'
 
 /** dados comuns dos documentos imprimíveis: moeda, data, carteiras e quem assina */
@@ -7,6 +8,7 @@ import type { DocCtx } from './documents'
 export function useDocCtx(): Omit<DocCtx, 'issuedAt'> {
   const { today, money, date, result, baseSettings } = useAppData()
   const wallets = result?.data.wallets
+  const { theme } = useTheme()
   return useMemo(
     () => ({
       today,
@@ -15,7 +17,8 @@ export function useDocCtx(): Omit<DocCtx, 'issuedAt'> {
       wallets: wallets ?? [],
       ownerName: String(baseSettings.ownerName ?? ''),
       ownerCity: String(baseSettings.ownerCity ?? ''),
+      theme,
     }),
-    [today, money, date, wallets, baseSettings],
+    [today, money, date, wallets, baseSettings, theme],
   )
 }

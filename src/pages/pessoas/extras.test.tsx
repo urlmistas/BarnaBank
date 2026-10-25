@@ -7,6 +7,7 @@ import { ToastProvider } from '@/components/ui/toast'
 import { STORAGE_KEY } from '@/lib/storage'
 import { Pessoas } from './Pessoas'
 import { choose } from '@/test-select'
+import { actionNames, clickAction } from '@/test-menu'
 
 const debt = (over: Record<string, unknown> = {}) => ({
   id: 'd1', name: 'Ana Souza', kind: 'receivable', principal: 300, rate: 0, interestType: 'composto', installments: 3, days: 90,
@@ -54,7 +55,7 @@ describe('Pessoas: renegociar e mais prazo', () => {
   it('renegociar troca o plano, mostra a prévia e o Desfazer volta', async () => {
     seed()
     mount()
-    fireEvent.click(await screen.findByRole('button', { name: /Renegociar/ }))
+    await clickAction('Renegociar')
     const dlg = openDialog()
     // 3 parcelas de 100 vencidas e sem encargos: faltam 300; parcelas de 150 viram 2x
     fireEvent.change(within(dlg).getByLabelText('Novo valor da parcela'), { target: { value: '150' } })
@@ -75,7 +76,7 @@ describe('Pessoas: renegociar e mais prazo', () => {
   it('valor inválido mostra o erro e não grava', async () => {
     seed()
     mount()
-    fireEvent.click(await screen.findByRole('button', { name: /Renegociar/ }))
+    await clickAction('Renegociar')
     const dlg = openDialog()
     fireEvent.change(within(dlg).getByLabelText('Novo valor da parcela'), { target: { value: '0' } })
     fireEvent.click(within(dlg).getByRole('button', { name: 'Renegociar' }))
@@ -86,7 +87,7 @@ describe('Pessoas: renegociar e mais prazo', () => {
   it('mais prazo remarca a parcela atrasada e valida a data', async () => {
     seed()
     mount()
-    fireEvent.click(await screen.findByRole('button', { name: /Mais prazo/ }))
+    await clickAction('Mais prazo')
     const dlg = openDialog()
     fireEvent.change(within(dlg).getByLabelText('Novo vencimento'), { target: { value: '2020-01-01' } })
     fireEvent.click(within(dlg).getByRole('button', { name: 'Remarcar' }))
@@ -100,8 +101,9 @@ describe('Pessoas: renegociar e mais prazo', () => {
   it('dívida recorrente não oferece renegociar', async () => {
     seed({ debts: [debt({ kind: 'payable', recurring: { amount: 50, label: 'Netflix' }, installments: 1, principal: 50 })] })
     mount()
-    await screen.findByRole('button', { name: /Mais prazo/ })
-    expect(screen.queryByRole('button', { name: /Renegociar/ })).toBeNull()
+    const names = await actionNames()
+    expect(names).toContain('Mais prazo')
+    expect(names).not.toContain('Renegociar')
   })
 })
 
@@ -165,7 +167,7 @@ describe('Pessoas: excluir conforme as Configurações', () => {
   it('confirmDelete ligado (padrão) pede confirmação', async () => {
     seed()
     mount()
-    fireEvent.click(await screen.findByRole('button', { name: /Excluir dívida de Ana Souza/ }))
+    await clickAction('Excluir')
     expect(stored().debts).toHaveLength(1)
     fireEvent.click(within(openDialog()).getByRole('button', { name: 'Excluir' }))
     await waitFor(() => expect(stored().debts).toHaveLength(0))
@@ -174,7 +176,7 @@ describe('Pessoas: excluir conforme as Configurações', () => {
   it('confirmDelete desligado exclui direto e oferece Desfazer', async () => {
     seed({}, { confirmDelete: false })
     mount()
-    fireEvent.click(await screen.findByRole('button', { name: /Excluir dívida de Ana Souza/ }))
+    await clickAction('Excluir')
     await waitFor(() => expect(stored().debts).toHaveLength(0))
     expect(document.querySelector('dialog[open]')).toBeNull()
     fireEvent.click(await screen.findByRole('button', { name: 'Desfazer' }))

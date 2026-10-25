@@ -123,3 +123,9 @@
   font-variant-numeric: tabular-nums;
   font-feature-settings: 'tnum', 'cv11';
 }
+
+/* Qualquer botão de excluir (ícone de lixeira) fica vermelho ao passar o mouse ou focar com o teclado */
+button:is(:hover, :focus-visible):has(.lucide-trash-2, .lucide-trash),
+[role='menuitem']:is(:hover, :focus-visible, [data-active='true']):has(.lucide-trash-2, .lucide-trash) {
+  color: var(--neg);
+}

@@ -140,6 +140,6 @@ describe('relatório', () => {
     expect(h).toContain('Fluxo &lt;mensal&gt;')
     expect(h).toContain('R$ 6,00')
     expect(h).toContain('<th class="num">Entradas</th>')
-    expect(h).toContain('color:#6a6d75')
+    expect(h).toContain('color:var(--p-subtle)')
   })
 })

@@ -30,13 +30,13 @@ async function copyText(text: string): Promise<boolean> {
   }
 }
 
-export function ShareButton({ type, refKey, label, className }: { type: ShareType; refKey: string; label: string; className?: string }) {
+export function ShareButton({ type, refKey, label, className, variant = 'ghost' }: { type: ShareType; refKey: string; label: string; className?: string; variant?: 'ghost' | 'outline' }) {
   const [open, setOpen] = useState(false)
   const shares = useShares()
   const live = !!shareFor(shares, type, refKey)
   return (
     <>
-      <Button variant="ghost" size="sm" className={className} onClick={() => setOpen(true)} aria-haspopup="dialog">
+      <Button variant={variant} size="sm" className={className} onClick={() => setOpen(true)} aria-haspopup="dialog">
         <Share2 aria-hidden="true" />
         {type === 'group' ? 'Link do grupo' : type === 'owe' ? 'Link do que devo' : type === 'debt' ? 'Link' : 'Link de cobrança'}
         {live && <span role="img" aria-label="link ativo" title="ativo" className="size-1.5 rounded-full bg-pos" />}

@@ -8,6 +8,7 @@ import { createReceiptStore, receiptIdOf } from '@/lib/receipts/store'
 import { memoryKV } from '@/lib/receipts/kv'
 import { STORAGE_KEY } from '@/lib/storage'
 import { Pessoas } from './Pessoas'
+import { actionNames, clickAction } from '@/test-menu'
 
 const IMG = 'data:image/jpeg;base64,AAAA'
 const mem = vi.hoisted(() => ({ kv: null as unknown }))
@@ -103,7 +104,7 @@ describe('Pessoas: documentos', () => {
   it('Extrato abre a página imprimível com o nome escapado', async () => {
     seed(debt({ name: 'Ana <b>Souza</b>' }))
     mount('/pessoas/' + encodeURIComponent('ana <b>souza</b>'))
-    fireEvent.click(await screen.findByRole('button', { name: /Extrato/ }))
+    await clickAction('Extrato')
     expect(window.open).toHaveBeenCalled()
     const html = win.document.write.mock.calls[0][0] as string
     expect(html).toContain('Extrato de Empréstimo')
@@ -114,7 +115,7 @@ describe('Pessoas: documentos', () => {
   it('Recibo só na dívida quitada', async () => {
     seed(debt())
     mount()
-    await screen.findByRole('button', { name: /Extrato/ })
+    expect(await actionNames()).not.toContain('Recibo de quitação')
     expect(screen.queryByRole('button', { name: /Recibo de quitação/ })).toBeNull()
     cleanup()
     localStorage.clear()
@@ -130,7 +131,7 @@ describe('Pessoas: documentos', () => {
     seed(debt())
     window.open = vi.fn(() => null)
     mount()
-    fireEvent.click(await screen.findByRole('button', { name: /Extrato/ }))
+    await clickAction('Extrato')
     expect(await screen.findByText(/bloqueou a nova janela/)).toBeTruthy()
   })
 
@@ -143,9 +144,9 @@ describe('Pessoas: documentos', () => {
 
   it('sem dados do aparelho (demonstração, só leitura) extrato fica e edição some', async () => {
     mount('/pessoas/ana%20souza')
-    fireEvent.click(await screen.findByRole('button', { name: /Extrato/ }))
+    await clickAction('Extrato')
     expect(win.document.write).toHaveBeenCalled()
     expect(screen.queryByRole('button', { name: /Recebi/ })).toBeNull()
-    expect(screen.queryByRole('button', { name: /Editar dívida/ })).toBeNull()
+    expect(await actionNames()).not.toContain('Editar')
   })
 })

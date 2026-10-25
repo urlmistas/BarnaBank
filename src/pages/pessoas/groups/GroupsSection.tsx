@@ -1,11 +1,12 @@
 import { useId, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Check, ChevronDown, MessageCircle, Pencil, Plus, Trash2, Users } from 'lucide-react'
+import { Check, ChevronDown, Ellipsis, MessageCircle, Pencil, Plus, Trash2, Users } from 'lucide-react'
 import { useAppData } from '@/app/data-context'
 import { useWrite } from '@/app/write'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
+import { Menu } from '@/components/ui/menu'
 import { Modal } from '@/components/ui/modal'
 import { useToast } from '@/components/ui/toast'
 import { EPS } from '@/lib/finance/dates'
@@ -117,22 +118,8 @@ function GroupCard({ g, st, calc }: { g: GroupData; st: GroupStats; calc: DebtCa
             </span>
             <span className="num text-xs text-fg-muted">{Math.round(pct)}%</span>
           </div>
-          <div role="progressbar" aria-label={pay ? 'Quanto já paguei' : 'Quanto já recebi'} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(pct)} className="mt-2 flex h-1.5 gap-0.5 overflow-hidden rounded-full">
-            {st.members.map((d) => {
-              const et = calc.effectiveTotal(d)
-              const fill = et > 0 ? Math.max(0, Math.min(100, (paidAmount(d) / et) * 100)) : 100
-              const s = memberState(d, calc)
-              return (
-                <span
-                  key={d.id}
-                  title={`${d.name}: ${money(Math.min(paidAmount(d), et))} de ${money(et)}`}
-                  style={{ flex: `${Math.max(et, 0.01).toFixed(2)} 1 0` }}
-                  className={cn('block overflow-hidden rounded-full bg-surface-2', s === 'atrasado' && 'bg-neg/25')}
-                >
-                  <i className="block h-full bg-accent" style={{ width: `${fill}%` }} />
-                </span>
-              )
-            })}
+          <div role="progressbar" aria-label={pay ? 'Quanto já paguei' : 'Quanto já recebi'} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(pct)} className="mt-2 h-1.5 overflow-hidden rounded-full bg-surface-2">
+            <div className="h-full rounded-full bg-accent transition-[width]" style={{ width: `${pct}%` }} />
           </div>
           {meta && <p className="mt-1.5 text-xs text-fg-subtle">{meta}</p>}
         </div>
@@ -155,22 +142,23 @@ function GroupCard({ g, st, calc }: { g: GroupData; st: GroupStats; calc: DebtCa
           </ul>
           {wallet && <p className="px-4 py-2 text-xs text-fg-muted">Pagamentos caem em: <b className="text-fg">{wallet.name}</b></p>}
           {g.notes && <p className="px-4 pb-2 text-xs text-fg-muted"><b className="text-fg">Anotações</b> {g.notes}</p>}
-          <div className="flex flex-wrap items-center gap-1.5 border-t border-border px-3 py-2">
+          <div className="flex flex-wrap items-center gap-2 border-t border-border px-4 py-3">
             {!pay && st.remaining > EPS && (
               <Button size="sm" variant="outline" onClick={() => setDlg('charge')}>
                 <MessageCircle aria-hidden="true" /> Cobrar pendentes
               </Button>
             )}
-            {n > 0 && !pay && <ShareButton type="group" refKey={g.id} label={g.title} />}
+            {n > 0 && !pay && <ShareButton type="group" refKey={g.id} label={g.title} variant="outline" />}
             {canEdit && (
-              <span className="ml-auto flex gap-0.5">
-                <Button size="sm" variant="ghost" onClick={() => setDlg('edit')} aria-label={`Editar grupo ${g.title}`}>
-                  <Pencil aria-hidden="true" /> Editar
-                </Button>
-                <Button size="icon" variant="ghost" className="size-8" aria-label={`Excluir grupo ${g.title}`} title="Excluir grupo" onClick={() => setDlg('delete')}>
-                  <Trash2 />
-                </Button>
-              </span>
+              <Menu
+                className="ml-auto"
+                label={`Mais ações do grupo ${g.title}`}
+                trigger={<Ellipsis aria-hidden="true" />}
+                items={[
+                  { label: 'Editar grupo', icon: <Pencil aria-hidden="true" />, onSelect: () => setDlg('edit') },
+                  { label: 'Excluir grupo', icon: <Trash2 aria-hidden="true" />, danger: true, onSelect: () => setDlg('delete') },
+                ]}
+              />
             )}
           </div>
         </div>

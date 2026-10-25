@@ -17,6 +17,8 @@ export interface DocCtx {
   ownerCity: string
   /** momento da emissão (injetável para teste) */
   issuedAt: Date
+  /** tema do site na hora de gerar; o documento sai igual e dá para trocar no botão da página */
+  theme?: 'dark' | 'light'
 }
 
 const stamp = (d: Date) => d.toLocaleDateString('pt-BR') + ' às ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
@@ -26,39 +28,39 @@ const typeLabel = (t: string) => (t === 'simples' ? 'simples' : t === 'price' ? 
 // ---------------------------------------------------------------- estilo comum das folhas claras
 
 const SHEET_CSS = `
-.sheet{max-width:680px;margin:0 auto;background:#fff;border:1px solid #e3e3df;border-radius:14px;padding:48px 52px 36px}
+.sheet{max-width:680px;margin:0 auto;background:var(--p-surface);border:1px solid var(--p-border);border-radius:14px;padding:48px 52px 36px}
 .s-top{display:flex;justify-content:space-between;align-items:center}
 .s-brand{display:flex;align-items:center;gap:10px}
 .s-mark{width:32px;height:32px;border-radius:8px;background:#d4b46a;display:flex;align-items:center;justify-content:center;font-family:"Geist","Inter",sans-serif;font-weight:600;color:#1a1608;font-size:18px}
 .s-brandname{font-family:"Geist","Inter",sans-serif;font-weight:600;font-size:17px;letter-spacing:-.02em}
-.s-doctype{text-align:right;color:#7f6420;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.08em}
-.s-rule{height:1px;background:#e3e3df;margin:22px 0 28px}
+.s-doctype{text-align:right;color:var(--p-accent-text);font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.08em}
+.s-rule{height:1px;background:var(--p-border);margin:22px 0 28px}
 .s-title{font-family:"Geist","Inter",sans-serif;font-weight:600;font-size:28px;line-height:34px;letter-spacing:-.03em;margin:0 0 4px}
-.s-sub{font-size:14px;color:#565961;margin-bottom:28px}
+.s-sub{font-size:14px;color:var(--p-muted);margin-bottom:28px}
 .s-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px;margin-bottom:28px}
-.s-label{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:#6a6d75;margin-bottom:5px;font-weight:600}
-.s-val{font-family:"Geist","Inter",sans-serif;font-variant-numeric:tabular-nums;font-size:18px;font-weight:600;letter-spacing:-.02em;color:#16171a}
-.s-val.accent{color:#7f6420}
-.s-summary{background:#f1f1ee;border:1px solid #e3e3df;border-radius:10px;padding:16px 20px;margin-bottom:28px;display:grid;grid-template-columns:1fr 1fr;gap:4px 28px}
-.s-summary .row{display:flex;justify-content:space-between;gap:12px;font-size:13px;padding:7px 0;border-bottom:1px solid #e3e3df;color:#565961}
-.s-summary .row b{font-family:"Geist","Inter",sans-serif;font-variant-numeric:tabular-nums;color:#16171a;font-weight:600}
+.s-label{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--p-subtle);margin-bottom:5px;font-weight:600}
+.s-val{font-family:"Geist","Inter",sans-serif;font-variant-numeric:tabular-nums;font-size:18px;font-weight:600;letter-spacing:-.02em;color:var(--p-fg)}
+.s-val.accent{color:var(--p-accent-text)}
+.s-summary{background:var(--p-surface2);border:1px solid var(--p-border);border-radius:10px;padding:16px 20px;margin-bottom:28px;display:grid;grid-template-columns:1fr 1fr;gap:4px 28px}
+.s-summary .row{display:flex;justify-content:space-between;gap:12px;font-size:13px;padding:7px 0;border-bottom:1px solid var(--p-border);color:var(--p-muted)}
+.s-summary .row b{font-family:"Geist","Inter",sans-serif;font-variant-numeric:tabular-nums;color:var(--p-fg);font-weight:600}
 table{width:100%;border-collapse:collapse;margin-bottom:24px}
-thead th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:#6a6d75;font-weight:600;padding:0 0 8px;border-bottom:1px solid #cfcfca}
-tbody td{padding:10px 0;border-bottom:1px solid #e3e3df;font-size:13px}
+thead th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--p-subtle);font-weight:600;padding:0 0 8px;border-bottom:1px solid var(--p-border-strong)}
+tbody td{padding:10px 0;border-bottom:1px solid var(--p-border);font-size:13px}
 tbody tr:last-child td{border-bottom:0}
 td+td,th+th{padding-left:14px}
 td.num,th.num{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
 td.num{font-family:"Geist","Inter",sans-serif;font-weight:500}
 .pill{font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px}
-.pill-paid{background:#e3f1ea;color:#1d7f53}
-.pill-pending{background:#f4ecd6;color:#7f6420}
+.pill-paid{background:var(--p-pos-bg);color:var(--p-pos)}
+.pill-pending{background:var(--p-warn-bg);color:var(--p-accent-text)}
 .s-notes{margin-bottom:24px}
-.s-notes p{font-size:14px;line-height:1.5;color:#16171a;margin:4px 0 0;white-space:pre-wrap}
-.s-footer{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;margin-top:32px;padding-top:16px;border-top:1px solid #e3e3df}
-.s-footer .issued{font-size:11px;color:#6a6d75}
-.s-seal{width:44px;height:44px;flex:none;border-radius:10px;border:1px solid #d4b46a;display:flex;align-items:center;justify-content:center;font-family:"Geist","Inter",sans-serif;font-size:11px;font-weight:600;letter-spacing:.06em;color:#7f6420;text-align:center;line-height:1.2}
+.s-notes p{font-size:14px;line-height:1.5;color:var(--p-fg);margin:4px 0 0;white-space:pre-wrap}
+.s-footer{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;margin-top:32px;padding-top:16px;border-top:1px solid var(--p-border)}
+.s-footer .issued{font-size:11px;color:var(--p-subtle)}
+.s-seal{width:44px;height:44px;flex:none;border-radius:10px;border:1px solid #d4b46a;display:flex;align-items:center;justify-content:center;font-family:"Geist","Inter",sans-serif;font-size:11px;font-weight:600;letter-spacing:.06em;color:var(--p-accent-text);text-align:center;line-height:1.2}
 tr,.s-summary,.s-grid{break-inside:avoid}
-@media print{.sheet{border:0;border-radius:0;margin:0;max-width:none;padding:6px 4px 0}}
+@media print{.sheet{background:transparent;border:0;border-radius:0;margin:0;max-width:none;padding:6px 4px 0}}
 `
 
 const top = (docType: string) =>
@@ -83,7 +85,7 @@ export function statementHtml(d: Debt, ctx: DocCtx): string {
             `<td><span class="pill pill-paid">${pay ? 'Pago' : 'Recebido'}</span></td></tr>`,
         )
         .join('')
-    : '<tr><td colspan="4" style="color:#6a6d75;font-style:italic">Nenhum pagamento registrado ainda.</td></tr>'
+    : '<tr><td colspan="4" style="color:var(--p-subtle);font-style:italic">Nenhum pagamento registrado ainda.</td></tr>'
   if (!paid) {
     for (const it of calc.schedule(d).insts) {
       if (it.open <= 0) continue
@@ -111,7 +113,7 @@ export function statementHtml(d: Debt, ctx: DocCtx): string {
     (d.notes ? `<div class="s-notes"><div class="s-label">Anotações</div><p>${esc(d.notes)}</p></div>` : '') +
     footer(ctx) +
     `</div>`
-  return renderDoc({ title: `Extrato — ${d.name} — BarnaBank`, css: SHEET_CSS, body })
+  return renderDoc({ title: `Extrato — ${d.name} — BarnaBank`, css: SHEET_CSS, body, theme: ctx.theme })
 }
 
 // ---------------------------------------------------------------- recibo de quitação
@@ -145,22 +147,22 @@ const RECEIPT_CSS = `
 .r-bar{display:flex;justify-content:space-between;align-items:center;background:#0d0e10;color:#d4b46a;padding:12px 52px;font-family:"Geist","Inter",sans-serif;font-size:13px;font-weight:600;letter-spacing:-.01em;border-bottom:3px solid #d4b46a}
 .r-bar span{color:#a1a3aa;font-weight:500;font-size:11px;font-variant-numeric:tabular-nums;letter-spacing:.04em}
 .r-in{padding:36px 52px 0}
-.r-h{font-size:24px;font-weight:600;margin:0;letter-spacing:-.03em}
-.r-sm{color:#565961;font-size:13px;margin:6px 0 28px}
-.r-total{background:#f1f1ee;border-left:3px solid #d4b46a;border-radius:0 10px 10px 0;padding:16px 18px;display:flex;justify-content:space-between;gap:16px;margin-bottom:28px}
-.r-total .k{font-size:11px;font-weight:600;color:#6a6d75;letter-spacing:.08em}
+.r-h{font-size:24px;font-weight:600;margin:0;letter-spacing:.01em}
+.r-sm{color:var(--p-muted);font-size:13px;margin:6px 0 28px}
+.r-total{background:var(--p-surface2);border-left:3px solid #d4b46a;border-radius:0 10px 10px 0;padding:16px 18px;display:flex;justify-content:space-between;gap:16px;margin-bottom:28px}
+.r-total .k{font-size:11px;font-weight:600;color:var(--p-subtle);letter-spacing:.08em}
 .r-total .v{font-family:"Geist","Inter",sans-serif;font-variant-numeric:tabular-nums;font-size:22px;font-weight:600;letter-spacing:-.02em;margin-top:4px}
 .r-total .v2{font-family:"Geist","Inter",sans-serif;font-size:15px;font-weight:600;margin-top:4px;text-align:right}
 .r-text{font-size:14px;line-height:1.65;margin:0 0 14px}
-.r-note{font-size:12px;color:#565961;margin:0 0 14px}
-.r-h2{font-size:11px;font-weight:600;color:#6a6d75;letter-spacing:.08em;margin:22px 0 6px;padding-bottom:6px;border-bottom:1px solid #cfcfca}
+.r-note{font-size:12px;color:var(--p-muted);margin:0 0 14px}
+.r-h2{font-size:11px;font-weight:600;color:var(--p-subtle);letter-spacing:.08em;margin:22px 0 6px;padding-bottom:6px;border-bottom:1px solid var(--p-border-strong)}
 .r-tbl td{padding:8px 10px;font-size:13px}
-.r-tbl tr:nth-child(odd) td{background:#f7f7f5}
-.r-tbl td.w{color:#565961;font-size:12px}
-.r-sum td{font-weight:600;border-top:1px solid #cfcfca}
+.r-tbl tr:nth-child(odd) td{background:var(--p-bg)}
+.r-tbl td.w{color:var(--p-muted);font-size:12px}
+.r-sum td{font-weight:600;border-top:1px solid var(--p-border-strong)}
 .r-place{margin:40px 0 0;font-size:13px}
-.r-sign{margin-top:56px;width:250px;border-top:1px solid #16171a;padding-top:6px;font-size:13px}
-.r-foot{margin:36px 52px 0;font-size:11px;color:#6a6d75}
+.r-sign{margin-top:56px;width:250px;border-top:1px solid var(--p-fg);padding-top:6px;font-size:13px}
+.r-foot{margin:36px 52px 0;font-size:11px;color:var(--p-subtle)}
 `
 
 export function receiptHtml(d: Debt, ctx: DocCtx, groupTitle?: string): string {
@@ -195,9 +197,9 @@ export function receiptHtml(d: Debt, ctx: DocCtx, groupTitle?: string): string {
     `<div class="r-h2">PAGAMENTOS</div><table class="r-tbl"><tbody>${rows}${more}` +
     `<tr class="r-sum"><td colspan="2">Total</td><td class="num">${esc(ctx.money(total))}</td></tr></tbody></table>` +
     `<p class="r-place">${city ? esc(city) + ', ' : ''}${esc(dataExtenso(last))}.</p>` +
-    `<div class="r-sign">${owner ? `<b>${esc(owner)}</b>` : '<span style="color:#6e7280">Assinatura de quem recebeu</span>'}</div></div>` +
+    `<div class="r-sign">${owner ? `<b>${esc(owner)}</b>` : '<span style="color:var(--p-subtle)">Assinatura de quem recebeu</span>'}</div></div>` +
     `<p class="r-foot">Gerado pelo BarnaBank em ${esc(dataCompleta(ctx.today))} · código ${esc(code)}. Valores conforme os pagamentos registrados.</p></div>`
-  return renderDoc({ title: `Recibo de quitação — ${d.name} — BarnaBank`, css: SHEET_CSS + RECEIPT_CSS, body })
+  return renderDoc({ title: `Recibo de quitação — ${d.name} — BarnaBank`, css: SHEET_CSS + RECEIPT_CSS, body, theme: ctx.theme })
 }
 
 // ---------------------------------------------------------------- ranking dos pagadores
@@ -290,7 +292,7 @@ export function rankingHtml(rows: RankingRow[], ctx: DocCtx): string {
     `<div class="podium">${podium}</div>${rest ? `<div class="rank-list">${rest}</div>` : ''}` +
     `<div class="fs"><div class="fs-label">Total já recebido por todos</div><div class="fs-val">${esc(ctx.money(total))}</div></div>` +
     `<div class="r-footer">Documento gerado por BarnaBank · uso pessoal e divertido entre amigos</div></div>`
-  return renderDoc({ title: 'Ranking — BarnaBank', css: RANK_CSS, body })
+  return renderDoc({ title: 'Ranking — BarnaBank', css: RANK_CSS, body, theme: 'dark', themable: false })
 }
 
 // ---------------------------------------------------------------- relatório do período
@@ -308,7 +310,7 @@ export function reportHtml(r: ReportDoc, ctx: DocCtx): string {
   const rows = r.rows
     .map(
       (x) =>
-        `<tr${x.muted ? ' style="color:#6a6d75"' : ''}><td>${esc(x.label)}</td>${x.cells.map((v) => `<td class="num">${esc(ctx.money(v))}</td>`).join('')}</tr>`,
+        `<tr${x.muted ? ' style="color:var(--p-subtle)"' : ''}><td>${esc(x.label)}</td>${x.cells.map((v) => `<td class="num">${esc(ctx.money(v))}</td>`).join('')}</tr>`,
     )
     .join('')
   const body =
@@ -317,5 +319,5 @@ export function reportHtml(r: ReportDoc, ctx: DocCtx): string {
     `<div><div class="s-label">Gastos</div><div class="s-val">${esc(ctx.money(r.summary.spending))}</div></div>` +
     `<div><div class="s-label">Saldo do período</div><div class="s-val accent">${esc(ctx.money(r.summary.net))}</div></div></div>` +
     `<table><thead><tr>${th}</tr></thead><tbody>${rows}</tbody></table>${footer(ctx)}</div>`
-  return renderDoc({ title: `Relatório — ${r.periodText} — BarnaBank`, css: SHEET_CSS, body })
+  return renderDoc({ title: `Relatório — ${r.periodText} — BarnaBank`, css: SHEET_CSS, body, theme: ctx.theme })
 }

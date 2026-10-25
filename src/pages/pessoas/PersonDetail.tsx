@@ -25,7 +25,7 @@ import { receiptIdOf } from '@/lib/receipts/store'
 const PersonCalendar = lazy(() => import('./PersonCalendar').then((m) => ({ default: m.PersonCalendar })))
 
 const ease = [0.2, 0, 0, 1] as const
-type Tab = 'dividas' | 'historico' | 'calendario'
+type Tab = 'receber' | 'pagar' | 'historico' | 'calendario'
 
 export function PersonDetailView({
   personKey,
@@ -128,8 +128,17 @@ function PersonFigures({ p, className }: { p: PersonDetail; className?: string }
 }
 
 function PersonTabs({ p, padded }: { p: PersonDetail; padded: boolean }) {
-  const [tab, setTab] = useState<Tab>('dividas')
+  const toReceive = p.debts.filter((v) => v.kind === 'receivable')
+  const toPay = p.debts.filter((v) => v.kind === 'payable')
+  const [tab, setTab] = useState<Tab>(toReceive.length || !toPay.length ? 'receber' : 'pagar')
   const baseId = useId()
+  const items: { value: Tab; label: string; count?: number }[] = []
+  if (toReceive.length || !toPay.length) items.push({ value: 'receber', label: 'Me devem', count: toReceive.length })
+  if (toPay.length) items.push({ value: 'pagar', label: 'Eu devo', count: toPay.length })
+  items.push({ value: 'historico', label: 'Histórico', count: p.history.length }, { value: 'calendario', label: 'Calendário' })
+  const list = tab === 'pagar' ? toPay : toReceive
+  // só a primeira dívida em aberto (ou a primeira, se tudo está quitado) vem aberta; as outras abrem ao clicar
+  const firstOpenId = (list.find((v) => !v.paid) ?? list[0])?.debt.id
   return (
     <div className="mt-5">
       <Tabs
@@ -138,11 +147,7 @@ function PersonTabs({ p, padded }: { p: PersonDetail; padded: boolean }) {
         value={tab}
         onChange={setTab}
         className={cn(padded && 'px-3')}
-        items={[
-          { value: 'dividas', label: 'Dívidas', count: p.debts.length },
-          { value: 'historico', label: 'Histórico', count: p.history.length },
-          { value: 'calendario', label: 'Calendário' },
-        ]}
+        items={items}
       />
       <AnimatePresence mode="wait" initial={false}>
         <motion.div
@@ -153,10 +158,10 @@ function PersonTabs({ p, padded }: { p: PersonDetail; padded: boolean }) {
           transition={{ duration: 0.15, ease }}
         >
           <TabPanel baseId={baseId} value={tab} className={cn('pt-4', padded ? 'px-5 pb-5' : 'pb-2')}>
-            {tab === 'dividas' && (
+            {(tab === 'receber' || tab === 'pagar') && (
               <div className="flex flex-col gap-3">
-                {p.debts.map((v) => (
-                  <DebtCard key={v.debt.id} v={v} />
+                {list.map((v) => (
+                  <DebtCard key={v.debt.id} v={v} defaultOpen={v.debt.id === firstOpenId} />
                 ))}
               </div>
             )}
@@ -205,10 +210,12 @@ function metaLine(v: DebtView, money: (n: number) => string, date: (iso: string)
 
 const INST_WINDOW = 6
 
-function DebtCard({ v }: { v: DebtView }) {
+function DebtCard({ v, defaultOpen }: { v: DebtView; defaultOpen: boolean }) {
   const { money, date } = useAppData()
-  const [open, setOpen] = useState(!v.paid)
+  const [open, setOpen] = useState(defaultOpen)
+  const [showInsts, setShowInsts] = useState(false)
   const [all, setAll] = useState(false)
+  const bodyId = useId()
   const listId = useId()
   const st = statusText(v, money)
   const pay = v.kind === 'payable'
@@ -228,80 +235,97 @@ function DebtCard({ v }: { v: DebtView }) {
 
   return (
     <Card aria-label={v.label} className="overflow-hidden">
-      <div className="px-4 pt-3.5 pb-3">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-              <h3 className="truncate text-sm font-medium">{v.label}</h3>
-              <Badge>{pay ? 'a pagar' : 'a receber'}</Badge>
-            </div>
-            <p className={cn('mt-0.5 text-xs', st.late ? 'text-neg' : 'text-fg-subtle')}>{st.text}</p>
-          </div>
-          <div className="shrink-0 text-right">
-            <p className="num text-base font-semibold tracking-tight">{money(v.paid ? v.paidAmount : v.remaining)}</p>
-            <p className="num text-xs text-fg-subtle">
-              {v.paid ? (pay ? 'pago no total' : 'recebido no total') : `falta de ${money(v.total)}`}
-            </p>
-          </div>
-        </div>
-        <div
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-controls={bodyId}
+        onClick={() => setOpen((o) => !o)}
+        className="block w-full cursor-pointer px-4 pt-3.5 pb-3 text-left transition-colors hover:bg-surface-2"
+      >
+        <span className="flex items-start justify-between gap-3">
+          <span className="min-w-0">
+            <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+              <span className="truncate text-sm font-medium">{v.label}</span>
+              {d.groupId && <Badge>grupo</Badge>}
+            </span>
+            <span className={cn('mt-0.5 block text-xs', st.late ? 'text-neg' : 'text-fg-subtle')}>{st.text}</span>
+          </span>
+          <span className="flex shrink-0 items-start gap-2">
+            <span className="text-right">
+              <span className="num block text-base font-semibold tracking-tight">{money(v.paid ? v.paidAmount : v.remaining)}</span>
+              <span className="num block text-xs text-fg-subtle">
+                {v.paid ? (pay ? 'pago no total' : 'recebido no total') : `falta de ${money(v.total)}`}
+              </span>
+            </span>
+            <ChevronDown aria-hidden="true" className={cn('mt-1 size-4 shrink-0 text-fg-subtle transition-transform', open && 'rotate-180')} />
+          </span>
+        </span>
+        <span
           role="progressbar"
           aria-label={pay ? 'Quanto já paguei' : 'Quanto já recebi'}
           aria-valuemin={0}
           aria-valuemax={100}
           aria-valuenow={Math.round(v.progress)}
-          className="mt-3 h-1 overflow-hidden rounded-full bg-surface-2"
+          className="mt-3 block h-1 overflow-hidden rounded-full bg-surface-2"
         >
-          <div className="h-full rounded-full bg-accent" style={{ width: `${v.progress}%` }} />
-        </div>
-        <p className="mt-2 text-xs text-fg-muted">{metaLine(v, money, date)}</p>
-        {d.notes && <p className="mt-1 line-clamp-2 text-xs text-fg-subtle">{d.notes}</p>}
-        {extras.length > 0 && (
-          <dl className="mt-2 flex flex-col gap-0.5 text-xs">
-            {extras.map((x) => (
-              <div key={x.label} className="flex justify-between gap-3">
-                <dt className="text-fg-muted">{x.label}</dt>
-                <dd className="num">{x.value}</dd>
-              </div>
-            ))}
-          </dl>
-        )}
-      </div>
-
-      <DebtActions debt={d} paid={v.paid} />
-
-      <button
-        type="button"
-        aria-expanded={open}
-        aria-controls={listId}
-        onClick={() => setOpen((o) => !o)}
-        className="flex w-full cursor-pointer items-center justify-between gap-2 border-t border-border px-4 py-2 text-xs font-medium text-fg-muted transition-colors hover:bg-surface-2 hover:text-fg"
-      >
-        <span>
-          Parcelas <span className="num text-fg-subtle">{v.covered}/{v.n} quitadas</span>
+          <span className="block h-full rounded-full bg-accent" style={{ width: `${v.progress}%` }} />
         </span>
-        <ChevronDown aria-hidden="true" className={cn('size-4 transition-transform', open && 'rotate-180')} />
       </button>
+
       <AnimatePresence initial={false}>
         {open && (
           <motion.div
-            id={listId}
+            id={bodyId}
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.18, ease }}
             className="overflow-hidden"
           >
-            <ol aria-label={`Parcelas de ${v.label}`} className="border-t border-border">
-              {insts.map((it) => (
-                <InstRow key={it.i} it={it} pay={pay} />
-              ))}
-            </ol>
-            {v.insts.length > INST_WINDOW + 2 && (
-              <div className="border-t border-border px-2 py-1">
-                <Button variant="ghost" size="sm" className="w-full" onClick={() => setAll((a) => !a)} aria-controls={listId}>
-                  {all ? 'Mostrar menos' : `Ver todas as ${v.insts.length} parcelas`}
-                </Button>
+            <div className="border-t border-border px-4 py-3">
+              <p className="text-xs text-fg-muted">{metaLine(v, money, date)}</p>
+              {d.notes && <p className="mt-1 line-clamp-2 text-xs text-fg-subtle">{d.notes}</p>}
+              {extras.length > 0 && (
+                <dl className="mt-2 flex flex-col gap-0.5 text-xs">
+                  {extras.map((x) => (
+                    <div key={x.label} className="flex justify-between gap-3">
+                      <dt className="text-fg-muted">{x.label}</dt>
+                      <dd className="num">{x.value}</dd>
+                    </div>
+                  ))}
+                </dl>
+              )}
+              <div className="mt-3">
+                <DebtActions debt={d} paid={v.paid} />
+              </div>
+            </div>
+
+            <button
+              type="button"
+              aria-expanded={showInsts}
+              aria-controls={listId}
+              onClick={() => setShowInsts((o) => !o)}
+              className="flex w-full cursor-pointer items-center justify-between gap-2 border-t border-border px-4 py-2 text-xs font-medium text-fg-muted transition-colors hover:bg-surface-2 hover:text-fg"
+            >
+              <span>
+                Parcelas <span className="num text-fg-subtle">{v.covered}/{v.n} quitadas</span>
+              </span>
+              <ChevronDown aria-hidden="true" className={cn('size-4 transition-transform', showInsts && 'rotate-180')} />
+            </button>
+            {showInsts && (
+              <div id={listId}>
+                <ol aria-label={`Parcelas de ${v.label}`} className="border-t border-border">
+                  {insts.map((it) => (
+                    <InstRow key={it.i} it={it} pay={pay} />
+                  ))}
+                </ol>
+                {v.insts.length > INST_WINDOW + 2 && (
+                  <div className="border-t border-border px-2 py-1">
+                    <Button variant="ghost" size="sm" className="w-full" onClick={() => setAll((a) => !a)} aria-controls={listId}>
+                      {all ? 'Mostrar menos' : `Ver todas as ${v.insts.length} parcelas`}
+                    </Button>
+                  </div>
+                )}
               </div>
             )}
           </motion.div>
