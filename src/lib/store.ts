@@ -1,5 +1,5 @@
 import type { Bill, Card, CardPayment, CardPurchase, Debt, Group, Transaction, Wallet } from '@/lib/types'
-import { normalizeDebts, STORAGE_KEY } from '@/lib/storage'
+import { normalizeDebts, SETTINGS_KEY, STORAGE_KEY } from '@/lib/storage'
 
 // Escrita no armazenamento do BarnaBank (mesma chave do app antigo, `barnabank_debts_v3`).
 //
@@ -127,4 +127,44 @@ export function setPhone(api: StoreApi, name: string, digits: string) {
 
 export function replaceDebt(api: StoreApi, id: string, fn: (d: Debt) => Debt) {
   api.debts = api.debts.map((d) => (d.id === id ? fn(d) : d))
+}
+
+export type SettingsResult = { ok: true; before: string | null; after: string } | { ok: false; error: string }
+
+/**
+ * Grava configurações em `barnabank_settings_v1`: junta `patch` ao JSON atual e preserva as chaves desconhecidas.
+ * Valor `undefined` apaga a chave. JSON atual corrompido: recusa sem sobrescrever. Avisa o app pelo STORE_EVENT.
+ */
+export function commitSettings(patch: Record<string, unknown>): SettingsResult {
+  const ls = storage()
+  if (!ls) return { ok: false, error: 'Este navegador não permite gravar dados.' }
+  let before: string | null
+  try {
+    before = ls.getItem(SETTINGS_KEY)
+  } catch {
+    return { ok: false, error: 'Não consegui ler as configurações deste navegador.' }
+  }
+  let cur: Raw = {}
+  if (before) {
+    try {
+      const parsed: unknown = JSON.parse(before)
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return { ok: false, error: 'As configurações salvas estão em formato desconhecido. Nada foi alterado.' }
+      cur = parsed as Raw
+    } catch {
+      return { ok: false, error: 'As configurações salvas estão corrompidas. Nada foi alterado.' }
+    }
+  }
+  const next: Raw = { ...cur }
+  for (const [k, v] of Object.entries(patch)) {
+    if (v === undefined) delete next[k]
+    else next[k] = v
+  }
+  const after = JSON.stringify(next)
+  try {
+    ls.setItem(SETTINGS_KEY, after)
+  } catch {
+    return { ok: false, error: 'Não consegui salvar neste navegador.' }
+  }
+  globalThis.dispatchEvent?.(new Event(STORE_EVENT))
+  return { ok: true, before, after }
 }

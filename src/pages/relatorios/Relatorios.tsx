@@ -21,6 +21,8 @@ import { cn } from '@/lib/utils'
 import type { AppData, YearMonth } from '@/lib/types'
 import { CHART_KINDS, CHART_LABEL, monthTitle, PERIOD_LABEL, pctText, periodTitle, previousTitle, TONE_VAR, type ChartKind } from './spec'
 import { buildView, type ChartView, type RankRow } from './view'
+import { PlanSections } from './PlanSections'
+import { MonthImageButton } from './MonthImage'
 
 // Relatórios: período (mês / 3 meses / 12 meses / ano), três medidas e UM gráfico por vez,
 // escolhido nas abas, com tabela alternativa e lista ordenada abaixo.
@@ -116,7 +118,7 @@ function Report({ data, today, range }: { data: AppData; today: string; range: R
     <div>
       <header className="flex flex-col gap-4">
         <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <h1 className="text-2xl font-semibold tracking-tight">Relatórios</h1>
             <Button
               size="sm"
@@ -132,6 +134,7 @@ function Report({ data, today, range }: { data: AppData; today: string; range: R
               <Printer aria-hidden="true" />
               Imprimir / PDF
             </Button>
+            {kind === 'mes' && <MonthImageButton data={data} today={today} month={anchor} />}
           </div>
           <PeriodNav
             title={periodText}
@@ -176,6 +179,8 @@ function Report({ data, today, range }: { data: AppData; today: string; range: R
       </Card>
 
       {view.rank.rows.length > 0 && <RankList key={chart + kind + anchor} rank={view.rank} />}
+
+      <PlanSections data={data} today={today} month={kind === 'mes' ? anchor : now} />
     </div>
   )
 }

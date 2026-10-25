@@ -41,6 +41,11 @@ async function active(env: SyncEnv): Promise<CloudSession> {
   return s
 }
 
+/** token de acesso da conta (renovado se preciso), para falar com o bot */
+export async function activeToken(env: SyncEnv): Promise<string> {
+  return (await active(env)).access
+}
+
 function mark(env: SyncEnv, rev?: string) {
   const s = env.session()
   if (!s) return

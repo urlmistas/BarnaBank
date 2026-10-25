@@ -3,6 +3,11 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="BarnaBank" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="color-scheme" content="dark light" />
     <meta name="theme-color" content="#0d0e10" />
@@ -15,9 +20,28 @@
         if (t === 'light') document.documentElement.classList.remove('dark');
       } catch (e) {}
     </script>
+    <script>
+      // Link do e-mail (confirmar conta / nova senha): o Supabase volta com os tokens no #hash, que aqui é a rota.
+      // Guarda o hash para Configurações (src/lib/auth-link.ts) e já aponta a rota para lá, antes do roteador subir.
+      try {
+        var h = location.hash || '';
+        if (h.indexOf('access_token=') >= 0 || h.indexOf('error_description=') >= 0) {
+          sessionStorage.setItem('bbweb_auth_hash', h.replace(/^#/, ''));
+          history.replaceState(null, '', location.pathname + location.search + '#/configuracoes');
+        }
+      } catch (e) {}
+    </script>
   </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+    <script>
+      // service worker (só no site publicado): deixa o app abrir rápido e offline. Ver public/sw.js.
+      if ('serviceWorker' in navigator && '%MODE%' === 'production') {
+        addEventListener('load', function () {
+          navigator.serviceWorker.register('%BASE_URL%sw.js', { scope: '%BASE_URL%' }).catch(function () {});
+        });
+      }
+    </script>
   </body>
 </html>

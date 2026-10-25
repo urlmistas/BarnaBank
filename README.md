@@ -1,24 +1,23 @@
 # BarnaBank Web
 
-**Versão 1.0.0** · [urlmistas.github.io/BarnaBank](https://urlmistas.github.io/BarnaBank/)
+[urlmistas.github.io/BarnaBank](https://urlmistas.github.io/BarnaBank/)
 
-Nova interface do BarnaBank (controle de dívidas, contas e carteiras), feita em React e publicada em paralelo ao
-[app atual](https://urlmistas.github.io/barna-bank/). A versão 1.0 é **somente leitura**: ela mostra os seus dados
-com um visual novo, mas não cria, edita nem apaga nada. Para alterar dados, continue usando o app atual.
+Interface nova do BarnaBank (controle de dívidas, contas e carteiras), feita em React. Ela lê e grava os mesmos dados
+do app antigo (`barna-bank`), com o mesmo formato, e no repositório também está o bot do Telegram (`bot/`).
 
-## O que tem na 1.0
+## O que tem
 
-| Tela | O que mostra |
+| Tela | O que faz |
 |---|---|
 | **Início** | Resumo do dia, a semana, o que vence e o que está atrasado. |
-| **Pessoas** | Lista única com o saldo líquido de cada pessoa (a receber − eu devo), filtros, busca e detalhe com parcelas e histórico. |
-| **Carteiras** | Saldo por carteira, extrato do mês, gráfico e detalhe de cartões com a fatura. |
-| **Contas** | Contas fixas e faturas de cartão por mês, com filtros, busca e detalhe. |
-| **Relatórios** | Período, três medidas, um gráfico por vez (categorias, evolução, comparação) e modo tabela. |
-| **Configurações** | Conta na nuvem, tema (sistema, claro, escuro), moeda, formato de data e origem dos dados. |
+| **Pessoas** | Saldo líquido por pessoa, filtros e busca. Nova dívida, pagamento rápido e parcial, quitar, renegociar, desfazer, comprovantes e recibo em PDF, cobrança por WhatsApp e link, grupos, placar. |
+| **Carteiras** | Saldo, extrato do mês e gráfico. Nova carteira, lançamentos, transferências, "Repetir todo mês" e importação de extrato (OFX/CSV). |
+| **Contas** | Contas fixas e faturas de cartão por mês. Marcar paga, cartões, compras, pagar fatura, calendário e "Cabe no mês?". |
+| **Relatórios** | Período, medidas, gráficos e tabela, orçamento do mês, metas, plano e resumo do mês em imagem. |
+| **Configurações** | Conta, Telegram, aparência, formatos, padrões (juros, multa, PIX), atalhos, dados, backup e instalação. |
 
-Também: tema escuro por padrão, layout para celular e desktop, carregamento com *skeletons*, estados de erro e de
-dados vazios, e filtros guardados na URL (dá para compartilhar um link com o filtro aplicado).
+Também: busca geral (`Ctrl+K` ou `/`), simulador de empréstimo, "olhinho" para esconder valores, atalhos de teclado,
+tema escuro por padrão, layout para celular e desktop, PWA instalável e filtros guardados na URL.
 
 ## De onde vêm os dados e como sincroniza
 
@@ -29,9 +28,9 @@ Os dados **deste aparelho** são sempre a fonte: o app lê e grava no `localStor
 2. O `localStorage` deste aparelho.
 3. Sem nada disso, **dados de demonstração** (selo "Demonstração" no topo).
 
-Cada gravação preserva os campos que o app ainda não conhece (`budgets`, `goals`, `shares`, `tgLog`…): o JSON atual é
-lido, só o que mudou é trocado e o resto volta intacto. O `localStorage` só é compartilhado na mesma origem; em
-`localhost` não há os dados do app publicado, e aparece a demonstração.
+Cada gravação preserva os campos que o app não edita (`shares`, `tgLog`, `catRules`, `invites`…): o JSON atual é lido,
+só o que mudou é trocado e o resto volta intacto. O `localStorage` só é compartilhado na mesma origem; em `localhost`
+não há os dados do app publicado, e aparece a demonstração.
 
 ### Conta na nuvem (Supabase)
 
@@ -54,11 +53,16 @@ voltar. Se a sessão expirar, o app sai da conta e **nenhum dado é apagado**.
 
 ### Bot do Telegram
 
-Em **Configurações → Nuvem e bot do Telegram**, informe o endereço do bot e a chave (`SYNC_KEY`). A configuração fica
-em `barnabank_cloud`, a mesma chave do app antigo, então quem já tinha configurado não precisa digitar de novo. O bot
-aplica sozinho as mensagens do Telegram (ele tem as mesmas regras do app); este app envia os dados do aparelho quando
-mudam e adota a versão do bot quando só o bot mudou. A chave só viaja no cabeçalho `Authorization`, nunca na URL, e
-não aparece em mensagens de erro.
+Há dois modos, e convivem no mesmo worker:
+
+- **Conta (bot compartilhado):** em **Configurações → Telegram**, logado, gere um código e mande ao bot. Só aparece
+  quando o build tem `VITE_BOT_URL` (variável `BOT_URL` do repositório, veja Publicação).
+- **Antigo (um dono só):** informe o endereço do bot e a chave (`SYNC_KEY`). Fica em `barnabank_cloud`, a mesma chave
+  do app antigo, então quem já configurou não digita de novo.
+
+O bot aplica sozinho as mensagens do Telegram (ele tem as mesmas regras do app); o app envia os dados do aparelho
+quando mudam e adota a versão do bot quando só o bot mudou. A chave só viaja no cabeçalho `Authorization`, nunca na
+URL, e não aparece em mensagens de erro. Instalação e detalhes: [bot/README.md](bot/README.md).
 
 ### O que o app novo grava no navegador
 
@@ -66,14 +70,14 @@ não aparece em mensagens de erro.
 |---|---|
 | `barnabank_debts_v3`, `barnabank_settings_v1` | Os dados (mesmo formato do app antigo). |
 | `barnabank_cloud` | Endereço e chave do bot, e o controle da última sincronização. |
-| `bbweb_theme` | Tema escolhido. |
-| `bbweb_prefs` | Moeda e formato de data escolhidos em Configurações. |
+| `barnabank_hide_values` | Se os valores estão escondidos. |
+| `barnabank_last_export`, `barnabank_backup_banner_snooze` | Controle do lembrete de backup. |
+| `bbweb_theme`, `bbweb_prefs`, `bbweb_shortcuts` | Tema, moeda e formato de data, atalhos ligados ou não. |
 | `bbweb_session` | Sessão do login na nuvem, com `rev` e `synced` da última sincronização. |
 | `bbweb_backup_prev` | Cópia dos dados de antes da última vez que a nuvem os substituiu. |
 
 A sessão do app antigo (`barnabank_sb`) não é lida nem renovada, para não derrubar o login dele. "Sair" em
-Configurações só apaga `bbweb_session`; os dados continuam no aparelho. Criar conta e recuperar senha continuam no app
-antigo.
+Configurações só apaga `bbweb_session`; os dados continuam no aparelho.
 
 ## Rodar localmente
 
@@ -82,7 +86,8 @@ Requer Node 22.
 ```bash
 npm install
 npm run dev        # http://localhost:5173/BarnaBank/
-npm test           # testes (vitest): lógica financeira, nuvem, preferências e a tela de Configurações
+npm test           # testes (vitest): lógica financeira, telas, nuvem e sincronização
+npm run test:bot   # testes do worker do bot
 npm run lint       # oxlint
 npm run build      # tsc + vite build, gera dist/
 npm run preview    # serve o dist/ em http://localhost:4173/BarnaBank/
@@ -102,12 +107,18 @@ src/
   app/            shell (cabeçalho, abas, barra inferior), tema, contexto de dados, diálogo de login
   components/ui/  button, card, badge, skeleton, tabs, segmented, input, error-boundary (base shadcn/ui)
   lib/
-    storage.ts    leitor somente leitura do localStorage + fallback de demonstração
-    cloud.ts      login e leitura da conta no Supabase (somente GET)
+    storage.ts    leitor do localStorage + fallback de demonstração
+    store.ts      gravação preservando os campos desconhecidos
+    cloud.ts      login e leitura da conta no Supabase
+    sync/         envio para a conta e para o bot, vínculo com o Telegram
+    backup/       exportar e importar backup
+    pwa/          instalação (manifest e service worker em public/)
     prefs.ts      preferências de moeda e data
     demo-data.ts  dados fictícios relativos à data de hoje
     finance/      lógica pura portada do app antigo, com testes
   pages/          Início, Pessoas, Carteiras, Contas, Relatórios e Configurações
+bot/              worker do Telegram (Cloudflare), publicado por .github/workflows/bot.yml
+scripts/          gen-icons.mjs (ícones do PWA)
 screenshots/      capturas das telas (desktop 1440 / celular 390, escuro e claro)
 ```
 
@@ -120,16 +131,27 @@ O repositório é `urlmistas/BarnaBank` e o site é publicado no GitHub Pages. O
 `base: '/BarnaBank/'`. O workflow `.github/workflows/deploy.yml` roda lint, testes e build e publica `dist/` a cada
 push na `main` (Settings → Pages → Source: **GitHub Actions**).
 
-**Secrets: nenhum.** O deploy não usa segredo algum. A chave do Supabase em `src/lib/cloud.ts` é a chave
-*publishable* (feita para ir no navegador, a mesma do app antigo); o acesso aos dados é protegido pelo login e pelas
-regras da tabela. Os secrets do app antigo (`CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN`, `SYNC_KEY`,
-`TELEGRAM_TOKEN`) servem só ao bot do Telegram e continuam lá; este repositório não tem bot.
+**Site:** não usa segredo. A chave do Supabase em `src/lib/cloud.ts` e em `bot/wrangler.toml` é a *publishable*
+(feita para ir no navegador); o acesso aos dados é protegido pelo login e pelas regras da tabela. Para ligar o
+Telegram por conta, crie a **variável** (Variables, não Secrets) `BOT_URL` com o endereço do bot
+(`https://barnabank-bot.<sub>.workers.dev`).
 
-## Limites da 1.0
+**Bot:** o workflow `.github/workflows/bot.yml` publica o worker `barnabank-bot` na Cloudflare quando algo em `bot/`
+muda (ou manualmente, em Actions → Publicar bot do Telegram). Precisa destes secrets do repositório:
+`TELEGRAM_TOKEN`, `SYNC_KEY` (16 caracteres ou mais), `CLOUDFLARE_API_TOKEN` e `CLOUDFLARE_ACCOUNT_ID`. O passo a
+passo está em [bot/README.md](bot/README.md).
 
-- Não cria, edita nem apaga dados (dívidas, pagamentos, carteiras, contas fixas, cartões).
-- Não lê ainda `budgets`, `goals`, `recurring` e `shares`, então não há orçamento do mês nem metas.
-- Sem PWA e sem criar conta nem recuperar senha (continuam no app antigo).
-- Não há linha de grupo em Pessoas: dívidas de grupo entram na linha da pessoa.
+**Convivência com o app antigo:** o worker se chama `barnabank-bot`, como o do app antigo, e usa o mesmo KV
+(`barnabank-data`). Publicar daqui **substitui o código do bot no ar**; o modo antigo com `SYNC_KEY` continua
+funcionando e os dados não mudam. Enquanto o repositório antigo existir, desligue o workflow do bot lá, senão um push
+em `bot/` dele sobrescreve o worker novo com o código velho.
 
-O mapa do que falta portar, com as linhas de referência no app antigo, está em [MIGRATION.md](MIGRATION.md).
+## Limites
+
+- Os dados do aparelho são a fonte. Sem internet, tudo fica salvo aqui e sincroniza quando a conexão volta.
+- O motor do bot (`bot/engine.js`) é uma cópia congelada das regras do app antigo; mudar uma regra financeira no app
+  exige atualizar o motor (veja [bot/ENGINE.md](bot/ENGINE.md)).
+- O plano grátis da Cloudflare limita as gravações do KV por dia, somando todas as contas.
+
+O histórico do que foi portado do app antigo, com decisões de redesenho e pontos duvidosos, está em
+[MIGRATION.md](MIGRATION.md).

@@ -3,7 +3,7 @@ import type { Fetch } from '@/lib/cloud'
 import { STORAGE_KEY } from '@/lib/storage'
 import { localHash } from './snapshot'
 import { installStorage, json, type MemStorage } from './test-helpers'
-import { BOT_KEY, BotError, botErrorText, botSync, readBotCfg, testBot, writeBotCfg } from './worker'
+import { ACCOUNT_KEY, BOT_KEY, BotError, botErrorText, botSync, readBotCfg, testBot, writeBotCfg } from './worker'
 
 let ls: MemStorage
 beforeEach(() => {
@@ -209,5 +209,29 @@ describe('testBot e configuração', () => {
     writeBotCfg(null)
     expect(ls.getItem(BOT_KEY)).toBeNull()
     expect(readBotCfg()).toEqual({})
+  })
+})
+
+describe('bot por conta', () => {
+  it('usa o token do login no lugar da chave', async () => {
+    const { st, f } = worker({ snapshot: { debts: [] }, rev: 5 })
+    writeBotCfg({ url: URL_BOT, key: ACCOUNT_KEY })
+    await botSync({ ...env(f), token: async () => 'jwt-da-conta' })
+    expect(st.calls.length).toBeGreaterThan(0)
+    expect(st.calls.every((c) => c.auth === 'Bearer jwt-da-conta')).toBe(true)
+  })
+
+  it('sem login: erro 401 claro e nenhuma chamada ao bot', async () => {
+    const { st, f } = worker()
+    writeBotCfg({ url: URL_BOT, key: ACCOUNT_KEY })
+    const e = await botSync({
+      ...env(f),
+      token: async () => {
+        throw new Error('x')
+      },
+    }).catch((x) => x)
+    expect(e).toBeInstanceOf(BotError)
+    expect(botErrorText(e)).toBe('Entre na sua conta de novo.')
+    expect(st.calls).toHaveLength(0)
   })
 })

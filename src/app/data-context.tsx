@@ -5,10 +5,12 @@ import {
 } from '@/lib/cloud'
 import { toISO } from '@/lib/finance/dates'
 import { makeDate, makeMoney } from '@/lib/format'
+import { HIDE_KEY, maskMoney, readHidden, writeHidden } from './hide-values'
 import { applyPrefs, PREFS_KEY, readPrefs, writePrefs, type DisplayPrefs } from '@/lib/prefs'
 import { STORE_EVENT } from '@/lib/store'
-import { sbPushIfChanged, sbResolve, sbSync, type SbResult, type SbRow, type SyncEnv } from '@/lib/sync/supabase'
-import { botErrorText, botOn, botSync, readBotCfg, testBot, writeBotCfg } from '@/lib/sync/worker'
+import { activeToken, sbPushIfChanged, sbResolve, sbSync, type SbResult, type SbRow, type SyncEnv } from '@/lib/sync/supabase'
+import { ACCOUNT_KEY, botByAccount, botErrorText, botOn, botSync, readBotCfg, testBot, writeBotCfg } from '@/lib/sync/worker'
+import { BOT_URL } from '@/lib/sync/telegram-link'
 import type { Settings } from '@/lib/types'
 
 export interface CloudState {
@@ -21,6 +23,8 @@ export interface CloudState {
 
 export interface BotUiState {
   status: 'off' | 'loading' | 'ok' | 'error'
+  /** o bot fala com o app pelo login da conta (e não pela chave) */
+  account?: boolean
   url?: string
   /** última sincronização com o bot */
   last?: string
@@ -37,6 +41,9 @@ interface DataState {
   baseSettings: Settings
   prefs: DisplayPrefs
   setPrefs: (p: DisplayPrefs) => void
+  /** valores em dinheiro escondidos (olhinho) */
+  hideValues: boolean
+  toggleHideValues: () => void
   /** edita/paga/exclui: só com dados reais deste aparelho */
   canEdit: boolean
   /** cria dívida: aparelho, vazio ou demonstração */
@@ -58,6 +65,10 @@ interface DataState {
   /** liga o bot (testa antes); devolve a mensagem de erro, ou null se conectou */
   connectBot: (url: string, key: string) => Promise<string | null>
   disconnectBot: () => void
+  /** token da conta para falar com o bot (renova se preciso); recusa sem login */
+  botToken: () => Promise<string>
+  /** liga ou desliga a sincronização com o bot pela conta (depois de vincular o Telegram) */
+  setAccountBot: (on: boolean) => void
 }
 
 const Ctx = createContext<DataState | null>(null)
@@ -71,7 +82,7 @@ const BOT_DELAY = 2500
 function botUiFromCfg(): BotUiState {
   const c = readBotCfg()
   if (!botOn(c)) return { status: 'off' }
-  return { status: c.err ? 'error' : 'ok', url: c.url, last: c.last, error: c.err || undefined }
+  return { status: c.err ? 'error' : 'ok', account: botByAccount(c), url: c.url, last: c.last, error: c.err || undefined }
 }
 
 export function DataProvider({ children }: { children: ReactNode }) {
@@ -94,6 +105,13 @@ export function DataProvider({ children }: { children: ReactNode }) {
   // agendadores (debounce): ficam em ref porque runSb/runBot os chamam e eles chamam runSb/runBot
   const scheduleSb = useRef<() => void>(() => {})
   const scheduleBot = useRef<() => void>(() => {})
+  const [hideValues, setHideValues] = useState<boolean>(() => readHidden())
+  const toggleHideValues = useCallback(() => {
+    setHideValues((h) => {
+      writeHidden(!h)
+      return !h
+    })
+  }, [])
   const [prefs, setPrefsState] = useState<DisplayPrefs>(() => readPrefs())
   const setPrefs = useCallback((p: DisplayPrefs) => {
     writePrefs(p)
@@ -112,9 +130,17 @@ export function DataProvider({ children }: { children: ReactNode }) {
     [],
   )
 
+  const botToken = useCallback(() => activeToken(sbEnv), [sbEnv])
+  const botEnv = useMemo(() => ({ fetcher, token: botToken }), [botToken])
+
   const dropSession = useCallback((error?: string) => {
     session.current = null
     writeSession(null)
+    // o bot por conta usa o login: sem ele, não há como sincronizar
+    if (botByAccount(readBotCfg())) {
+      writeBotCfg(null)
+      setBot({ status: 'off' })
+    }
     setConflict(null)
     setConflictOpen(false)
     setCloud({ status: 'off', error })
@@ -162,12 +188,12 @@ export function DataProvider({ children }: { children: ReactNode }) {
     botBusy.current = true
     setBot((b) => ({ ...b, status: 'loading', error: undefined }))
     try {
-      await botSync({ fetcher })
+      await botSync(botEnv)
       const c = readBotCfg()
-      setBot({ status: 'ok', url: c.url, last: c.last })
+      setBot({ status: 'ok', account: botByAccount(c), url: c.url, last: c.last })
     } catch (e) {
       const c = readBotCfg()
-      setBot({ status: 'error', url: c.url, last: c.last, error: botErrorText(e) })
+      setBot({ status: 'error', account: botByAccount(c), url: c.url, last: c.last, error: botErrorText(e) })
     } finally {
       botBusy.current = false
       if (botAgain.current) {
@@ -175,7 +201,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         scheduleBot.current()
       }
     }
-  }, [])
+  }, [botEnv])
 
   useEffect(() => {
     scheduleSb.current = () => {
@@ -207,6 +233,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     const onStorage = (e: StorageEvent) => {
       if (e.key === null || e.key.startsWith('barnabank_')) setLocal(loadAppData(today))
       if (e.key === null || e.key === PREFS_KEY) setPrefsState(readPrefs())
+      if (e.key === null || e.key === HIDE_KEY) setHideValues(readHidden())
     }
     // gravação feita por este app (o evento `storage` só chega nas outras abas): relê e agenda o envio
     const onStore = () => {
@@ -288,6 +315,20 @@ export function DataProvider({ children }: { children: ReactNode }) {
     setBot({ status: 'off' })
   }, [])
 
+  const setAccountBot = useCallback(
+    (on: boolean) => {
+      if (!on) {
+        if (botByAccount(readBotCfg())) disconnectBot()
+        return
+      }
+      if (!BOT_URL || botOn(readBotCfg())) return
+      writeBotCfg({ url: BOT_URL, key: ACCOUNT_KEY })
+      setBot({ status: 'loading', account: true, url: BOT_URL })
+      void runBot()
+    },
+    [disconnectBot, runBot],
+  )
+
   const value = useMemo<DataState>(() => {
     const waiting = !local
     const result = local
@@ -307,7 +348,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       status: waiting ? 'loading' : 'ready',
       result: waiting ? null : result,
       today,
-      money: makeMoney(settings),
+      money: hideValues ? maskMoney : makeMoney(settings),
       date: makeDate(settings),
       baseSettings,
       prefs,
@@ -315,6 +356,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
       canCreate,
       readOnlyReason,
       setPrefs,
+      hideValues,
+      toggleHideValues,
       cloud,
       bot,
       conflict,
@@ -326,8 +369,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
       refreshCloud: () => void syncAll(false),
       connectBot,
       disconnectBot,
+      botToken,
+      setAccountBot,
     }
-  }, [local, cloud, bot, conflict, conflictOpen, today, signIn, signOut, resolveConflict, syncAll, connectBot, disconnectBot, prefs, setPrefs])
+  }, [local, cloud, bot, conflict, conflictOpen, today, signIn, signOut, resolveConflict, syncAll, connectBot, disconnectBot, botToken, setAccountBot, prefs, setPrefs, hideValues, toggleHideValues])
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
 }

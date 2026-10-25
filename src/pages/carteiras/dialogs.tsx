@@ -6,6 +6,8 @@ import { Input } from '@/components/ui/input'
 import { Field, Modal } from '@/components/ui/modal'
 import { Select } from '@/components/ui/select'
 import { checkTx, checkWallet, createTx, createWallet, emptyTxInput, findTxIndex, txToInput, updateTx, updateWallet, usedCategories, type TxInput } from '@/lib/finance/wallet-mutations'
+import { getRecurring, setRecurring } from '@/lib/finance/plan-store'
+import { recurringFromTx } from '@/lib/finance/recurring'
 import { formatMoneyInput, parseMoney } from '@/lib/money-input'
 import { walletIconKey } from '@/lib/storage'
 import type { Transaction, TransactionType, Wallet } from '@/lib/types'
@@ -147,6 +149,7 @@ function TxForm({ txId, walletId, onClose }: { txId?: string; walletId?: string;
   const [date, setDate] = useState(start.date)
   const [category, setCategory] = useState(start.category)
   const [note, setNote] = useState(start.note)
+  const [repeat, setRepeat] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const transfer = type === 'transferencia'
   const walletOptions = wallets.map((w) => ({ value: w.id, label: w.name }))
@@ -179,8 +182,13 @@ function TxForm({ txId, walletId, onClose }: { txId?: string; walletId?: string;
       : type === 'gasto'
         ? `Gasto de ${money(v)} registrado`
         : `Entrada de ${money(v)} registrada`
-    const ok = write(msg, (api) => {
-      api.transactions.push(created)
+    // "Repetir todo mês": cria o recorrente já com este mês marcado como feito (só entrada e gasto)
+    const rec = repeat && !transfer ? recurringFromTx(created) : null
+    const ok = write(rec ? `${msg} · repete todo mês` : msg, (api) => {
+      if (rec) {
+        setRecurring(api, [...getRecurring(api), rec.rec])
+        api.transactions.push(rec.tx)
+      } else api.transactions.push(created)
     }, 'Lançamento desfeito')
     if (ok) onClose()
   }
@@ -235,6 +243,12 @@ function TxForm({ txId, walletId, onClose }: { txId?: string; walletId?: string;
       <Field label="Observação (opcional)" htmlFor={ids.note} className="mt-3">
         <Input id={ids.note} value={note} maxLength={80} onChange={(e) => setNote(e.target.value)} />
       </Field>
+      {!transfer && !txId && (
+        <label className="mt-3 flex cursor-pointer items-center gap-2 text-sm">
+          <input type="checkbox" checked={repeat} onChange={(e) => setRepeat(e.target.checked)} className="size-4" />
+          Repetir todo mês, no mesmo dia
+        </label>
+      )}
 
       <ErrorLine>{err}</ErrorLine>
       <Buttons onCancel={onClose} okLabel={tx ? 'Salvar alterações' : 'Salvar lançamento'} />

@@ -30,7 +30,11 @@ function setup(over: { cloud?: CloudState; bot?: BotUiState; conflict?: object |
   return fns
 }
 
+const go = (name: string) => fireEvent.click(screen.getByRole('button', { name }))
+
 beforeEach(() => {
+  history.replaceState(null, '', '/')
+  localStorage.clear()
   window.matchMedia = ((q: string) => ({ matches: false, media: q, addEventListener() {}, removeEventListener() {} })) as unknown as typeof window.matchMedia
   HTMLDialogElement.prototype.showModal = vi.fn()
   HTMLDialogElement.prototype.close = vi.fn()
@@ -40,7 +44,29 @@ afterEach(cleanup)
 describe('Configuracoes', () => {
   it('mostra as seções', () => {
     setup()
-    for (const t of ['Conta', 'Nuvem e bot do Telegram', 'Aparência', 'Formatos', 'Dados']) expect(screen.getByRole('heading', { name: t })).toBeTruthy()
+    const por: [string, string[]][] = [
+      ['Conta e nuvem', ['Conta', 'Nuvem e bot do Telegram']],
+      ['Visual', ['Aparência', 'Formatos']],
+      ['Finanças', ['Padrões', 'Pix']],
+      ['Atalhos', ['Teclado', 'Geral', 'Ir para uma tela']],
+      ['Dados e app', ['Dados', 'Backup', 'Aplicativo']],
+    ]
+    for (const [cat, titles] of por) {
+      go(cat)
+      for (const t of titles) expect(screen.getByRole('heading', { name: t })).toBeTruthy()
+    }
+  })
+
+  it('atalhos: o interruptor grava a escolha', () => {
+    setup()
+    go('Atalhos')
+    const sw = screen.getByRole('switch', { name: 'Atalhos de uma tecla' })
+    expect(sw.getAttribute('aria-checked')).toBe('true')
+    fireEvent.click(sw)
+    expect(sw.getAttribute('aria-checked')).toBe('false')
+    expect(localStorage.getItem('bbweb_shortcuts')).toBe('0')
+    fireEvent.click(sw)
+    expect(localStorage.getItem('bbweb_shortcuts')).toBe('1')
   })
 
   it('desconectado: botão Entrar abre o diálogo de login', () => {
@@ -70,17 +96,20 @@ describe('Configuracoes', () => {
 
   it('Dados: carregando mostra "Carregando…" e não o selo "Sem dados"', () => {
     setup({ status: 'loading' })
+    go('Dados e app')
     expect(screen.getByText('Carregando…')).toBeTruthy()
     expect(screen.queryByText('Sem dados')).toBeNull()
   })
 
   it('Dados: mostra a origem', () => {
     setup({ source: 'demo' })
+    go('Dados e app')
     expect(screen.getByText('Demonstração')).toBeTruthy()
   })
 
   it('Formatos: trocar a moeda grava a preferência; "Voltar ao padrão" limpa', () => {
     const fns = setup({ prefs: { currency: 'USD' } })
+    go('Visual')
     fireEvent.click(screen.getByRole('button', { name: 'Voltar ao padrão' }))
     expect(fns.setPrefs).toHaveBeenCalledWith({})
     fireEvent.change(screen.getByLabelText('Moeda'), { target: { value: '' } })
@@ -115,5 +144,58 @@ describe('Configuracoes', () => {
     const fns = setup({ cloud: { status: 'ok', email: 'a@b.com' }, conflict: { updated_at: '2026-10-20T10:00:00Z', data: {} } })
     fireEvent.click(screen.getByRole('button', { name: 'Resolver' }))
     expect(fns.setConflictOpen).toHaveBeenCalledWith(true)
+  })
+})
+
+describe('Telegram por conta', () => {
+  const BOT = 'https://bot.exemplo.workers.dev'
+  const ctx = (over: Record<string, unknown>) => {
+    state.current = { cloud: { status: 'ok', email: 'a@b.com' }, bot: { status: 'off' }, botToken: async () => 'tok', setAccountBot: vi.fn(), refreshCloud: vi.fn(), ...over }
+    return state.current as { setAccountBot: ReturnType<typeof vi.fn> }
+  }
+
+  it('sem login pede para entrar na conta', async () => {
+    const { TelegramSection } = await import('./telegram')
+    ctx({ cloud: { status: 'off' } })
+    render(<TelegramSection botUrl={BOT} onOwnBot={() => {}} />)
+    expect(screen.getByText(/Entre na sua conta/)).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Gerar código' })).toBeNull()
+  })
+
+  it('não vinculado: gera o código e vincula quando o bot confirma', async () => {
+    const { TelegramSection } = await import('./telegram')
+    const c = ctx({})
+    let linked = false
+    globalThis.fetch = vi.fn(async (_u: unknown, init?: RequestInit) => {
+      const body =
+        init?.method === 'POST'
+          ? { code: 'K7M2Q9XA', expiresIn: 600, bot: 'barna_bot', url: 'https://t.me/barna_bot?start=BBK7M2Q9XA' }
+          : { linked, bot: 'barna_bot', at: null }
+      return new Response(JSON.stringify(body), { status: 200 })
+    }) as unknown as typeof fetch
+    render(<TelegramSection botUrl={BOT} onOwnBot={() => {}} />)
+    const btn = await screen.findByRole('button', { name: 'Gerar código' })
+    await waitFor(() => expect((btn as HTMLButtonElement).disabled).toBe(false))
+    fireEvent.click(btn)
+    expect((await screen.findByLabelText('Código de vínculo')).textContent).toBe('K7M2 Q9XA')
+    expect(screen.getByRole('link', { name: /Abrir no Telegram/ }).getAttribute('href')).toBe('https://t.me/barna_bot?start=BBK7M2Q9XA')
+    linked = true
+    await waitFor(() => expect(c.setAccountBot).toHaveBeenCalledWith(true), { timeout: 6000 })
+  }, 10000)
+
+  it('vinculado: mostra o bot e desvincula', async () => {
+    const { TelegramSection } = await import('./telegram')
+    const c = ctx({ bot: { status: 'ok', account: true } })
+    const methods: string[] = []
+    globalThis.fetch = vi.fn(async (_u: unknown, init?: RequestInit) => {
+      methods.push(init?.method ?? 'GET')
+      return new Response(JSON.stringify({ linked: true, bot: 'barna_bot', at: '2026-10-20T10:00:00Z', ok: true }), { status: 200 })
+    }) as unknown as typeof fetch
+    render(<TelegramSection botUrl={BOT} onOwnBot={() => {}} />)
+    expect(await screen.findByText('Telegram vinculado')).toBeTruthy()
+    expect(screen.getByText(/@barna_bot/)).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Desvincular' }))
+    await waitFor(() => expect(c.setAccountBot).toHaveBeenCalledWith(false))
+    expect(methods).toContain('DELETE')
   })
 })

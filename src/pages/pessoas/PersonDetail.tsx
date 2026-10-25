@@ -14,6 +14,8 @@ import { cn } from '@/lib/utils'
 import type { AppData, Debt } from '@/lib/types'
 import { Avatar, SignedMoney } from './parts'
 import { DebtActions } from './DebtActions'
+import { ShareButton } from './share-dialog'
+import { PersonExtra } from './PersonExtra'
 import { ConfirmDialog, EditPaymentDialog } from './dialogs'
 import { useDebtActions } from './use-debt-actions'
 import { ReceiptDialog } from './receipt-ui'
@@ -84,7 +86,15 @@ export function PersonDetailView({
         )}
       </header>
 
+      <div className={cn('mt-3 flex flex-wrap gap-1', !fullPage && 'mx-4')}>
+        {p.hasReceivable && <ShareButton type="person" refKey={p.key} label={p.name} />}
+        {p.hasPayable && <ShareButton type="owe" refKey={p.key} label={p.name} />}
+      </div>
+
       <PersonFigures p={p} className={cn('mt-5', !fullPage && 'mx-5')} />
+      <div className={cn(!fullPage && 'mx-5')}>
+        <PersonExtra personKey={p.key} name={p.name} />
+      </div>
       <PersonTabs p={p} padded={!fullPage} />
     </motion.article>
   )

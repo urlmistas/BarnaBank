@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
-import { Plus, Trophy, UserRound } from 'lucide-react'
+import { Medal, Plus, Trophy, UserRound } from 'lucide-react'
 import { useAppData } from '@/app/data-context'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -17,7 +17,11 @@ import { cn } from '@/lib/utils'
 import type { AppData } from '@/lib/types'
 import { PeopleList } from './PeopleList'
 import { PersonDetailView } from './PersonDetail'
+import { ClaimsPanel } from './claims-panel'
+import { GroupsSection } from './groups/GroupsSection'
 import { DebtFormDialog } from './dialogs'
+import { BoardDialog } from './dialogs-extra'
+import { PEOPLE_SORTS, type PeopleSort } from '@/lib/finance/person-extra'
 
 // Pessoas: lista primeiro. No PC (≥1024px) a pessoa abre num painel ao lado;
 // no celular /pessoas/:id é uma página inteira. Filtro e busca ficam na URL (?f=&q=),
@@ -37,25 +41,31 @@ function PessoasReady({ data, today }: { data: AppData; today: string }) {
   const [params, setParams] = useSearchParams()
   const { canCreate } = useAppData()
   const [creating, setCreating] = useState(false)
+  const [board, setBoard] = useState(false)
   const toast = useToast()
   const doc = useDocCtx()
   const rawF = params.get('f') as PeopleFilter | null
   const filter: PeopleFilter = rawF && PEOPLE_FILTERS.includes(rawF) ? rawF : 'abertos'
   const query = params.get('q') ?? ''
+  const rawO = params.get('o') as PeopleSort | null
+  const sort: PeopleSort = rawO && PEOPLE_SORTS.includes(rawO) ? rawO : 'due'
 
   const view = useMemo(() => {
     const calc = makeDebtCalc(today)
     return { calc, rows: buildPersonRows(data, today, calc), totals: peopleTotals(data, today) }
   }, [data, today])
 
-  const update = (next: { f?: PeopleFilter; q?: string }) => {
+  const update = (next: { f?: PeopleFilter; q?: string; o?: PeopleSort }) => {
     const p = new URLSearchParams(params)
     const f = next.f ?? filter
     const q = next.q ?? query
+    const o = next.o ?? sort
     if (f === 'abertos') p.delete('f')
     else p.set('f', f)
     if (q) p.set('q', q)
     else p.delete('q')
+    if (o === 'due') p.delete('o')
+    else p.set('o', o)
     setParams(p, { replace: true })
   }
   const qs = params.toString()
@@ -95,6 +105,12 @@ function PessoasReady({ data, today }: { data: AppData; today: string }) {
                 Ranking
               </Button>
             )}
+            {data.debts.some((d) => d.kind === 'receivable') && (
+              <Button size="sm" variant="outline" onClick={() => setBoard(true)}>
+                <Medal aria-hidden="true" />
+                Placar
+              </Button>
+            )}
             {canCreate && (
               <Button size="sm" onClick={() => setCreating(true)}>
                 <Plus aria-hidden="true" />
@@ -106,6 +122,11 @@ function PessoasReady({ data, today }: { data: AppData; today: string }) {
         {hasPeople && <Metrics totals={view.totals} />}
       </header>
 
+      <div className="mt-6 flex flex-col gap-4 empty:hidden">
+        <ClaimsPanel />
+        <GroupsSection filter={filter} query={query} />
+      </div>
+
       <div className={cn('mt-6', hasPeople && 'lg:grid lg:grid-cols-[minmax(0,400px)_minmax(0,1fr)] lg:items-start lg:gap-8')}>
         <PeopleList
           rows={view.rows}
@@ -113,6 +134,8 @@ function PessoasReady({ data, today }: { data: AppData; today: string }) {
           query={query}
           onFilter={(f) => update({ f })}
           onQuery={(q) => update({ q })}
+          sort={sort}
+          onSort={(o) => update({ o })}
           selectedKey={wide ? id : undefined}
           search={qs}
         />
@@ -137,6 +160,7 @@ function PessoasReady({ data, today }: { data: AppData; today: string }) {
         )}
       </div>
       <DebtFormDialog open={creating} onClose={() => setCreating(false)} />
+      <BoardDialog open={board} onClose={() => setBoard(false)} />
     </div>
   )
 }

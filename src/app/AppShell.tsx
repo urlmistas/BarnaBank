@@ -1,12 +1,17 @@
-import { NavLink, useLocation, useOutlet } from 'react-router-dom'
+import { useCallback, useState } from 'react'
+import { NavLink, useLocation, useNavigate, useOutlet } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
-import { ChartColumn, House, Moon, Receipt, Settings, Sun, Users, Wallet, type LucideIcon } from 'lucide-react'
+import { Calculator, ChartColumn, Eye, EyeOff, House, Moon, Receipt, Search, Settings, Sun, Users, Wallet, type LucideIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 import { useTheme } from './theme'
 import { useAppData } from './data-context'
 import { SyncConflictDialog } from './SyncConflictDialog'
+import { SearchDialog } from './SearchDialog'
+import { SimulatorDialog } from './SimulatorDialog'
+import { useShortcuts } from './use-shortcuts'
+import type { ShortcutAction } from '@/lib/shortcuts'
 
 const NAV: { to: string; label: string; icon: LucideIcon }[] = [
   { to: '/', label: 'Início', icon: House },
@@ -33,7 +38,22 @@ export function AppShell() {
   const location = useLocation()
   const outlet = useOutlet()
   const { theme, toggle } = useTheme()
-  const { result, cloud, bot, conflict } = useAppData()
+  const { result, cloud, bot, conflict, hideValues, toggleHideValues } = useAppData()
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [simOpen, setSimOpen] = useState(false)
+  const navigate = useNavigate()
+  const runShortcut = useCallback(
+    (a: ShortcutAction) => {
+      if (a === 'search') setSearchOpen(true)
+      else if (a === 'simulator') setSimOpen(true)
+      else if (a === 'hide') toggleHideValues()
+      else if (a === 'theme') toggle()
+      else if (a === 'help') navigate('/configuracoes#atalhos')
+      else navigate(a.go)
+    },
+    [navigate, toggle, toggleHideValues],
+  )
+  useShortcuts(runShortcut)
   const isDemo = result?.source === 'demo'
   // aviso discreto no ícone quando a conta não respondeu (detalhe em Configurações)
   const cloudError = cloud.status === 'error' || bot.status === 'error' || !!conflict
@@ -90,6 +110,22 @@ export function AppShell() {
                 Demonstração
               </Badge>
             )}
+            <Button variant="ghost" size="icon" onClick={() => setSearchOpen(true)} aria-label="Buscar" title="Buscar (Ctrl+K ou /)">
+              <Search />
+            </Button>
+            <Button variant="ghost" size="icon" onClick={() => setSimOpen(true)} aria-label="Simulador de empréstimo" title="Simulador de empréstimo">
+              <Calculator />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={toggleHideValues}
+              aria-pressed={hideValues}
+              aria-label={hideValues ? 'Mostrar valores' : 'Esconder valores'}
+              title={hideValues ? 'Mostrar valores' : 'Esconder valores'}
+            >
+              {hideValues ? <EyeOff /> : <Eye />}
+            </Button>
             <Button
               variant="ghost"
               size="icon"
@@ -118,6 +154,8 @@ export function AppShell() {
       </header>
 
       <SyncConflictDialog />
+      <SearchDialog open={searchOpen} onClose={() => setSearchOpen(false)} />
+      <SimulatorDialog open={simOpen} onClose={() => setSimOpen(false)} />
 
       <AnimatePresence mode="wait" initial={false}>
         <motion.main

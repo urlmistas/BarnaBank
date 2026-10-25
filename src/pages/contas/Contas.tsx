@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
-import { ChevronLeft, ChevronRight, CreditCard, Plus, Receipt } from 'lucide-react'
+import { ChevronLeft, ChevronRight, CreditCard, Plus, Receipt, Scale } from 'lucide-react'
 import { useAppData } from '@/app/data-context'
 import { Button } from '@/components/ui/button'
+import { Segmented } from '@/components/ui/segmented'
 import { Skeleton } from '@/components/ui/skeleton'
 import { CONTA_FILTERS, contasMonthRange, contasRows, contasTotals, type ContaFilter, type ContasTotals } from '@/lib/finance/contas'
 import { clampMonth, stepMonth } from '@/lib/finance/wallets'
@@ -14,6 +15,8 @@ import type { AppData, YearMonth } from '@/lib/types'
 import { ContasList, NoContas } from './ContasList'
 import { ContaDetailView } from './ContaDetail'
 import { BillFormDialog, CardFormDialog } from './dialogs'
+import { CalendarView } from './CalendarView'
+import { FitsDialog } from './FitsDialog'
 import { monthName, monthTitle } from './text'
 
 // Contas: contas fixas e faturas de cartão de um mês. No PC (≥1024px) a conta abre num
@@ -34,10 +37,12 @@ function ContasReady({ data, today }: { data: AppData; today: string }) {
   const wide = useMediaQuery('(min-width: 1024px)')
   const [params, setParams] = useSearchParams()
   const { canCreate } = useAppData()
-  const [creating, setCreating] = useState<'bill' | 'card' | null>(null)
+  const [creating, setCreating] = useState<'bill' | 'card' | 'fits' | null>(null)
   const rawF = params.get('f') as ContaFilter | null
   const filter: ContaFilter = rawF && CONTA_FILTERS.includes(rawF) ? rawF : 'todas'
   const query = params.get('q') ?? ''
+  // v=cal mostra o calendário do mês no lugar da lista
+  const view: 'lista' | 'cal' = params.get('v') === 'cal' ? 'cal' : 'lista'
   const now = ymOf(today)
   const range = useMemo(() => contasMonthRange(data, today), [data, today])
   const rawM = params.get('m')
@@ -46,6 +51,12 @@ function ContasReady({ data, today }: { data: AppData; today: string }) {
   const rows = useMemo(() => contasRows(data, month, today), [data, month, today])
   const totals = useMemo(() => contasTotals(rows), [rows])
 
+  const setView = (v: 'lista' | 'cal') => {
+    const p = new URLSearchParams(params)
+    if (v === 'cal') p.set('v', 'cal')
+    else p.delete('v')
+    setParams(p, { replace: true })
+  }
   const update = (next: { f?: ContaFilter; q?: string; m?: YearMonth }) => {
     const p = new URLSearchParams(params)
     const f = next.f ?? filter
@@ -88,6 +99,12 @@ function ContasReady({ data, today }: { data: AppData; today: string }) {
         <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
           <h1 className="text-2xl font-semibold tracking-tight">Contas</h1>
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+            {data.wallets.length > 0 && (
+              <Button size="sm" variant="outline" onClick={() => setCreating('fits')}>
+                <Scale aria-hidden="true" />
+                Cabe no mês?
+              </Button>
+            )}
             {canCreate && (
               <div className="flex gap-2">
                 <Button size="sm" variant="outline" onClick={() => setCreating('card')}>
@@ -104,11 +121,28 @@ function ContasReady({ data, today }: { data: AppData; today: string }) {
           </div>
         </div>
         {has && <Metrics totals={totals} month={month} />}
+        {has && !id && (
+          <Segmented
+            id="contas-view"
+            label="Mostrar como"
+            value={view}
+            onChange={setView}
+            options={[
+              { value: 'lista', label: 'Lista' },
+              { value: 'cal', label: 'Calendário' },
+            ]}
+            className="w-full sm:w-64"
+          />
+        )}
       </header>
 
       {!has ? (
         <div className="mt-6">
           <NoContas />
+        </div>
+      ) : view === 'cal' && !id ? (
+        <div className="mt-6">
+          <CalendarView data={data} month={month} />
         </div>
       ) : (
         <div className="mt-6 lg:grid lg:grid-cols-[minmax(0,420px)_minmax(0,1fr)] lg:items-start lg:gap-8">
@@ -144,6 +178,7 @@ function ContasReady({ data, today }: { data: AppData; today: string }) {
       )}
       <BillFormDialog open={creating === 'bill'} onClose={() => setCreating(null)} month={month} />
       <CardFormDialog open={creating === 'card'} onClose={() => setCreating(null)} />
+      <FitsDialog open={creating === 'fits'} onClose={() => setCreating(null)} data={data} />
     </div>
   )
 }

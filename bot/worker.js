@@ -9,6 +9,11 @@ import {getEngine} from './engine.js';
 //   GET  /api/state        o app busca os dados e as mensagens pendentes (Authorization: Bearer SYNC_KEY)
 //   PUT  /api/state        o app envia os dados atualizados e confirma as mensagens aplicadas
 //   GET  /api/backups[/d]  backups diários (últimos 30 dias)
+//   GET|POST|DELETE /api/link  vincular o Telegram à conta do app (login do app, não a SYNC_KEY)
+//
+// Contas: cada conta do app (Supabase) tem os dados separados no KV, com o prefixo "u:<id>:" (scoped()).
+// A SYNC_KEY continua valendo para o bot antigo, de um dono só, com as chaves sem prefixo.
+// Vincular: o app pede um código (POST /api/link), a pessoa manda o código ao bot, e chat:<id> aponta para a conta.
 //   (cron diário)          contas recorrentes, backup, lembretes (seus e de quem te deve)
 //
 // O "motor" (engine.js, gerado do app.js por build-engine.mjs) roda aqui as mesmas regras do app:
@@ -17,7 +22,7 @@ import {getEngine} from './engine.js';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, PUT, OPTIONS',
+  'Access-Control-Allow-Methods': 'GET, PUT, POST, DELETE, OPTIONS',
   'Access-Control-Allow-Headers': 'Authorization, Content-Type',
   'Access-Control-Max-Age': '86400'
 };
@@ -29,6 +34,7 @@ export default {
     if (req.method === 'OPTIONS') return new Response(null, {headers: CORS});
     try {
       if (url.pathname === '/api/state') return await api(req, env, ctx, url);
+      if (url.pathname === '/api/link') return await apiLink(req, url, env);
       if (url.pathname.startsWith('/api/photo/')) return await apiPhoto(req, url, env);
       if (url.pathname.startsWith('/api/claim/')) return await apiClaim(req, url, env);
       if (url.pathname === '/api/backups' || url.pathname.startsWith('/api/backups/')) return await apiBackups(req, url, env);
@@ -52,6 +58,7 @@ export default {
       await step('motor', () => cloudApply(env, e => e.runRecurring()));
       await step('lembretes', () => dailyReminder(env));
       await step('amigos', () => friendReminders(env));
+      await step('contas', () => accountsDaily(env, step));
     })();
     if (ctx && ctx.waitUntil) ctx.waitUntil(job);
     await job;
@@ -95,6 +102,124 @@ async function putIfChanged(env, key, v, ignore) {
   await putJSON(env, key, v);
   return true;
 }
+// ---------------------------------------------------------------- contas (vários donos no mesmo bot)
+// Chaves que valem para o bot inteiro, em qualquer conta. O resto ganha o prefixo "u:<conta>:".
+const GLOBAL_KEYS = new Set(['origin', 'botName', 'hook', 'hookCheck', 'seenUpd']);
+const rootOf = env => env.ROOT || env.BB;
+// o mesmo env, mas com o KV da conta: todo o código que usa env.BB passa a ler e gravar só os dados dela
+function scoped(env, uid) {
+  if (!uid) return env;
+  const root = rootOf(env), pre = 'u:' + uid + ':';
+  const k = key => GLOBAL_KEYS.has(key) ? key : pre + key;
+  const BB = {get: (key, o) => root.get(k(key), o), put: (key, v, o) => root.put(k(key), v, o), delete: key => root.delete(k(key))};
+  return {...env, ROOT: root, BB, uid};
+}
+// quem chama o app: a SYNC_KEY (bot antigo, uid '') ou o login da conta (token do Supabase, conferido lá)
+async function who(req, url, env) {
+  if (authed(req, url, env)) return {uid: ''};
+  const tok = (req.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '').trim();
+  if (!env.SB_URL || !env.SB_KEY || tok.split('.').length !== 3) return null;
+  try {
+    const r = await fetch(String(env.SB_URL).replace(/\/+$/, '') + '/auth/v1/user', {headers: {apikey: env.SB_KEY, Authorization: 'Bearer ' + tok}});
+    if (!r.ok) return null;
+    const u = await r.json();
+    return u && /^[0-9a-f-]{36}$/i.test(u.id || '') ? {uid: u.id, email: u.email || ''} : null;
+  } catch (e) { return null; }
+}
+const LINK_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+const LINK_TTL = 600;
+function newLinkCode() {
+  const b = crypto.getRandomValues(new Uint8Array(8));
+  return [...b].map(x => LINK_ALPHABET[x % LINK_ALPHABET.length]).join('');
+}
+// "ABCD2345", "BB-ABCD2345", "/start BBABCD2345" ou "/vincular ABCD2345"
+function linkCodeOf(text) {
+  const t = String(text || '').trim();
+  const m = /^(?:\/start\s+|\/vincular\s+)?(BB-?)?([A-HJ-NP-Z2-9]{8})$/i.exec(t);
+  return m ? {code: m[2].toUpperCase(), explicit: !!m[1] || t.startsWith('/')} : null;
+}
+async function botUsername(env) {
+  let bot = await env.BB.get('botName');
+  if (!bot) { const me = await tg(env, 'getMe'); if (me.ok && me.result && me.result.username) { bot = me.result.username; await env.BB.put('botName', bot); } }
+  return bot || '';
+}
+async function linkChat(env, chat, uid, code) {
+  const root = rootOf(env), sc = scoped(env, uid);
+  const oldChat = await sc.BB.get('owner');
+  if (oldChat && oldChat !== chat) await root.delete('chat:' + oldChat);
+  const prev = await getJSON(env, 'chat:' + chat, null);
+  if (prev && prev.uid && prev.uid !== uid) { await scoped(env, prev.uid).BB.delete('owner'); await root.delete('acct:' + prev.uid); }
+  await sc.BB.put('owner', chat);
+  await putJSON(env, 'chat:' + chat, {uid, role: 'owner'});
+  await putJSON(env, 'acct:' + uid, {chat, at: new Date().toISOString()});
+  await root.delete('link:' + code);
+  await say(sc, chat, '✅ Conta vinculada! O que você mandar aqui entra no BarnaBank.\n\n' + HELP);
+}
+async function apiLink(req, url, env) {
+  const w = await who(req, url, env);
+  if (!w || !w.uid) return json({error: 'unauthorized'}, 401);
+  const root = rootOf(env), sc = scoped(env, w.uid);
+  const bot = await botUsername(env);
+  if (req.method === 'GET') {
+    const chat = await sc.BB.get('owner');
+    const acct = chat ? await getJSON(env, 'acct:' + w.uid, null) : null;
+    return json({linked: !!chat, bot, at: acct && acct.at || null});
+  }
+  if (req.method === 'POST') {
+    const code = newLinkCode();
+    await root.put('link:' + code, JSON.stringify({uid: w.uid}), {expirationTtl: LINK_TTL});
+    return json({code, expiresIn: LINK_TTL, bot, url: bot ? 'https://t.me/' + bot + '?start=BB' + code : ''});
+  }
+  if (req.method === 'DELETE') {
+    const chat = await sc.BB.get('owner');
+    if (chat) {
+      await root.delete('chat:' + chat);
+      await sc.BB.delete('owner');
+      await say(sc, chat, '🔌 Este Telegram foi desvinculado da sua conta no BarnaBank. Para voltar, gere um código novo no app.');
+    }
+    await root.delete('acct:' + w.uid);
+    return json({ok: true});
+  }
+  return json({error: 'method'}, 405);
+}
+// links públicos e convites de quem te deve apontam para a conta: o visitante não tem login
+async function indexTokens(env, tokens, gone) {
+  if (!env.uid) return;
+  const root = rootOf(env);
+  for (const t of tokens) await root.put('tok:' + t, env.uid);
+  for (const t of gone) await root.delete('tok:' + t);
+}
+async function indexInvites(env, snap) {
+  if (!env.uid) return;
+  const root = rootOf(env);
+  const now = Object.values((snap && snap.invites) || {}).map(i => i && i.code).filter(c => typeof c === 'string' && /^[A-Za-z0-9]{8,40}$/.test(c)).slice(0, 200);
+  const known = await getJSON(env, 'invIdx', []);
+  const add = now.filter(c => !known.includes(c)), gone = known.filter(c => !now.includes(c));
+  if (!add.length && !gone.length) return;
+  for (const c of add) await root.put('inv:' + c, env.uid);
+  for (const c of gone) await root.delete('inv:' + c);
+  await putJSON(env, 'invIdx', now);
+}
+// cron: o que o bot faz por dia, uma vez para cada conta vinculada
+async function accountsDaily(env, step) {
+  const root = rootOf(env);
+  let cursor;
+  do {
+    const page = await root.list({prefix: 'acct:', cursor});
+    for (const k of page.keys) {
+      const uid = k.name.slice(5);
+      const sc = scoped(env, uid);
+      await step('conta ' + uid.slice(0, 8), async () => {
+        await backupDaily(sc);
+        await cloudApply(sc, e => e.runRecurring());
+        await dailyReminder(sc);
+        await friendReminders(sc);
+      });
+    }
+    cursor = page.list_complete ? undefined : page.cursor;
+  } while (cursor);
+}
+
 const brl = v => 'R$ ' + Number(v || 0).toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, '.');
 const norm = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
 const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -176,7 +301,9 @@ async function say(env, chat, text, extra) {
 
 // ---------------------------------------------------------------- API do app
 async function api(req, env, ctx, url) {
-  if (!authed(req, url, env)) return json({error: 'unauthorized'}, 401);
+  const w = await who(req, url, env);
+  if (!w) return json({error: 'unauthorized'}, 401);
+  env = scoped(env, w.uid);
   // aproveita a visita do app para garantir que o bot está ligado
   if (ctx && ctx.waitUntil) ctx.waitUntil(ensureWebhook(env, url.origin, false).catch(() => {}));
   if (req.method === 'GET') {
@@ -187,8 +314,7 @@ async function api(req, env, ctx, url) {
     for (const t of shareIdx) { const vw = await getJSON(env, 'views:' + t, null); if (vw) views[t] = {count: vw.count, first: vw.first, last: vw.last}; }
     const fr = {};
     Object.keys(friends).forEach(k => { fr[k] = {code: friends[k].code, at: friends[k].at, name: friends[k].name || ''}; });
-    let bot = await env.BB.get('botName');
-    if (!bot) { const me = await tg(env, 'getMe'); if (me.ok && me.result && me.result.username) { bot = me.result.username; await env.BB.put('botName', bot); } }
+    const bot = await botUsername(env);
     return json({snapshot, inbox, undo, claims, views, friends: fr, bot: bot || '', rev: meta.rev || 0, updatedAt: meta.updatedAt || null});
   }
   if (req.method === 'PUT') {
@@ -280,6 +406,7 @@ async function saveState(env, data, oldStr) {
       if (oldStr) await backupDaily(env, oldStr);
       await env.BB.put('snapshot', newStr);
       changed = true;
+      await indexInvites(env, data.snapshot);
     }
   }
   if (data.summary) {
@@ -309,7 +436,9 @@ async function backupDaily(env, snapStr) {
   return true;
 }
 async function apiBackups(req, url, env) {
-  if (!authed(req, url, env)) return json({error: 'unauthorized'}, 401);
+  const w = await who(req, url, env);
+  if (!w) return json({error: 'unauthorized'}, 401);
+  env = scoped(env, w.uid);
   const day = url.pathname.slice('/api/backups/'.length);
   if (day) {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return json({error: 'data inválida'}, 400);
@@ -323,7 +452,9 @@ async function apiBackups(req, url, env) {
 }
 
 async function apiClaim(req, url, env) {
-  if (!authed(req, url, env)) return json({error: 'unauthorized'}, 401);
+  const w = await who(req, url, env);
+  if (!w) return json({error: 'unauthorized'}, 401);
+  env = scoped(env, w.uid);
   const rest = url.pathname.slice('/api/claim/'.length).split('/');
   const id = (rest[0] || '').replace(/[^A-Za-z0-9]/g, '');
   if (rest[1] === 'photo' && req.method === 'GET') {
@@ -338,7 +469,9 @@ async function apiClaim(req, url, env) {
 }
 
 async function apiPhoto(req, url, env) {
-  if (!authed(req, url, env)) return json({error: 'unauthorized'}, 401);
+  const w = await who(req, url, env);
+  if (!w) return json({error: 'unauthorized'}, 401);
+  env = scoped(env, w.uid);
   const id = url.pathname.slice('/api/photo/'.length).replace(/[^A-Za-z0-9]/g, '');
   const data = id ? await env.BB.get('photo:' + id) : null;
   return data ? json({data}) : json({error: 'not found'}, 404);
@@ -386,6 +519,8 @@ const HELP =
   '❓ Perguntas: <code>quanto gastei com ifood esse mês?</code>, <code>quem me deve mais?</code>, <code>quanto o Vini já me pagou?</code>\n\n' +
   '/resumo · /atrasados · /semana · /semanal · /saldo · /repetir · /ultimos · /pendentes · /lembretes';
 
+const NEED_LINK = '👋 Para usar o bot, vincule sua conta: abra o BarnaBank, vá em Configurações, Telegram, e mande aqui o código que aparecer.';
+
 async function telegram(req, env, url) {
   const secret = await hookSecret(env);
   if (url.pathname !== '/tg/' + secret || req.headers.get('X-Telegram-Bot-Api-Secret-Token') !== secret) return json({error: 'forbidden'}, 403);
@@ -407,7 +542,12 @@ async function onUpdate(env, up) {
     seen.push(up.update_id);
     await putJSON(env, 'seenUpd', seen.slice(-60));
   }
-  if (up.callback_query) { await onCallback(env, up.callback_query); return; }
+  if (up.callback_query) {
+    const cc = up.callback_query.message && String(up.callback_query.message.chat.id);
+    const ci = cc ? await getJSON(env, 'chat:' + cc, null) : null;
+    await onCallback(ci && ci.uid ? scoped(env, ci.uid) : env, up.callback_query);
+    return;
+  }
   const msg = up.message;
   if (!msg || !msg.chat) return;
   const photo = (msg.photo && msg.photo.length) ? pickPhoto(msg.photo)
@@ -415,12 +555,27 @@ async function onUpdate(env, up) {
   const voice = msg.voice || (msg.audio && /audio/.test(msg.audio.mime_type || 'audio') ? msg.audio : null);
   if (typeof msg.text !== 'string' && !photo && !voice) return;
   const chat = String(msg.chat.id);
-  let owner = await env.BB.get('owner');
   const text = String(msg.text || msg.caption || '').trim();
   const invite = /^\/start\s+([A-Za-z0-9]{8,40})$/.exec(text);
+  // de qual conta é este chat: vínculo do dono, amigo já cadastrado ou convite novo
+  const lk = linkCodeOf(text);
+  if (lk) {
+    const rec = await getJSON(env, 'link:' + lk.code, null);
+    if (rec && rec.uid) { await linkChat(env, chat, rec.uid, lk.code); return; }
+    if (lk.explicit) { await say(env, chat, 'Esse código não vale mais (eles duram 10 minutos). Gere um novo em Configurações no app.'); return; }
+  }
+  const idx = await getJSON(env, 'chat:' + chat, null);
+  const invUid = !(idx && idx.uid) && invite ? await env.BB.get('inv:' + invite[1]) : null;
+  const acctUid = (idx && idx.uid) || invUid;
+  if (acctUid) env = scoped(env, acctUid);
+  let owner = await env.BB.get('owner');
   if (chat !== owner && (invite || (owner && await friendByChat(env, chat)))) {
     if (!owner) { await say(env, chat, 'Este bot ainda não foi ativado pelo dono.'); return; }
     await friendMessage(env, chat, msg, invite ? invite[1] : null);
+    return;
+  }
+  if (!owner && env.SB_URL) {
+    await say(env, chat, NEED_LINK);
     return;
   }
   if (!owner) {
@@ -430,7 +585,7 @@ async function onUpdate(env, up) {
     } else await say(env, chat, 'Mande /start para ativar o bot.');
     return;
   }
-  if (chat !== owner) { await say(env, chat, 'Este bot é privado.'); return; }
+  if (chat !== owner) { await say(env, chat, env.SB_URL ? NEED_LINK : 'Este bot é privado.'); return; }
   if (voice) {
     const heard = await transcribe(env, voice);
     if (heard.error) { await say(env, chat, heard.error); return; }
@@ -1630,6 +1785,10 @@ async function friendMessage(env, chat, msg, code) {
     friends[key] = {chat, code, at: new Date().toISOString(), name, sent: {}, ...(old && !isNew ? {lead: old.lead, pause: old.pause} : {})};
     Object.keys(friends[key]).forEach(k => { if (friends[key][k] === undefined) delete friends[key][k]; });
     await putJSON(env, 'friends', friends);
+    if (env.uid) {
+      const ex = await getJSON({BB: rootOf(env)}, 'chat:' + chat, null);
+      if (!ex || ex.role === 'friend') await rootOf(env).put('chat:' + chat, JSON.stringify({uid: env.uid, role: 'friend'}));
+    }
     await tg(env, 'setMyCommands', {commands: FR_CMDS, scope: {type: 'chat', chat_id: chat}});
     const c = s && (s.charges || []).find(x => x.key === key);
     await say(env, chat, '✅ Pronto! Você vai receber aqui os lembretes do que está em aberto' + (ownerName ? ' com <b>' + esc(ownerName) + '</b>' : '') +
@@ -1737,6 +1896,7 @@ async function saveShares(env, shares) {
   const now = Object.keys(shares).filter(t => /^[A-Za-z0-9]{16,40}$/.test(t) && shares[t] && typeof shares[t] === 'object').slice(0, 300);
   for (const t of now) await putIfChanged(env, 'share:' + t, shares[t], ['updatedAt']);
   for (const t of old) if (!now.includes(t) && env.BB.delete) await env.BB.delete('share:' + t);
+  await indexTokens(env, now.filter(t => !old.includes(t)), old.filter(t => !now.includes(t)));
   if (JSON.stringify(old) !== JSON.stringify(now)) await putJSON(env, 'shareIndex', now);
 }
 const fmtFull = iso => iso ? iso.slice(8, 10) + '/' + iso.slice(5, 7) + '/' + iso.slice(2, 4) : '';
@@ -1745,6 +1905,8 @@ const BOT_UA = /bot|crawler|spider|preview|whatsapp|facebookexternalhit|telegram
 async function shareRoute(req, url, env, ctx) {
   const parts = url.pathname.split('/').filter(Boolean); // ['s', token, ...]
   const token = String(parts[1] || '').replace(/[^A-Za-z0-9]/g, '');
+  const tokUid = token ? await env.BB.get('tok:' + token) : null;
+  if (tokUid) env = scoped(env, tokUid);
   const v = token ? await getJSON(env, 'share:' + token, null) : null;
   if (parts[2] === 'pix.json' && req.method === 'GET') {
     if (!v || !v.pixInfo) return json({error: 'no pix'}, 404);

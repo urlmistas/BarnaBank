@@ -70,6 +70,8 @@ export interface Transaction {
   category?: string
   note?: string
   auto?: string
+  /** chave de importação de extrato (evita importar o mesmo lançamento duas vezes) */
+  imp?: string
 }
 
 export interface Group {
@@ -114,6 +116,8 @@ export interface CardPurchase {
   desc?: string
   category?: string
   note?: string
+  /** chave de importação de extrato */
+  imp?: string
 }
 
 export interface CardPayment {
@@ -139,6 +143,49 @@ export interface AppData {
   cards: Card[]
   cardPurchases: CardPurchase[]
   cardPayments: CardPayment[]
+  /** orçamento do mês: categoria → limite (app.js migrateFinance ~l.268) */
+  budgets?: Record<string, number>
+  goals?: Goal[]
+  recurring?: Recurring[]
+}
+
+export interface GoalAdd {
+  id?: string
+  date: ISODate
+  /** negativo = retirada */
+  amount: number
+  note?: string
+}
+
+/** meta de economia (goalInfo ~l.4735) */
+export interface Goal {
+  id: string
+  name: string
+  target: number
+  /** '' = sem prazo */
+  deadline: ISODate | ''
+  /** carteira cujo saldo conta como guardado; '' = valores guardados na própria meta */
+  walletId: string
+  adds: GoalAdd[]
+  created?: ISODate
+}
+
+/** lançamento que entra sozinho na carteira todo mês (runRecurring ~l.5249) */
+export interface Recurring {
+  id: string
+  type: 'entrada' | 'gasto'
+  amount: number
+  category: string
+  /** dia do mês, 1 a 31 */
+  day: number
+  walletId: string
+  /** primeiro mês, 'YYYY-MM' */
+  start: YearMonth
+  end?: YearMonth
+  note?: string
+  active?: boolean
+  /** mês 'YYYY-MM' → id da transação gerada */
+  posted: Record<string, string>
 }
 
 export interface Settings {

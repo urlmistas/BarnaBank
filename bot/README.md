@@ -100,6 +100,22 @@ A nuvem guarda uma cópia dos dados por dia (como estavam no começo do dia) e m
 
 O app também guarda uma cópia dos dados na nuvem, então dá para usar em outro aparelho.
 
+## Várias contas no mesmo bot
+
+Um bot só atende todas as contas do app. Cada conta tem os dados separados no KV (prefixo `u:<id da conta>:`), e o bot sabe de quem é cada conversa:
+
+1. No app, logado, em **Configurações > Conta e nuvem > Telegram**, **Gerar código** (vale 10 minutos, uso único).
+2. Mande o código ao bot (ou toque em **Abrir no Telegram**). O bot responde "Conta vinculada" e passa a lançar tudo na sua conta.
+3. **Desvincular** (no app) solta o Telegram da conta. Os dados continuam guardados.
+
+O app fala com o bot pelo login da conta: o worker confere o token no Supabase (`SB_URL` e `SB_KEY`, em `wrangler.toml`; a chave é a publicável, que já é pública). Quem vincula não precisa de endereço nem de chave.
+
+O modo antigo continua valendo: com a `SYNC_KEY` (endereço e chave colados no app) o bot guarda tudo sem prefixo, para um dono só. Os dois modos convivem no mesmo worker.
+
+Limites do plano grátis da Cloudflare, que valem para todas as contas somadas: 1.000 gravações por dia no KV e 50 chamadas internas por execução. O lembrete diário percorre as contas uma a uma, então com poucas contas funciona; com mais, o plano pago (US$ 5/mês) tira esses limites.
+
+Um amigo (quem te deve) que entra pelos lembretes fica ligado à conta que mandou o convite. Se a mesma pessoa entrar nos lembretes de duas contas, as mensagens dela vão para a mais recente.
+
 ## Instalação (uma vez só, dá para fazer pelo celular)
 
 São três contas grátis: Telegram, Cloudflare e o GitHub que você já usa.

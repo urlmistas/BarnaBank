@@ -8,6 +8,11 @@ workers_dev = true
 binding = "BB"
 id = "__KV_ID__"
 
+# login das contas: o app manda o token do Supabase e o bot confere lá (chave publicável, não é segredo)
+[vars]
+SB_URL = "https://epsddfqunjqopylrbbyv.supabase.co"
+SB_KEY = "sb_publishable_W04BorQgNFQ2TMGxnaRYow_EwuzV5Ni"
+
 # lembrete diário no Telegram às 9h (horário de Brasília = 12h UTC)
 [triggers]
 crons = ["0 12 * * *"]

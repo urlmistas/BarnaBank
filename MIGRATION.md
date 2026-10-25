@@ -1,4 +1,4 @@
-# Migração — estado e o que falta
+# Migração — estado e decisões
 
 Referência: app antigo (`index.html`, `app.css`, `app.js` ES5 com ~8500 linhas).
 Linhas aproximadas de `app.js`.
@@ -13,12 +13,12 @@ Linhas aproximadas de `app.js`.
 | Carteiras e saldo | `walletEvents` ~127 | `src/lib/finance/wallets.ts` |
 | Contas fixas e faturas de cartão | ~3034–3205 | `src/lib/finance/bills-cards.ts` |
 | Início | `renderDashboard` ~4010, `renderWeek` ~2244, fontes da semana ~2211 e ~3438, `renderTodayBanner` ~4507, `renderHomeSide` ~5561 | `src/lib/finance/dashboard.ts`, `src/pages/inicio` |
-| Pessoas (somente leitura) | `personRows` ~2049, `renderPeopleList` ~2120, `applyFilterSortSearch` ~928, `renderStats` ~824, `renderPersonPage` ~1929, `buildCard` ~1123 (parcelas/histórico), `debtLabel` ~1116, `initials` ~659, `monthEvents` ~5620, `renderChart` ~920 | `src/lib/finance/people.ts`, `src/pages/pessoas` |
-| Carteiras (somente leitura) | `renderWalletsPage` ~4061, `buildWalletCard` ~4077, `walletEvents` ~127, `cardUsed` ~3200, fatura do mês (aba Cartões ~3368), `walletIconKey` ~73 | `src/lib/finance/wallets.ts`, `cardUsed` em `bills-cards.ts`, `src/pages/carteiras` |
-| Relatórios (somente leitura) | `renderRelatorios` ~3948, `renderCategoryBars` ~3925, `monthSpending` ~4536, `renderSpendBars` ~4565, `renderMixChart` ~4666, `renderRelCards` ~4703, `renderCompare` ~7384, `renderEvoChart` ~4040, empréstimos no período ~3972 | `src/lib/finance/reports.ts`, `src/pages/relatorios` |
+| Pessoas | `personRows` ~2049, `renderPeopleList` ~2120, `applyFilterSortSearch` ~928, `renderStats` ~824, `renderPersonPage` ~1929, `buildCard` ~1123 (parcelas/histórico), `debtLabel` ~1116, `initials` ~659, `monthEvents` ~5620, `renderChart` ~920 | `src/lib/finance/people.ts`, `src/pages/pessoas` |
+| Carteiras | `renderWalletsPage` ~4061, `buildWalletCard` ~4077, `walletEvents` ~127, `cardUsed` ~3200, fatura do mês (aba Cartões ~3368), `walletIconKey` ~73 | `src/lib/finance/wallets.ts`, `cardUsed` em `bills-cards.ts`, `src/pages/carteiras` |
+| Relatórios | `renderRelatorios` ~3948, `renderCategoryBars` ~3925, `monthSpending` ~4536, `renderSpendBars` ~4565, `renderMixChart` ~4666, `renderRelCards` ~4703, `renderCompare` ~7384, `renderEvoChart` ~4040, empréstimos no período ~3972 | `src/lib/finance/reports.ts`, `src/pages/relatorios` |
 | Configurações (só o que vale para o app novo) | `DEFAULT_SETTINGS` ~9, `#settingsOverlay` (index.html ~715) | `src/pages/configuracoes`, `src/lib/prefs.ts`, `src/app/theme.tsx` |
-| Conta na nuvem (somente leitura) | `sbFetch`/`sbToken` ~8266, login ~8340, `sbPull` ~8395, `SB_ERRS` ~8291 | `src/lib/cloud.ts`, `src/app/AccountDialog.tsx`, `data-context.tsx` |
-| Contas (somente leitura) | `renderContasPage` ~3327 (contas fixas, faturas, 4 medidas), `billTxOf` ~3059, `billStatus` ~3052, `cardInvoices` ~3160, `cardUsed` ~3200 | `src/lib/finance/contas.ts`, `src/pages/contas` |
+| Conta na nuvem | `sbFetch`/`sbToken` ~8266, login ~8340, `sbPull` ~8395, `SB_ERRS` ~8291 | `src/lib/cloud.ts`, `src/app/AccountDialog.tsx`, `data-context.tsx` |
+| Contas | `renderContasPage` ~3327 (contas fixas, faturas, 4 medidas), `billTxOf` ~3059, `billStatus` ~3052, `cardInvoices` ~3160, `cardUsed` ~3200 | `src/lib/finance/contas.ts`, `src/pages/contas` |
 
 Ficaram de fora do Início (por decisão de redesenho): previsão do fim do mês
 (`monthForecast` ~5490), alertas de gastos (`renderAlerts` ~7423), cobranças/claims
@@ -26,37 +26,30 @@ Ficaram de fora do Início (por decisão de redesenho): previsão do fim do mês
 (`renderStartCard` ~5186), barra por categoria e lista "A receber" por pessoa.
 Podem voltar dentro de Relatórios/Pessoas.
 
-## Falta portar
+## Estado
 
-As **cinco telas** (Início, Pessoas, Carteiras, Contas, Relatórios) já estão no app novo, **só leitura**.
-O que falta:
+As cinco telas e as Configurações estão no app novo, **lendo e gravando** os mesmos dados do app antigo, com
+sincronização para a conta (Supabase) e para o bot do Telegram (que agora vive em `bot/`).
 
-1. **Ações de escrita** (todas as telas). Pessoas: nova/editar/excluir dívida, pagamento rápido/parcial
-   (`quickPay` ~1057), quitar com desconto, mais prazo, renegociar, desfazer pagamento, comprovantes,
-   cartão de grupo (`groupStats` ~2456), cobrança por WhatsApp (`whatsappMessage` ~678), etiquetas/notas
-   (`personExtraHtml` ~5463), confiança (`trustInfo` ~7866), ordenação alternativa, dividir conta, placar.
-   Carteiras: nova/editar/excluir carteira (~4173), lançamento e transferência (~4221), importar extrato
-   OFX/CSV. Contas: conta fixa (`billDialog` ~3102), marcar paga/desfazer (`payBillDialog` ~3063), cartão
-   (`cardDialog` ~3206), compra (`purchaseDialog` ~3240), pagar fatura (`payInvoiceDialog` ~3278),
-   "Cabe no mês?" e aba Calendário (`renderCalendar` ~5659). Relatórios: definir orçamento (`budgetDialog` ~4630).
-2. **Campos do armazenamento ainda não lidos** por `src/lib/storage.ts`: `budgets` (orçamento do mês,
-   `budgetStatus` ~4590), `goals` (metas, `goalInfo` ~4735), `recurring` (lançamentos recorrentes ~5258),
-   `shares` (links públicos), `nudges`, `tgLog`, `catRules`, `invites`. Sem eles não há "Orçamento do mês"
-   nem metas no app novo.
-3. **Relatórios — ficou de fora**: orçamento do mês (precisa de `budgets`), "Assinaturas e gastos que se
-   repetem" (`detectSubs` ~7766, heurística), "Resumo do mês" em imagem (`btnMonthImage`), alertas de
-   gastos fora do padrão (`spendingAlerts` ~7404).
-4. **Transversais**: campos de Configurações que só servem para escrever (abaixo), busca geral, simulador, backup (`buildBackup`
-   ~367), PWA (manifest ~3884), **envio** para a nuvem (`sbPush` ~8410, conflito "Qual versão manter?" ~8440;
-   a **leitura** já existe), criar conta/recuperar senha (~8350), nuvem do bot (`cloudPush` ~6353), links públicos (`shares`),
-   bot do Telegram (`tgLog`), "olhinho" que esconde valores, atalhos de teclado (~3467).
+Portado depois da leitura: escrita em Pessoas, Carteiras e Contas; orçamento, metas e recorrentes; plano;
+calendário e "Cabe no mês?"; importação de extrato; comprovantes, recibo e PDF; resumo do mês em imagem; busca,
+simulador, "olhinho", atalhos; backup; PWA; envio para a nuvem com o diálogo "Qual versão manter?"; criar conta e
+recuperar senha; vínculo do Telegram por código.
+
+Pendências conhecidas (nada disso foi portado):
+
+- Alertas de gastos fora do padrão (`spendingAlerts` ~7404).
+- Itens deixados de fora do Início por decisão de redesenho (previsão do fim do mês, cartão de boas-vindas, barra
+  por categoria, lista "A receber" por pessoa). Podem voltar dentro de Relatórios ou Pessoas.
+
+Esta lista não foi conferida item a item contra o app antigo; ao achar diferença, registre aqui.
 
 ### Pessoas: decisões de redesenho e lógica duvidosa
 
 - **Uma lista só** em vez de "Me devem" / "Eu devo": a linha mostra o líquido
   (a receber − eu devo) com sinal e cor. Quem tem as duas coisas aparece uma vez.
 - **Dívidas de grupo entram na linha da pessoa** (o antigo as tirava da lista de pessoas e
-  mostrava uma linha do grupo). Não há linha/cartão de grupo nesta entrega.
+  mostrava uma linha do grupo). A linha de grupo veio depois, em `src/pages/pessoas/groups/`.
 - **Filtros** com a semântica das pílulas antigas: Em aberto (padrão; `pendentes`), Em atraso
   (alguma dívida com status `atrasado`), Quitados (quem tem **alguma** dívida quitada, mesmo
   com outras em aberto) e Todos. O antigo trocava para "Todos" ao digitar na busca; aqui a
@@ -100,9 +93,8 @@ O que falta:
   último movimento, se futuro). Mês vazio oferece "Ir para <último mês com movimento>".
 - **Gráfico** (aba "Saldo no tempo", carregado sob demanda): saldo diário da carteira do primeiro
   movimento até hoje, uma série só; menor e maior saldo do período.
-- Sem botões de ação (lançamento, carteira, importar, editar, excluir): o app novo é só leitura.
-- **Recorrentes** não são simulados: o antigo grava os lançamentos recorrentes vencidos em
-  `transactions` quando é aberto; se ele não foi aberto desde o vencimento, o app novo não os mostra.
+- Ações de escrita portadas depois da leitura: lançamento, transferência, carteira, importar extrato, editar, excluir.
+- **Recorrentes**: ao abrir, o app lança os recorrentes vencidos (`runRecurring`), como o antigo.
 - **Leitor** (`storage.ts`): carteiras agora passam por `walletIconKey` (emoji → ícone, como o
   `loadData` ~238) e itens sem `id` são **descartados** (o antigo os mantinha); `id`/`name` viram
   texto. `card.walletId` só é mantido se for texto não vazio. Tudo na memória, nada é gravado.
@@ -143,7 +135,7 @@ O que falta:
   inteira, igual ao antigo) com disponível, carteira que paga (`card.walletId`, link), aba **Compras**
   (descrição `desc` → nota → categoria, data, "parcela 2/4 de R$ …") com os pagamentos e aba **Faturas**
   (todas as faturas não vazias, inclusive futuras com parcelas). Setas trocam a fatura/mês.
-- **Sem gráficos** nesta tela. Sem botões de pagar/marcar/novo/editar (o app é só leitura).
+- **Sem gráficos** nesta tela. Pagar, marcar, novo e editar foram portados depois.
 - Tipo `CardPurchase` ganhou `desc` (o antigo grava a descrição nesse campo). O leitor já copiava o
   campo; nada mudou em `storage.ts`.
 - Demonstração: novas contas fixas (Aluguel paga pela transação t2, Energia atrasada, Salário como
@@ -175,8 +167,8 @@ O que falta:
   esmaecidos e fora das medidas. Cores: dourado + dois cinzas (`--chart-*`); verde/vermelho só em valores com
   sinal. O validador do dataviz acusa "cinza sem croma" (é o pedido) e contraste < 3:1 do cinza claro;
   compensado com legenda com valores, fresta de 2px entre segmentos e a tabela.
-- **Removidos**: orçamento (sem `budgets` no leitor), assinaturas (`detectSubs`, heurística), "Resumo do mês"
-  em imagem (sem exportar/imprimir nesta entrega).
+- **Ficaram para depois** (hoje portados): orçamento, assinaturas (`detectSubs`) e "Resumo do mês" em imagem.
+  Seguem fora: alertas de gastos fora do padrão.
 - **Lógica duvidosa (portada igual)**: a parcela do cartão conta no **mês da compra + n**, não no mês da
   fatura (difere de Contas). Conta fixa marcada sem carteira (`'x'`) conta o valor cadastrado. Gastos de
   Relatórios ≠ "Saiu" do Início: o Início soma movimentos das carteiras (inclui pagamentos de dívida e de
@@ -192,15 +184,14 @@ O que falta:
 
 ### Conta na nuvem: decisões e lógica duvidosa
 
-- **Só leitura**: login por senha (`/auth/v1/token`) e `GET /rest/v1/bb_user_state`. Não há `POST/PATCH` na
-  tabela (há teste garantindo). Os dados baixados passam pelo mesmo `parseAppData` do `localStorage`.
+- **Leitura e envio**: login por senha (`/auth/v1/token`), `GET` e `PATCH` condicionado a `updated_at` em
+  `/rest/v1/bb_user_state` (veja o README). Os dados baixados passam pelo mesmo `parseAppData` do `localStorage`.
 - **Sessão própria** em `bbweb_session` (tokens, nunca a senha). A do antigo (`barnabank_sb`) é ignorada: o
   Supabase troca o refresh token a cada renovação, e renovar a sessão do antigo o desconectaria.
 - **Prioridade**: dados da conta (se houver) > `localStorage` > demonstração. Se a conta não tem dados ou a
   rede falha, mostra os do aparelho e avisa na janela da conta. Sessão inválida (400/401/403) → sai da conta.
 - **Dados só na memória**: cada abertura baixa de novo (sem internet, ficam os do aparelho).
-- **Duvidoso**: se o app antigo deste aparelho tem mudanças ainda não enviadas, o novo mostra a versão da conta
-  (mais antiga). O antigo resolveria com "Qual versão manter?"; o novo não pergunta.
+- Quando a conta e o aparelho mudaram, o app pergunta "Qual versão manter?" (`SyncConflictDialog`), como o antigo.
 - A chave publicável do Supabase está no código (como no antigo); o acesso depende do RLS da tabela.
 
 ### Configurações: decisões
@@ -210,16 +201,13 @@ O que falta:
   Escuro), **moeda** e **formato de data**, **de onde vêm os dados** e link para o app atual, e a versão (commit).
 - Moeda e data: padrão "Como no BarnaBank" (lê `barnabank_settings_v1` ou o `settings` da conta). Escolher
   outra grava só em `bbweb_prefs` e vale só no app novo; o antigo não muda.
-- **Não vieram** (só servem para criar/editar, e o app é só leitura): juros/multa/mora padrão, chave PIX/tipo/
-  cidade/nome, carteira padrão, confirmar antes de excluir, lembrete de backup, exportar/importar backup
-  (exportar daqui sairia incompleto: o leitor ainda não carrega `budgets`, `goals`, `recurring` etc.), dica
-  de "Adicionar à tela inicial" (sem PWA ainda).
+- Na 1.0 só leitura ficaram de fora e depois foram portados: padrões (juros, multa, mora, carteira padrão), chave
+  PIX, backup (exportar, importar e lembrete) e a instalação como app (PWA).
 
-## Antes de gravar dados
+## Gravação de dados
 
-O app novo é somente leitura. Para as telas com edição será preciso decidir:
-- gravar em `barnabank_debts_v3` no **mesmo formato** do `saveData` (~352), incluindo os
-  campos que o leitor novo ainda não tipa (`budgets`, `goals`, `nudges`, `recurring`,
-  `shares`, `tgLog`, `catRules`, `invites`) — o leitor atual não os carrega, então uma
-  gravação ingênua **apagaria** esses dados;
-- disparar a mesma sincronização de nuvem (`cloudSchedule`, `sbSchedule`) que o antigo faz.
+O app grava em `barnabank_debts_v3` no **mesmo formato** do `saveData` do antigo. `src/lib/store.ts` lê o JSON
+atual, troca só o que mudou e devolve o resto intacto (`budgets`, `goals`, `nudges`, `recurring`, `shares`, `tgLog`,
+`catRules`, `invites`…), então uma gravação não apaga o que o app não conhece. `tgLog` e `shares` pertencem ao bot:
+o app só os repassa. Cada gravação agenda o envio para a conta e para o bot (`src/lib/sync/`). Regras do bot:
+[bot/ENGINE.md](bot/ENGINE.md).

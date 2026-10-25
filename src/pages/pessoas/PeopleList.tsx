@@ -7,6 +7,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Segmented } from '@/components/ui/segmented'
 import { filterCounts, filterPeople, personStatus, type PeopleFilter, type PersonRow } from '@/lib/finance/people'
+import { Select } from '@/components/ui/select'
+import { PEOPLE_SORTS, SORT_LABEL, sortPeople, type PeopleSort } from '@/lib/finance/person-extra'
 import { plural } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { Avatar, SignedMoney } from './parts'
@@ -33,6 +35,8 @@ export function PeopleList({
   query,
   onFilter,
   onQuery,
+  sort = 'due',
+  onSort,
   selectedKey,
   search,
 }: {
@@ -41,12 +45,15 @@ export function PeopleList({
   query: string
   onFilter: (f: PeopleFilter) => void
   onQuery: (q: string) => void
+  sort?: PeopleSort
+  onSort?: (o: PeopleSort) => void
   selectedKey?: string
   search: string
 }) {
   const searchId = useId()
   const listRef = useRef<HTMLUListElement>(null)
-  const shown = useMemo(() => filterPeople(rows, filter, query), [rows, filter, query])
+  const shown = useMemo(() => sortPeople(filterPeople(rows, filter, query), sort), [rows, filter, query, sort])
+  const sortId = useId()
   const counts = useMemo(() => filterCounts(rows, query), [rows, query])
 
   if (!rows.length) return <NoPeople />
@@ -101,6 +108,20 @@ export function PeopleList({
             count: f === 'atrasados' || f === 'quitados' ? counts[f] : undefined,
           }))}
         />
+        {onSort && (
+          <div className="flex items-center gap-2">
+            <label htmlFor={sortId} className="shrink-0 text-xs text-fg-muted">
+              Ordenar por
+            </label>
+            <Select
+              id={sortId}
+              value={sort}
+              onChange={onSort}
+              options={PEOPLE_SORTS.map((s) => ({ value: s, label: SORT_LABEL[s] }))}
+              className="sm:w-48"
+            />
+          </div>
+        )}
       </div>
 
       <p className="sr-only" role="status" aria-live="polite">

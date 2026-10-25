@@ -10,6 +10,8 @@ import { STORAGE_KEY } from '@/lib/storage'
 // - a configuração fica na MESMA chave do app antigo, então o que já foi configurado continua valendo.
 
 export const BOT_KEY = 'barnabank_cloud'
+/** no lugar da SYNC_KEY: fala com o bot pelo login da conta (token da sessão) */
+export const ACCOUNT_KEY = '@conta'
 
 export interface BotCfg {
   url?: string
@@ -40,6 +42,8 @@ export type BotResult =
 export interface BotEnv {
   fetcher: Fetch
   now?: () => Date
+  /** token do login (renova se preciso); usado quando a chave é ACCOUNT_KEY */
+  token?: () => Promise<string>
 }
 
 function ls(): Storage | undefined {
@@ -69,6 +73,7 @@ export function writeBotCfg(cfg: BotCfg | null) {
 }
 
 export const botOn = (cfg: BotCfg) => !!(cfg.url && cfg.key)
+export const botByAccount = (cfg: Pick<BotCfg, 'key'>) => cfg.key === ACCOUNT_KEY
 
 export class BotError extends Error {
   status?: number
@@ -81,7 +86,7 @@ export class BotError extends Error {
 /** mensagem curta em português; nunca inclui a chave */
 export function botErrorText(e: unknown): string {
   const err = e as BotError
-  if (err?.status === 401) return 'Chave errada.'
+  if (err?.status === 401) return err.message === 'Sem login' ? 'Entre na sua conta de novo.' : 'Chave errada.'
   if (err?.status) return 'O bot respondeu com erro ' + err.status + '.'
   if (/failed to fetch|networkerror|load failed/i.test(err?.message || '')) return 'Sem conexão com o bot.'
   return 'Não consegui falar com o bot.'
@@ -89,15 +94,26 @@ export function botErrorText(e: unknown): string {
 
 const base = (url: string) => url.trim().replace(/\/+$/, '')
 
+async function accountToken(env: BotEnv): Promise<string> {
+  try {
+    if (!env.token) throw new Error('sem login')
+    return await env.token()
+  } catch {
+    throw new BotError('Sem login', 401)
+  }
+}
+
 async function call(env: BotEnv, cfg: Pick<BotCfg, 'url' | 'key'>, method: 'GET' | 'PUT', body?: unknown): Promise<BotState> {
   let r: Response
   try {
+    const bearer = botByAccount(cfg) ? await accountToken(env) : (cfg.key ?? '')
     r = await env.fetcher(base(cfg.url ?? '') + '/api/state', {
       method,
-      headers: { Authorization: 'Bearer ' + (cfg.key ?? ''), 'Content-Type': 'application/json' },
+      headers: { Authorization: 'Bearer ' + bearer, 'Content-Type': 'application/json' },
       body: body === undefined ? undefined : JSON.stringify(body),
     })
-  } catch {
+  } catch (e) {
+    if (e instanceof BotError) throw e
     throw new BotError('failed to fetch')
   }
   if (!r.ok) throw new BotError('Erro ' + r.status, r.status)

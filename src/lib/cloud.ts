@@ -69,14 +69,14 @@ export async function sbFetch<T>(fetcher: Fetch, path: string, init: RequestInit
   return j as T
 }
 
-interface TokenResponse {
+export interface TokenResponse {
   access_token: string
   refresh_token: string
   expires_in?: number
   user?: { id: string; email?: string }
 }
 
-function toSession(j: TokenResponse, now: number, keep?: CloudSession): CloudSession {
+export function toSession(j: TokenResponse, now: number, keep?: CloudSession): CloudSession {
   return {
     // renovar o token não muda o que já foi sincronizado
     ...(keep?.rev ? { rev: keep.rev } : {}),
@@ -127,9 +127,11 @@ export async function pullState(fetcher: Fetch, s: CloudSession, today: string):
 
 const ERRS: [RegExp, string][] = [
   [/invalid login credentials|invalid_credentials/i, 'E-mail ou senha incorretos.'],
-  [/email not confirmed/i, 'Confirme seu e-mail no BarnaBank atual antes de entrar.'],
-  [/rate limit|too many/i, 'Muitas tentativas. Espere alguns minutos e tente de novo.'],
-  [/invalid.*email|email_address_invalid/i, 'E-mail inválido.'],
+  [/email not confirmed/i, 'Confirme seu e-mail: abra o link que enviamos para você.'],
+  [/already registered|user_already_exists/i, 'Esse e-mail já tem conta. Use "Entrar".'],
+  [/password.*(at least|short|weak)|weak_password/i, 'Senha fraca demais. Use as regras indicadas.'],
+  [/rate limit|too many|over_email_send_rate_limit/i, 'Muitas tentativas. Espere alguns minutos e tente de novo.'],
+  [/invalid.*email|email_address_invalid|unable to validate email/i, 'E-mail inválido.'],
   [/failed to fetch|networkerror|load failed/i, 'Sem conexão com a internet.'],
   [/jwt|token|refresh/i, 'Sua sessão expirou. Entre de novo.'],
 ]

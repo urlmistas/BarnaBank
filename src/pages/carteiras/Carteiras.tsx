@@ -14,6 +14,7 @@ import type { AppData, YearMonth } from '@/lib/types'
 import { WalletList } from './WalletList'
 import { WalletDetailView } from './WalletDetail'
 import { TxFormDialog, WalletFormDialog } from './dialogs'
+import { ImportStatementButton } from './import-dialog'
 
 // Carteiras: saldo total em destaque, uma linha por carteira. No PC (≥1024px) a carteira
 // abre num painel ao lado; no celular /carteiras/:id é uma página inteira (como Pessoas).
@@ -96,6 +97,7 @@ function CarteirasReady({ data, today }: { data: AppData; today: string }) {
         <div className="flex flex-col gap-3 lg:items-end">
           {canCreate && (
             <div className="flex flex-wrap gap-2">
+              {(has || data.cards.length > 0) && <ImportStatementButton data={data} />}
               {canEdit && has && (
                 <Button size="sm" variant="outline" onClick={() => setDlg('tx')}>
                   <ArrowLeftRight aria-hidden="true" />

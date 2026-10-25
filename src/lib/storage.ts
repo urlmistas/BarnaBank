@@ -3,6 +3,7 @@ import type {
 } from '@/lib/types'
 import { syncRecurringDebt } from '@/lib/finance/debts'
 import { buildDemoData } from '@/lib/demo-data'
+import { normalizePlan } from '@/lib/finance/plan-normalize'
 
 // Leitor SOMENTE LEITURA dos dados do app antigo.
 // Mesmas chaves e mesmo formato de app.js (STORAGE_KEY ~l.4, loadData ~l.217, saveData ~l.352).
@@ -194,7 +195,7 @@ export function parseAppData(raw: string | null, today: string): AppData | null 
     }
     return syncRecurringDebt(d, today)
   })
-  return { debts, contacts, wallets, transactions, groups, ...normalizeFinance(p) }
+  return { debts, contacts, wallets, transactions, groups, ...normalizeFinance(p), ...normalizePlan(p) }
 }
 
 export function hasAnyData(d: AppData): boolean {
