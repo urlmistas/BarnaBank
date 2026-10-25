@@ -111,7 +111,8 @@ describe('bot: pedidos e visualizações', () => {
     const [url, init] = f.mock.calls[0]
     expect(url).toBe('https://bot.dev/api/state')
     expect(url).not.toContain('segredo')
-    expect((init?.headers as Record<string, string>).Authorization).toBe('Bearer segredo-123')
+    const headers = init?.headers as Record<string, string> | undefined
+    expect(headers?.Authorization).toBe('Bearer segredo-123')
   })
 
   it('chave errada vira erro com status 401', async () => {

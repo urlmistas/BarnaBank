@@ -13,6 +13,7 @@ export interface MenuItem {
 }
 
 interface Place {
+  host: Element
   right: number
   top?: number
   bottom?: number
@@ -48,12 +49,13 @@ export function Menu({
   React.useLayoutEffect(() => {
     if (!open || !btn.current) return
     const r = btn.current.getBoundingClientRect()
+    const host = btn.current.closest('dialog') ?? document.body
     const below = window.innerHeight - r.bottom - 12
     const above = r.top - 12
     const want = shown.length * 36 + 8
     const up = below < want && above > below
     const right = Math.max(8, window.innerWidth - r.right)
-    setPlace(up ? { right, bottom: window.innerHeight - r.top + 4, maxHeight: above } : { right, top: r.bottom + 4, maxHeight: below })
+    setPlace(up ? { host, right, bottom: window.innerHeight - r.top + 4, maxHeight: above } : { host, right, top: r.bottom + 4, maxHeight: below })
   }, [open, shown.length])
 
   React.useEffect(() => {
@@ -113,7 +115,6 @@ export function Menu({
   }
 
   if (!shown.length) return null
-  const host = open && btn.current ? (btn.current.closest('dialog') ?? document.body) : null
 
   return (
     <>
@@ -138,7 +139,7 @@ export function Menu({
       >
         {trigger}
       </button>
-      {host &&
+      {open &&
         place &&
         createPortal(
           <ul
@@ -169,7 +170,7 @@ export function Menu({
               </li>
             ))}
           </ul>,
-          host,
+          place.host,
         )}
     </>
   )

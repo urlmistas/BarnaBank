@@ -9,7 +9,7 @@ do app antigo (`barna-bank`), com o mesmo formato, e no repositório também est
 
 | Tela | O que faz |
 |---|---|
-| **Início** | Resumo do dia, a semana, o que vence e o que está atrasado. |
+| **Início** | Resumo do dia, a semana, o que vence e o que está atrasado, e os gastos fora do padrão do mês. |
 | **Pessoas** | Saldo líquido por pessoa, filtros e busca. Nova dívida, pagamento rápido e parcial, quitar, renegociar, desfazer, comprovantes e recibo em PDF, cobrança por WhatsApp e link, grupos, placar. |
 | **Carteiras** | Saldo, extrato do mês e gráfico. Nova carteira, lançamentos, transferências, "Repetir todo mês" e importação de extrato (OFX/CSV). |
 | **Contas** | Contas fixas e faturas de cartão por mês. Marcar paga, cartões, compras, pagar fatura, calendário e "Cabe no mês?". |

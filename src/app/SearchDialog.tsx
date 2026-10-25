@@ -61,7 +61,6 @@ function SearchBody({ onClose }: { onClose: () => void }) {
   const flat = useMemo(() => sections.flatMap((s) => s.items), [sections])
   const q = normTxt(text.trim().slice(0, MAX_QUERY))
 
-  useEffect(() => setActive(0), [text])
   useEffect(() => activeRef.current?.scrollIntoView?.({ block: 'nearest' }), [active])
 
   const go = (it: SearchItem | undefined) => {
@@ -95,7 +94,10 @@ function SearchBody({ onClose }: { onClose: () => void }) {
           id={inputId}
           value={text}
           maxLength={MAX_QUERY}
-          onChange={(e) => setText(e.target.value)}
+          onChange={(e) => {
+            setText(e.target.value)
+            setActive(0)
+          }}
           placeholder="Pessoa, carteira, categoria, conta, compra ou valor"
           autoComplete="off"
           autoFocus

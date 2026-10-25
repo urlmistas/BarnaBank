@@ -21,7 +21,7 @@ Linhas aproximadas de `app.js`.
 | Contas | `renderContasPage` ~3327 (contas fixas, faturas, 4 medidas), `billTxOf` ~3059, `billStatus` ~3052, `cardInvoices` ~3160, `cardUsed` ~3200 | `src/lib/finance/contas.ts`, `src/pages/contas` |
 
 Ficaram de fora do Início (por decisão de redesenho): previsão do fim do mês
-(`monthForecast` ~5490), alertas de gastos (`renderAlerts` ~7423), cobranças/claims
+(`monthForecast` ~5490), cobranças/claims
 (`renderClaims` ~7287), plano (`renderDashPlan` ~4864), cartão de boas-vindas
 (`renderStartCard` ~5186), barra por categoria e lista "A receber" por pessoa.
 Podem voltar dentro de Relatórios/Pessoas.
@@ -36,18 +36,21 @@ calendário e "Cabe no mês?"; importação de extrato; comprovantes, recibo e P
 simulador, "olhinho", atalhos; backup; PWA; envio para a nuvem com o diálogo "Qual versão manter?"; criar conta e
 recuperar senha; vínculo do Telegram por código.
 
-Pendências conhecidas (nada disso foi portado):
+Redesenhos e extras dos últimos dias (nada disso existe no app antigo ou mudou de forma):
 
-- Alertas de gastos fora do padrão (`spendingAlerts` ~7404).
-- Itens deixados de fora do Início por decisão de redesenho (previsão do fim do mês, cartão de boas-vindas, barra
-  por categoria, lista "A receber" por pessoa). Podem voltar dentro de Relatórios ou Pessoas.
+- **Pessoas:** seletor Todos / Me devem / Eu devo acima da lista (`?l=`), com o valor só do lado escolhido. Dentro da pessoa, abas Me devem e Eu devo; só a primeira dívida em aberto vem aberta; ações num menu "Mais ações" e só o pagamento rápido, o WhatsApp e o Link ficam à vista. A barra do grupo é contínua, da esquerda para a direita.
+- **Início:** card "Gastos fora do padrão" (`spendingAlerts`, em `src/lib/finance/alerts.ts`): categoria do mês com pelo menos 50% acima da média dos 3 meses anteriores e R$ 50 a mais, ou nova a partir de R$ 300. "Já sei" esconde por mês, na mesma chave do antigo (`barnabank_alerts_hide`).
+- **Documentos imprimíveis:** Inter e Geist embutidos, cores sólidas (degradê, sombra e transparência serrilham o texto no PDF) e o tema do site (claro ou escuro, com botão para trocar na página). O ranking é sempre escuro.
+- **Escolha do "Qual versão manter?":** fica na sessão (`pref`) e vale para os próximos conflitos; "manter deste aparelho" sobrescreve a linha da conta sem condição.
+- **Lembretes do bot:** hora, resumo do dia, da semana (com o dia), do mês e aviso a quem te deve, em Configurações. O bot guarda por conta (`/api/prefs`) e o cron roda de hora em hora.
+- **Interface:** Select e Menu próprios (lista estilizada, teclado), janelas e avisos animados, lixeira vermelha no hover.
 
 Esta lista não foi conferida item a item contra o app antigo; ao achar diferença, registre aqui.
 
 ### Pessoas: decisões de redesenho e lógica duvidosa
 
 - **Uma lista só** em vez de "Me devem" / "Eu devo": a linha mostra o líquido
-  (a receber − eu devo) com sinal e cor. Quem tem as duas coisas aparece uma vez.
+  (a receber − eu devo) com sinal e cor. Quem tem as duas coisas aparece uma vez. Depois veio o seletor Todos / Me devem / Eu devo, que filtra a lista por lado.
 - **Dívidas de grupo entram na linha da pessoa** (o antigo as tirava da lista de pessoas e
   mostrava uma linha do grupo). A linha de grupo veio depois, em `src/pages/pessoas/groups/`.
 - **Filtros** com a semântica das pílulas antigas: Em aberto (padrão; `pendentes`), Em atraso
@@ -168,7 +171,7 @@ Esta lista não foi conferida item a item contra o app antigo; ao achar diferen�
   sinal. O validador do dataviz acusa "cinza sem croma" (é o pedido) e contraste < 3:1 do cinza claro;
   compensado com legenda com valores, fresta de 2px entre segmentos e a tabela.
 - **Ficaram para depois** (hoje portados): orçamento, assinaturas (`detectSubs`) e "Resumo do mês" em imagem.
-  Seguem fora: alertas de gastos fora do padrão.
+  Os alertas de gastos fora do padrão vieram depois, no Início.
 - **Lógica duvidosa (portada igual)**: a parcela do cartão conta no **mês da compra + n**, não no mês da
   fatura (difere de Contas). Conta fixa marcada sem carteira (`'x'`) conta o valor cadastrado. Gastos de
   Relatórios ≠ "Saiu" do Início: o Início soma movimentos das carteiras (inclui pagamentos de dívida e de

@@ -59,7 +59,8 @@ describe('recuperação', () => {
     const b = fakeFetch(200, {})
     await updatePassword(b.f, 'tok', 'Nova123!')
     expect(b.calls[0].init?.method).toBe('PUT')
-    expect((b.calls[0].init?.headers as Record<string, string>).Authorization).toBe('Bearer tok')
+    const headers = b.calls[0].init?.headers as Record<string, string> | undefined
+    expect(headers?.Authorization).toBe('Bearer tok')
     expect(b.calls[0].url).not.toContain('Nova123')
   })
 

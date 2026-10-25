@@ -1,14 +1,15 @@
 import { lazy, Suspense, useId, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
-import { ArrowRight, CircleAlert, Clock, Inbox } from 'lucide-react'
+import { ArrowRight, CircleAlert, Clock, Inbox, TriangleAlert, X } from 'lucide-react'
 import { useAppData } from '@/app/data-context'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { dashboardAlert, dashboardSummary, upcomingItems, type DashboardAlert, type UpcomingItem } from '@/lib/finance/dashboard'
+import { alertText, hideAlert, readHiddenAlerts, spendingAlerts, type SpendingAlert } from '@/lib/finance/alerts'
 import { balanceSeries } from '@/lib/finance/wallets'
-import { addDaysISO, parseISO } from '@/lib/finance/dates'
+import { addDaysISO, parseISO, ymOf } from '@/lib/finance/dates'
 import { MONTHS, lateLabel, plural, relativeDay } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import type { AppData } from '@/lib/types'
@@ -37,6 +38,7 @@ function InicioReady({ data, today }: { data: AppData; today: string }) {
         items,
         alert: dashboardAlert(items, today),
         summary: dashboardSummary(data, today),
+        spending: spendingAlerts(data, today),
         series: data.wallets.length ? balanceSeries(data, addDaysISO(today, -29), today) : [],
       }
     }, [data, today])
@@ -45,6 +47,7 @@ function InicioReady({ data, today }: { data: AppData; today: string }) {
         <div className="flex min-w-0 flex-col gap-6">
           <Hero summary={view.summary} />
           {view.alert && <AlertRow alert={view.alert} />}
+          <SpendingAlerts alerts={view.spending} today={today} />
           <Upcoming items={view.items} />
         </div>
         <MonthCard summary={view.summary} series={view.series} />
@@ -108,6 +111,46 @@ function AlertRow({ alert }: { alert: DashboardAlert }) {
         </Link>
       </Button>
     </div>
+  )
+}
+
+/** categorias do mês que passaram muito da média (até 4); "Já sei" esconde a categoria até o mês acabar */
+function SpendingAlerts({ alerts, today }: { alerts: SpendingAlert[]; today: string }) {
+  const { money } = useAppData()
+  const month = ymOf(today)
+  const [hidden, setHidden] = useState(() => readHiddenAlerts())
+  const list = alerts.filter((a) => hidden[month + ':' + a.key] !== 1).slice(0, 4)
+  if (!list.length) return null
+  return (
+    <section aria-label="Gastos fora do padrão" className="rounded-md border border-border bg-surface">
+      <h2 className="flex items-center gap-2 px-4 pt-3 text-sm font-medium">
+        <TriangleAlert aria-hidden="true" className="size-4 text-accent-text" />
+        Gastos fora do padrão em {MONTHS[parseISO(today).getMonth()]}
+      </h2>
+      <ul className="mt-1 pb-1">
+        {list.map((a) => (
+          <li key={a.key} className="flex items-center gap-3 px-4 py-2">
+            <p className="min-w-0 flex-1 text-sm">
+              <b className="font-medium">{a.name}</b> <span className="num">{money(a.cur)}</span>
+              <span className="block text-xs text-fg-muted">{alertText(a, money)}</span>
+            </p>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-8"
+              aria-label={`Esconder o alerta de ${a.name}`}
+              title="Já sei, esconder"
+              onClick={() => {
+                hideAlert(month, a.key)
+                setHidden(readHiddenAlerts())
+              }}
+            >
+              <X aria-hidden="true" />
+            </Button>
+          </li>
+        ))}
+      </ul>
+    </section>
   )
 }
 

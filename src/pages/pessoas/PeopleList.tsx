@@ -13,6 +13,7 @@ import { plural } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { Avatar, SignedMoney } from './parts'
 import { personHref } from './links'
+import { PEOPLE_SIDES, SIDE_LABEL, rowsOfSide, type PeopleSide } from './people-sides'
 
 const FILTER_LABEL: Record<PeopleFilter, string> = {
   abertos: 'Em aberto',
@@ -27,17 +28,6 @@ const FILTER_IN: Record<PeopleFilter, string> = {
   atrasados: ' em atraso',
   quitados: ' entre os quitados',
   todos: '',
-}
-
-export type PeopleSide = 'todos' | 'receber' | 'pagar'
-export const PEOPLE_SIDES: PeopleSide[] = ['todos', 'receber', 'pagar']
-const SIDE_LABEL: Record<PeopleSide, string> = { todos: 'Todos', receber: 'Me devem', pagar: 'Eu devo' }
-
-/** só quem tem dívida daquele lado; o valor passa a ser só daquele lado (não o saldo dos dois) */
-export function rowsOfSide(rows: PersonRow[], side: PeopleSide): PersonRow[] {
-  if (side === 'todos') return rows
-  const kind = side === 'receber' ? 'receivable' : 'payable'
-  return rows.filter((r) => r.debts.some((d) => d.kind === kind)).map((r) => ({ ...r, net: side === 'receber' ? r.toReceive : -r.toPay }))
 }
 
 export function PeopleList({

@@ -12,6 +12,8 @@ export interface SelectOption<T extends string> {
 }
 
 interface Place {
+  /** onde a lista é desenhada: o <dialog> aberto que contém o campo, ou o body */
+  host: Element
   left: number
   width: number
   top?: number
@@ -68,13 +70,14 @@ export function Select<T extends string>({
   React.useLayoutEffect(() => {
     if (!open || !btn.current) return
     const r = btn.current.getBoundingClientRect()
+    const host = btn.current.closest('dialog') ?? document.body
     const below = window.innerHeight - r.bottom - GAP - 8
     const above = r.top - GAP - 8
     const up = below < Math.min(MAX_LIST, options.length * 36 + 8) && above > below
     setPlace(
       up
-        ? { left: r.left, width: r.width, bottom: window.innerHeight - r.top + GAP, maxHeight: Math.min(MAX_LIST, above) }
-        : { left: r.left, width: r.width, top: r.bottom + GAP, maxHeight: Math.min(MAX_LIST, below) },
+        ? { host, left: r.left, width: r.width, bottom: window.innerHeight - r.top + GAP, maxHeight: Math.min(MAX_LIST, above) }
+        : { host, left: r.left, width: r.width, top: r.bottom + GAP, maxHeight: Math.min(MAX_LIST, below) },
     )
   }, [open, options.length])
 
@@ -156,8 +159,6 @@ export function Select<T extends string>({
     }
   }
 
-  const host = open && btn.current ? (btn.current.closest('dialog') ?? document.body) : null
-
   return (
     <div className={cn('relative w-full', className)}>
       <button
@@ -183,7 +184,7 @@ export function Select<T extends string>({
         aria-hidden="true"
         className={cn('pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2 text-fg-subtle transition-transform', open && 'rotate-180')}
       />
-      {host &&
+      {open &&
         place &&
         createPortal(
           <ul
@@ -212,7 +213,7 @@ export function Select<T extends string>({
               </li>
             ))}
           </ul>,
-          host,
+          place.host,
         )}
     </div>
   )

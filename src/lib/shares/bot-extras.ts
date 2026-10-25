@@ -108,7 +108,9 @@ export function useBotExtras(fetcher: Fetch = (u, i) => globalThis.fetch(u, i)):
   const [error, setError] = useState<string | null>(null)
   const alive = useRef(true)
   const fetchRef = useRef(fetcher)
-  fetchRef.current = fetcher
+  useEffect(() => {
+    fetchRef.current = fetcher
+  })
 
   const reload = useCallback(async () => {
     const cfg = readBotCfg()
@@ -132,7 +134,8 @@ export function useBotExtras(fetcher: Fetch = (u, i) => globalThis.fetch(u, i)):
 
   useEffect(() => {
     alive.current = true
-    void reload()
+    // fora do corpo do efeito: o carregamento muda o estado depois, não durante a montagem
+    queueMicrotask(() => void reload())
     return () => {
       alive.current = false
     }

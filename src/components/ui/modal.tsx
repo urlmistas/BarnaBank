@@ -22,11 +22,9 @@ export function Modal({
   const titleId = useId()
   // o conteúdo fica montado até a animação de saída terminar (senão a janela esvazia antes de sumir)
   const [keep, setKeep] = useState(open)
+  if (open && !keep) setKeep(true)
   useEffect(() => {
-    if (open) {
-      setKeep(true)
-      return
-    }
+    if (open) return
     const t = window.setTimeout(() => setKeep(false), 220)
     return () => window.clearTimeout(t)
   }, [open])

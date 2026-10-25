@@ -43,11 +43,8 @@ export function AccountDialog({
 
   // chegou pelo link do e-mail: abre a janela já na tela certa
   useEffect(() => {
-    if (!link) return
-    setMode(recovery ? 'recovery' : 'login')
-    setMsg(link.error ? { text: link.error, kind: 'err' } : null)
-    dialogRef.current?.showModal?.()
-  }, [link, recovery, dialogRef])
+    if (link) dialogRef.current?.showModal?.()
+  }, [link, dialogRef])
 
   // senha nunca fica guardada: some ao fechar a janela
   useEffect(() => {

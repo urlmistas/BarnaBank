@@ -35,7 +35,7 @@ export function GroupsSection({ filter, query }: { filter: GroupFilter; query: s
   const { result, today, canCreate } = useAppData()
   const [creating, setCreating] = useState(false)
   const data = result?.data
-  const calc = useMemo(() => makeDebtCalc(today), [today, data])
+  const calc = useMemo(() => makeDebtCalc(today), [today])
   const items = useMemo(() => {
     if (!data) return []
     return data.groups
