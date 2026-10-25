@@ -5,7 +5,12 @@ import { BotError } from './worker'
 // a pessoa manda o código no Telegram e o bot passa a guardar os dados dela separados dos de outras contas.
 
 /** endereço do bot compartilhado (definido no build: VITE_BOT_URL). Vazio = só o modo antigo, com chave. */
-export const BOT_URL = String(import.meta.env.VITE_BOT_URL ?? '').trim().replace(/\/+$/, '')
+export const botBase = (raw: unknown): string => {
+  const v = String(raw ?? '').trim().replace(/\/+$/, '')
+  // a variável do repositório pode vir sem o https:// (aí o endereço viraria um caminho relativo do site)
+  return v && !/^https?:\/\//i.test(v) ? 'https://' + v : v
+}
+export const BOT_URL = botBase(import.meta.env.VITE_BOT_URL)
 
 export interface LinkStatus {
   linked: boolean

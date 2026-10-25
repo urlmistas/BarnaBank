@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Fetch } from '@/lib/cloud'
-import { codeLabel, linkCreate, linkRemove, linkStatus } from './telegram-link'
+import { botBase, codeLabel, linkCreate, linkRemove, linkStatus } from './telegram-link'
 import { json } from './test-helpers'
 
 const BASE = 'https://bot.exemplo.workers.dev'
@@ -40,5 +40,13 @@ describe('telegram-link', () => {
 
   it('codeLabel separa em dois blocos', () => {
     expect(codeLabel('K7M2Q9XA')).toBe('K7M2 Q9XA')
+  })
+})
+
+describe('botBase', () => {
+  it('põe https:// quando a variável vem só com o domínio e tira a barra final', () => {
+    expect(botBase('barnabank-bot.barnabank.workers.dev')).toBe('https://barnabank-bot.barnabank.workers.dev')
+    expect(botBase(' https://bot.exemplo.workers.dev/ ')).toBe('https://bot.exemplo.workers.dev')
+    expect(botBase(undefined)).toBe('')
   })
 })
