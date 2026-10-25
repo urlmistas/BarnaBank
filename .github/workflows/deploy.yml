@@ -28,6 +28,7 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm test
+      - run: npm run test:bot
       - run: npm run build
         env:
           # bot compartilhado: Settings > Secrets and variables > Actions > Variables > BOT_URL (https://barnabank-bot.<sub>.workers.dev)
