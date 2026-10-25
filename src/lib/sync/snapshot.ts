@@ -58,7 +58,32 @@ export function hashStr(s: string): string {
   return (h >>> 0).toString(36)
 }
 
-export const localHash = () => hashStr(read(STORAGE_KEY) ?? '')
+/** mesmo conteúdo com as chaves em outra ordem (cada lado que grava reordena o JSON) tem o mesmo hash */
+function canonical(v: unknown): unknown {
+  if (Array.isArray(v)) return v.map(canonical)
+  if (isObj(v)) return Object.fromEntries(Object.keys(v).sort().map((k) => [k, canonical(v[k])]))
+  return v
+}
+
+/**
+ * Hash do conteúdo dos dados deste aparelho, para saber "mudou desde a última sincronização".
+ * Ignora a ordem das chaves e o carimbo `exportedAt`: sem isso, adotar a mesma coisa vinda da conta ou do bot
+ * parecia uma mudança e os dois lados ficavam se reenviando para sempre.
+ */
+export function localHash(): string {
+  const raw = read(STORAGE_KEY) ?? ''
+  try {
+    const o: unknown = JSON.parse(raw)
+    if (isObj(o)) {
+      const { exportedAt: _at, ...rest } = o
+      void _at
+      return hashStr(JSON.stringify(canonical(rest)))
+    }
+  } catch {
+    /* texto que não é JSON: vale como está */
+  }
+  return hashStr(raw)
+}
 
 /** appIsEmpty do antigo (~l.5165): nada que valha a pena perder */
 export function isLocalEmpty(): boolean {

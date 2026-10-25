@@ -8,6 +8,7 @@ import { makeDate, makeMoney } from '@/lib/format'
 import { HIDE_KEY, maskMoney, readHidden, writeHidden } from './hide-values'
 import { applyPrefs, PREFS_KEY, readPrefs, writePrefs, type DisplayPrefs } from '@/lib/prefs'
 import { STORE_EVENT } from '@/lib/store'
+import { createBreaker } from '@/lib/sync/breaker'
 import { activeToken, sbPushIfChanged, sbResolve, sbSync, type SbResult, type SbRow, type SyncEnv } from '@/lib/sync/supabase'
 import { ACCOUNT_KEY, botByAccount, botErrorText, botOn, botSync, readBotCfg, testBot, writeBotCfg } from '@/lib/sync/worker'
 import { BOT_URL } from '@/lib/sync/telegram-link'
@@ -76,6 +77,7 @@ const Ctx = createContext<DataState | null>(null)
 const forced = () => new URLSearchParams(globalThis.location?.search ?? '').get('dados')
 
 const fetcher: Fetch = (url, init) => fetch(url, init)
+const PAUSED = 'Os dados estão mudando sem parar (outro aparelho aberto?). Sincronização pausada por 5 minutos; use Sincronizar agora para tentar antes.'
 const SB_DELAY = 1500
 const BOT_DELAY = 2500
 
@@ -98,6 +100,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const session = useRef<CloudSession | null>(forced() ? null : readSession())
   // conflito pendente: enquanto não houver resposta, as sincronizações automáticas não mexem na conta nem reabrem o aviso
   const conflictRef = useRef<SbRow | null>(null)
+  // vai e vem sem fim de dados (outro aparelho disputando): pausa as sincronizações automáticas por alguns minutos
+  const breaker = useRef(createBreaker())
   const sbBusy = useRef(false)
   const sbAgain = useRef(false)
   const botBusy = useRef(false)
@@ -154,6 +158,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     async (job: () => Promise<SbResult>, answer = false): Promise<void> => {
       if (!session.current || forced()) return
       if (conflictRef.current && !answer) return
+      if (breaker.current.paused() && !answer) return
       if (sbBusy.current) {
         sbAgain.current = true
         return
@@ -163,6 +168,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
       try {
         const res = await job()
         if (res.kind === 'off') return
+        if (breaker.current.record(res.kind)) {
+          setCloud({ status: 'error', email: session.current?.email, error: PAUSED })
+          return
+        }
         if (res.kind === 'conflict') {
           // só abre o aviso quando o conflito é novo (não a cada tentativa)
           const fresh = !conflictRef.current
@@ -190,7 +199,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   )
 
   const runBot = useCallback(async (): Promise<void> => {
-    if (!botOn(readBotCfg()) || forced()) return
+    if (!botOn(readBotCfg()) || forced() || breaker.current.paused()) return
     if (botBusy.current) {
       botAgain.current = true
       return
@@ -198,8 +207,12 @@ export function DataProvider({ children }: { children: ReactNode }) {
     botBusy.current = true
     setBot((b) => ({ ...b, status: 'loading', error: undefined }))
     try {
-      await botSync(botEnv)
+      const res = await botSync(botEnv)
       const c = readBotCfg()
+      if (breaker.current.record(res.kind)) {
+        setBot({ status: 'error', account: botByAccount(c), url: c.url, last: c.last, error: PAUSED })
+        return
+      }
       setBot({ status: 'ok', account: botByAccount(c), url: c.url, last: c.last })
     } catch (e) {
       const c = readBotCfg()
@@ -379,7 +392,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
       resolveConflict,
       signIn,
       signOut,
-      refreshCloud: () => void syncAll(false),
+      refreshCloud: () => {
+        breaker.current.reset()
+        void syncAll(false)
+      },
       connectBot,
       disconnectBot,
       botToken,

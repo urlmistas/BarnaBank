@@ -126,3 +126,19 @@ describe('utilidades', () => {
     expect(localHash()).not.toBe(h)
   })
 })
+
+describe('localHash', () => {
+  it('não muda com a ordem das chaves nem com o carimbo exportedAt, mas muda com o conteúdo', () => {
+    ls.setItem(STORAGE_KEY, JSON.stringify({ debts: [{ id: 'a', name: 'Ana' }], wallets: [], exportedAt: '2026-10-25T10:00:00Z' }))
+    const h = localHash()
+    ls.setItem(STORAGE_KEY, JSON.stringify({ wallets: [], exportedAt: '2026-10-25T11:00:00Z', debts: [{ name: 'Ana', id: 'a' }] }))
+    expect(localHash()).toBe(h)
+    ls.setItem(STORAGE_KEY, JSON.stringify({ wallets: [], debts: [{ name: 'Ana', id: 'b' }] }))
+    expect(localHash()).not.toBe(h)
+  })
+
+  it('texto que não é JSON ainda tem hash', () => {
+    ls.setItem(STORAGE_KEY, '{quebrado')
+    expect(localHash()).toBe(hashStr('{quebrado'))
+  })
+})
