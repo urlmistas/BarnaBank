@@ -103,7 +103,7 @@ function NoWallets({ onCreate }: { onCreate?: () => void }) {
       <p className="mt-1 max-w-sm text-sm text-fg-muted">
         {onCreate
           ? 'Crie carteiras para a conta do banco, o dinheiro, a poupança. Elas aparecem aqui com o saldo e os movimentos de cada mês.'
-          : 'Crie carteiras no BarnaBank atual (conta do banco, dinheiro, poupança). Elas aparecem aqui com o saldo e os movimentos de cada mês.'}
+          : 'Crie carteiras (conta do banco, dinheiro, poupança). Elas aparecem aqui com o saldo e os movimentos de cada mês.'}
       </p>
       {onCreate && (
         <Button size="sm" className="mt-4" onClick={onCreate}>

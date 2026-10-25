@@ -7,6 +7,7 @@ import { ToastProvider } from '@/components/ui/toast'
 import { toISO } from '@/lib/finance/dates'
 import { STORAGE_KEY } from '@/lib/storage'
 import { Carteiras } from './Carteiras'
+import { chosen } from '@/test-select'
 
 const cloud = vi.hoisted(() => ({ session: null as null | Record<string, unknown> }))
 vi.mock('@/lib/cloud', async (orig) => ({
@@ -120,7 +121,7 @@ describe('Carteiras: escrita', () => {
     fireEvent.click(within(dlg).getByRole('button', { name: 'Transferência' }))
     fireEvent.change(within(dlg).getByLabelText('Valor (R$)'), { target: { value: '20' } })
     // destino padrão = outra carteira (Dinheiro)
-    expect((within(dlg).getByLabelText('Para') as HTMLSelectElement).value).toBe('w2')
+    expect(chosen(within(dlg).getByLabelText('Para'))).toBe('w2')
     fireEvent.click(within(dlg).getByRole('button', { name: 'Salvar lançamento' }))
     await waitFor(() => expect(stored().transactions).toHaveLength(3))
     expect(stored().transactions[2]).toMatchObject({ walletId: 'w1', toWalletId: 'w2', type: 'transferencia', amount: 20, category: 'Transferência' })

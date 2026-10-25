@@ -6,6 +6,7 @@ import { DataProvider } from '@/app/data-context'
 import { ToastProvider } from '@/components/ui/toast'
 import { STORAGE_KEY } from '@/lib/storage'
 import { Pessoas } from './Pessoas'
+import { choose } from '@/test-select'
 
 const debt = (over: Record<string, unknown> = {}) => ({
   id: 'd1', name: 'Ana Souza', kind: 'receivable', principal: 300, rate: 0, interestType: 'composto', installments: 3, days: 90,
@@ -195,9 +196,9 @@ describe('Pessoas: ordenação e placar', () => {
     two()
     mount('/pessoas')
     await screen.findByRole('list', { name: 'Pessoas' })
-    fireEvent.change(screen.getByLabelText('Ordenar por'), { target: { value: 'name' } })
+    choose(screen.getByLabelText('Ordenar por'), 'name')
     await waitFor(() => expect(names()[0]).toMatch(/^.*Ana/))
-    fireEvent.change(screen.getByLabelText('Ordenar por'), { target: { value: 'valueAsc' } })
+    choose(screen.getByLabelText('Ordenar por'), 'valueAsc')
     await waitFor(() => expect(names()[0]).toMatch(/Zeca/))
   })
 

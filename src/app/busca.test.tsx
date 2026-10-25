@@ -8,6 +8,7 @@ import { Carteiras } from '@/pages/carteiras/Carteiras'
 import { AppShell } from './AppShell'
 import { DataProvider } from './data-context'
 import { HIDE_KEY } from './hide-values'
+import { choose } from '@/test-select'
 
 const dlg = () => document.querySelector<HTMLElement>('dialog[open]')
 
@@ -152,7 +153,7 @@ describe('simulador de empréstimo', () => {
     await waitFor(() => expect(within(d).getByText('Total').nextElementSibling?.textContent).toMatch(/133,10/))
     expect(within(d).getByText('Juros').nextElementSibling?.textContent).toMatch(/33,10/)
     expect(within(d).getByText(/× \(1 \+ 10%\)³/)).toBeTruthy()
-    fireEvent.change(within(d).getByLabelText('Tipo de juros'), { target: { value: 'simples' } })
+    choose(within(d).getByLabelText('Tipo de juros'), 'simples')
     await waitFor(() => expect(within(d).getByText('Total').nextElementSibling?.textContent).toMatch(/130,00/))
   })
 

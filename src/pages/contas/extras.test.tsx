@@ -7,6 +7,7 @@ import { ToastProvider } from '@/components/ui/toast'
 import { toISO } from '@/lib/finance/dates'
 import { STORAGE_KEY } from '@/lib/storage'
 import { Contas } from './Contas'
+import { choose } from '@/test-select'
 
 const stored = () => JSON.parse(localStorage.getItem(STORAGE_KEY)!)
 const dlg = () => document.querySelector<HTMLElement>('dialog[open]')!
@@ -68,7 +69,7 @@ describe('Contas: Cabe no mês?', () => {
 
     fireEvent.change(within(d).getByLabelText('Valor total (R$)'), { target: { value: '120,50' } })
     fireEvent.change(within(d).getByLabelText('O que é'), { target: { value: 'Fone' } })
-    fireEvent.change(within(d).getByLabelText('Como vai pagar'), { target: { value: 'w:w1' } })
+    choose(within(d).getByLabelText('Como vai pagar'), 'w:w1')
     fireEvent.click(within(d).getByRole('button', { name: 'Registrar a compra' }))
     await waitFor(() => expect(stored().transactions).toHaveLength(2))
     expect(stored().transactions[1]).toMatchObject({ type: 'gasto', amount: 120.5, category: 'Compras', note: 'Fone', walletId: 'w1' })
@@ -82,7 +83,7 @@ describe('Contas: Cabe no mês?', () => {
     const d = dlg()
     fireEvent.change(within(d).getByLabelText('Valor total (R$)'), { target: { value: '600' } })
     fireEvent.change(within(d).getByLabelText('Parcelas'), { target: { value: '3' } })
-    fireEvent.change(within(d).getByLabelText('Como vai pagar'), { target: { value: 'c:c1' } })
+    choose(within(d).getByLabelText('Como vai pagar'), 'c:c1')
     expect(await within(d).findByText(/3x de/)).toBeTruthy()
     fireEvent.click(within(d).getByRole('button', { name: 'Registrar a compra' }))
     await waitFor(() => expect(stored().cardPurchases).toHaveLength(1))

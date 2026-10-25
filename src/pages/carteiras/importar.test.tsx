@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { choose } from '@/test-select'
 import { cleanup, configure, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { DataProvider } from '@/app/data-context'
@@ -123,7 +124,7 @@ describe('Carteiras: importar extrato', () => {
     mount()
     await pickFile(OFX)
     await waitFor(() => expect(dlg()).toBeTruthy())
-    fireEvent.change(within(dlg()).getByLabelText('Para onde'), { target: { value: 'c:c1' } })
+    choose(within(dlg()).getByLabelText('Para onde'), 'c:c1')
     // a entrada de 1.500 não entra como compra
     await waitFor(() => expect(within(dlg()).getByText('1 de 2 marcados')).toBeTruthy())
     fireEvent.click(within(dlg()).getByRole('button', { name: 'Importar 1' }))

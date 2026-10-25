@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState, type FormEvent } from 'react'
-import { ChevronDown, Cloud, Database, Keyboard, Landmark, Loader2, Palette, RefreshCw, type LucideIcon } from 'lucide-react'
+import { Cloud, Database, Keyboard, Landmark, Loader2, Palette, RefreshCw, type LucideIcon } from 'lucide-react'
 import { useAppData } from '@/app/data-context'
 import { useTheme, THEME_PREFS, type ThemePref } from '@/app/theme'
 import { AccountDialog } from '@/app/AccountDialog'
@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Segmented } from '@/components/ui/segmented'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Select } from '@/components/ui/select'
 import { CURRENCIES, DATE_FORMATS, type Currency, type DateFormat } from '@/lib/prefs'
 import { clearAuthLink, loginFromLink, peekAuthLink, type AuthLink } from '@/lib/auth-link'
 import { cn } from '@/lib/utils'
@@ -311,59 +312,32 @@ function AppearanceSection() {
   )
 }
 
-function Select<T extends string>({
-  id,
-  value,
-  onChange,
-  options,
-}: {
-  id: string
-  value: T | ''
-  onChange: (v: T | '') => void
-  options: { value: T | ''; label: string }[]
-}) {
-  return (
-    <div className="relative w-full sm:w-72">
-      <select
-        id={id}
-        value={value}
-        onChange={(e) => onChange(e.target.value as T | '')}
-        className="h-9 w-full cursor-pointer appearance-none rounded-sm border border-border bg-surface pr-9 pl-3 text-sm text-fg transition-colors outline-none hover:border-border-strong focus-visible:border-border-strong"
-      >
-        {options.map((o) => (
-          <option key={o.value} value={o.value}>
-            {o.label}
-          </option>
-        ))}
-      </select>
-      <ChevronDown aria-hidden="true" className="pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2 text-fg-subtle" />
-    </div>
-  )
-}
-
 function FormatSection() {
   const { prefs, setPrefs, baseSettings, money, date, today } = useAppData()
   const curId = useId()
   const dateId = useId()
-  const baseCur = CURRENCIES.find((c) => c.value === baseSettings.currency)?.label ?? baseSettings.currency
-  const baseDate = DATE_FORMATS.find((d) => d.value === baseSettings.dateFormat)?.label ?? 'DD/MM/AA'
+  // sem escolha, a lista mostra o que já vale (moeda e data gravadas nas configurações dos dados)
+  const curValue = (prefs.currency ?? CURRENCIES.find((c) => c.value === baseSettings.currency)?.value ?? 'BRL') as Currency
+  const dateValue = (prefs.dateFormat ?? DATE_FORMATS.find((d) => d.value === baseSettings.dateFormat)?.value ?? 'dmy') as DateFormat
   const custom = !!(prefs.currency || prefs.dateFormat)
   return (
     <Section title="Formatos">
       <Row label="Moeda" htmlFor={curId}>
         <Select<Currency>
           id={curId}
-          value={prefs.currency ?? ''}
-          onChange={(v) => setPrefs({ ...prefs, currency: v || undefined })}
-          options={[{ value: '', label: `Como no BarnaBank · ${baseCur}` }, ...CURRENCIES]}
+          className="sm:w-72"
+          value={curValue}
+          onChange={(v) => setPrefs({ ...prefs, currency: v })}
+          options={[...CURRENCIES]}
         />
       </Row>
       <Row label="Data" htmlFor={dateId}>
         <Select<DateFormat>
           id={dateId}
-          value={prefs.dateFormat ?? ''}
-          onChange={(v) => setPrefs({ ...prefs, dateFormat: v || undefined })}
-          options={[{ value: '', label: `Como no BarnaBank · ${baseDate}` }, ...DATE_FORMATS]}
+          className="sm:w-72"
+          value={dateValue}
+          onChange={(v) => setPrefs({ ...prefs, dateFormat: v })}
+          options={[...DATE_FORMATS]}
         />
       </Row>
       <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 sm:px-5">

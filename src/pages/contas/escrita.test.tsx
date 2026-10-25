@@ -7,6 +7,7 @@ import { ToastProvider } from '@/components/ui/toast'
 import { toISO, ymOf } from '@/lib/finance/dates'
 import { STORAGE_KEY } from '@/lib/storage'
 import { Contas } from './Contas'
+import { choose } from '@/test-select'
 
 const cloud = vi.hoisted(() => ({ session: null as null | Record<string, unknown> }))
 vi.mock('@/lib/cloud', async (orig) => ({
@@ -83,7 +84,7 @@ describe('Contas: escrita', () => {
     mount('/contas/fixa-b1')
     fireEvent.click(await screen.findByRole('button', { name: 'Marcar como paga' }))
     const dlg = openDialog()
-    fireEvent.change(within(dlg).getByLabelText('Carteira'), { target: { value: 'w1' } })
+    choose(within(dlg).getByLabelText('Carteira'), 'w1')
     fireEvent.click(within(dlg).getByRole('button', { name: 'Marcar como paga' }))
     await waitFor(() => expect(stored().transactions).toHaveLength(1))
     const out = stored()
@@ -162,7 +163,7 @@ describe('Contas: escrita', () => {
     mount('/contas/cartao-c1')
     fireEvent.click(await screen.findByRole('button', { name: 'Pagar fatura' }))
     const dlg = openDialog()
-    fireEvent.change(within(dlg).getByLabelText('Carteira'), { target: { value: 'w1' } })
+    choose(within(dlg).getByLabelText('Carteira'), 'w1')
     fireEvent.click(within(dlg).getByRole('button', { name: 'Registrar pagamento' }))
     await waitFor(() => expect(stored().cardPayments).toHaveLength(1))
     const out = stored()

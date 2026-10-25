@@ -96,6 +96,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [conflict, setConflict] = useState<SbRow | null>(null)
   const [conflictOpen, setConflictOpen] = useState(false)
   const session = useRef<CloudSession | null>(forced() ? null : readSession())
+  // conflito pendente: enquanto não houver resposta, as sincronizações automáticas não mexem na conta nem reabrem o aviso
+  const conflictRef = useRef<SbRow | null>(null)
   const sbBusy = useRef(false)
   const sbAgain = useRef(false)
   const botBusy = useRef(false)
@@ -141,6 +143,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       writeBotCfg(null)
       setBot({ status: 'off' })
     }
+    conflictRef.current = null
     setConflict(null)
     setConflictOpen(false)
     setCloud({ status: 'off', error })
@@ -148,8 +151,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   // conta (Supabase): uma sincronização por vez; mudança feita durante ela pede outra logo depois
   const runSb = useCallback(
-    async (job: () => Promise<SbResult>): Promise<void> => {
+    async (job: () => Promise<SbResult>, answer = false): Promise<void> => {
       if (!session.current || forced()) return
+      if (conflictRef.current && !answer) return
       if (sbBusy.current) {
         sbAgain.current = true
         return
@@ -160,9 +164,15 @@ export function DataProvider({ children }: { children: ReactNode }) {
         const res = await job()
         if (res.kind === 'off') return
         if (res.kind === 'conflict') {
+          // só abre o aviso quando o conflito é novo (não a cada tentativa)
+          const fresh = !conflictRef.current
+          conflictRef.current = res.row
           setConflict(res.row)
-          setConflictOpen(true)
-        } else setConflict(null)
+          if (fresh) setConflictOpen(true)
+        } else {
+          conflictRef.current = null
+          setConflict(null)
+        }
         setCloud({ status: 'ok', email: session.current?.email, updatedAt: new Date().toISOString() })
       } catch (e) {
         // sessão que não vale mais: sai da conta, mas os dados continuam neste aparelho
@@ -283,9 +293,12 @@ export function DataProvider({ children }: { children: ReactNode }) {
     async (useCloud: boolean) => {
       const row = conflict
       if (!row) return
+      conflictRef.current = null
       setConflict(null)
       setConflictOpen(false)
-      await runSb(() => sbResolve(sbEnv, row, useCloud))
+      // se outra sincronização está rodando, espera: a escolha não pode ser descartada
+      while (sbBusy.current) await new Promise((ok) => window.setTimeout(ok, 100))
+      await runSb(() => sbResolve(sbEnv, row, useCloud), true)
     },
     [conflict, runSb, sbEnv],
   )
