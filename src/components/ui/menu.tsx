@@ -147,7 +147,7 @@ export function Menu({
             role="menu"
             aria-label={label}
             style={{ position: 'fixed', width: WIDTH, right: place.right, top: place.top, bottom: place.bottom, maxHeight: place.maxHeight }}
-            className="z-[100] overflow-y-auto overscroll-contain rounded-md border border-border-strong bg-surface p-1"
+            className="bb-pop z-[100] overflow-y-auto overscroll-contain rounded-md border border-border-strong bg-surface p-1"
           >
             {shown.map((it, i) => (
               <li key={it.label} role="none">

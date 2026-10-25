@@ -129,3 +129,62 @@ button:is(:hover, :focus-visible):has(.lucide-trash-2, .lucide-trash),
 [role='menuitem']:is(:hover, :focus-visible, [data-active='true']):has(.lucide-trash-2, .lucide-trash) {
   color: var(--neg);
 }
+
+/* Janelas (dialog): entram e saem com fade + leve subida; o fundo escurece e clareia junto */
+dialog {
+  opacity: 0;
+  transform: translateY(10px) scale(0.98);
+  transition:
+    opacity 0.2s ease,
+    transform 0.2s cubic-bezier(0.2, 0, 0, 1),
+    overlay 0.2s allow-discrete,
+    display 0.2s allow-discrete;
+}
+dialog[open] {
+  opacity: 1;
+  transform: none;
+}
+dialog::backdrop {
+  opacity: 0;
+  transition:
+    opacity 0.2s ease,
+    overlay 0.2s allow-discrete,
+    display 0.2s allow-discrete;
+}
+dialog[open]::backdrop {
+  opacity: 1;
+}
+@starting-style {
+  dialog[open] {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
+  dialog[open]::backdrop {
+    opacity: 0;
+  }
+}
+
+/* listas de Select e Menu: abrem com um fade curto */
+@keyframes bb-pop {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.bb-pop {
+  animation: bb-pop 0.14s cubic-bezier(0.2, 0, 0, 1);
+  transform-origin: top;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  dialog,
+  dialog::backdrop,
+  .bb-pop {
+    transition: none;
+    animation: none;
+  }
+}

@@ -184,6 +184,27 @@ describe('Pessoas: excluir conforme as Configurações', () => {
   })
 })
 
+describe('Pessoas: Me devem / Eu devo', () => {
+  it('separa a lista por lado e mostra só o valor daquele lado', async () => {
+    seed({
+      debts: [
+        debt({ id: 'a', name: 'Ana', principal: 100, installments: 1 }),
+        debt({ id: 'b', name: 'Caio', kind: 'payable', principal: 50, installments: 1 }),
+      ],
+    })
+    mount('/pessoas')
+    const rows = () => screen.getAllByRole('link').filter((l) => l.hasAttribute('data-row')).map((l) => l.getAttribute('aria-label') ?? '')
+    await screen.findByRole('list', { name: 'Pessoas' })
+    expect(rows()).toHaveLength(2)
+    fireEvent.click(screen.getByRole('radio', { name: /Eu devo/ }))
+    await waitFor(() => expect(rows()).toHaveLength(1))
+    expect(rows()[0]).toMatch(/^Caio/)
+    fireEvent.click(screen.getByRole('radio', { name: /Me devem/ }))
+    await waitFor(() => expect(rows()[0]).toMatch(/^Ana/))
+    expect(rows()).toHaveLength(1)
+  })
+})
+
 describe('Pessoas: ordenação e placar', () => {
   const two = () =>
     seed({

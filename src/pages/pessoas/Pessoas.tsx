@@ -15,7 +15,7 @@ import { plural } from '@/lib/format'
 import { useMediaQuery } from '@/lib/use-media-query'
 import { cn } from '@/lib/utils'
 import type { AppData } from '@/lib/types'
-import { PeopleList } from './PeopleList'
+import { PeopleList, PEOPLE_SIDES, type PeopleSide } from './PeopleList'
 import { PersonDetailView } from './PersonDetail'
 import { ClaimsPanel } from './claims-panel'
 import { GroupsSection } from './groups/GroupsSection'
@@ -47,6 +47,8 @@ function PessoasReady({ data, today }: { data: AppData; today: string }) {
   const rawF = params.get('f') as PeopleFilter | null
   const filter: PeopleFilter = rawF && PEOPLE_FILTERS.includes(rawF) ? rawF : 'abertos'
   const query = params.get('q') ?? ''
+  const rawL = params.get('l') as PeopleSide | null
+  const side: PeopleSide = rawL && PEOPLE_SIDES.includes(rawL) ? rawL : 'todos'
   const rawO = params.get('o') as PeopleSort | null
   const sort: PeopleSort = rawO && PEOPLE_SORTS.includes(rawO) ? rawO : 'due'
 
@@ -55,11 +57,14 @@ function PessoasReady({ data, today }: { data: AppData; today: string }) {
     return { calc, rows: buildPersonRows(data, today, calc), totals: peopleTotals(data, today) }
   }, [data, today])
 
-  const update = (next: { f?: PeopleFilter; q?: string; o?: PeopleSort }) => {
+  const update = (next: { f?: PeopleFilter; q?: string; o?: PeopleSort; l?: PeopleSide }) => {
     const p = new URLSearchParams(params)
     const f = next.f ?? filter
     const q = next.q ?? query
     const o = next.o ?? sort
+    const l = next.l ?? side
+    if (l === 'todos') p.delete('l')
+    else p.set('l', l)
     if (f === 'abertos') p.delete('f')
     else p.set('f', f)
     if (q) p.set('q', q)
@@ -130,6 +135,8 @@ function PessoasReady({ data, today }: { data: AppData; today: string }) {
       <div className={cn('mt-6', hasPeople && 'lg:grid lg:grid-cols-[minmax(0,400px)_minmax(0,1fr)] lg:items-start lg:gap-8')}>
         <PeopleList
           rows={view.rows}
+          side={side}
+          onSide={(l) => update({ l })}
           filter={filter}
           query={query}
           onFilter={(f) => update({ f })}

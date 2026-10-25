@@ -191,7 +191,7 @@ export function Select<T extends string>({
             id={listId}
             role="listbox"
             style={{ position: 'fixed', left: place.left, width: place.width, top: place.top, bottom: place.bottom, maxHeight: place.maxHeight }}
-            className="z-[100] overflow-y-auto overscroll-contain rounded-md border border-border-strong bg-surface p-1 shadow-lg"
+            className="bb-pop z-[100] overflow-y-auto overscroll-contain rounded-md border border-border-strong bg-surface p-1 shadow-lg"
           >
             {options.map((o, i) => (
               <li

@@ -29,8 +29,21 @@ const FILTER_IN: Record<PeopleFilter, string> = {
   todos: '',
 }
 
+export type PeopleSide = 'todos' | 'receber' | 'pagar'
+export const PEOPLE_SIDES: PeopleSide[] = ['todos', 'receber', 'pagar']
+const SIDE_LABEL: Record<PeopleSide, string> = { todos: 'Todos', receber: 'Me devem', pagar: 'Eu devo' }
+
+/** só quem tem dívida daquele lado; o valor passa a ser só daquele lado (não o saldo dos dois) */
+export function rowsOfSide(rows: PersonRow[], side: PeopleSide): PersonRow[] {
+  if (side === 'todos') return rows
+  const kind = side === 'receber' ? 'receivable' : 'payable'
+  return rows.filter((r) => r.debts.some((d) => d.kind === kind)).map((r) => ({ ...r, net: side === 'receber' ? r.toReceive : -r.toPay }))
+}
+
 export function PeopleList({
-  rows,
+  rows: allRows,
+  side = 'todos',
+  onSide,
   filter,
   query,
   onFilter,
@@ -41,6 +54,8 @@ export function PeopleList({
   search,
 }: {
   rows: PersonRow[]
+  side?: PeopleSide
+  onSide?: (s: PeopleSide) => void
   filter: PeopleFilter
   query: string
   onFilter: (f: PeopleFilter) => void
@@ -51,12 +66,17 @@ export function PeopleList({
   search: string
 }) {
   const searchId = useId()
+  const rows = useMemo(() => rowsOfSide(allRows, side), [allRows, side])
+  const sideCounts = useMemo(
+    () => ({ todos: allRows.length, receber: rowsOfSide(allRows, 'receber').length, pagar: rowsOfSide(allRows, 'pagar').length }),
+    [allRows],
+  )
   const listRef = useRef<HTMLUListElement>(null)
   const shown = useMemo(() => sortPeople(filterPeople(rows, filter, query), sort), [rows, filter, query, sort])
   const sortId = useId()
   const counts = useMemo(() => filterCounts(rows, query), [rows, query])
 
-  if (!rows.length) return <NoPeople />
+  if (!allRows.length) return <NoPeople />
 
   // setas ↑/↓ andam entre as linhas
   function onListKey(e: KeyboardEvent<HTMLUListElement>) {
@@ -97,6 +117,15 @@ export function PeopleList({
             </button>
           )}
         </div>
+        {onSide && (
+          <Segmented
+            id="pessoas-lado"
+            label="Quem deve a quem"
+            value={side}
+            onChange={onSide}
+            options={PEOPLE_SIDES.map((v) => ({ value: v, label: SIDE_LABEL[v], count: sideCounts[v] }))}
+          />
+        )}
         <Segmented
           id="pessoas-filtro"
           label="Filtrar pessoas"

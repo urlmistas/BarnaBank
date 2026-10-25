@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, type ReactNode } from 'react'
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -20,6 +20,16 @@ export function Modal({
 }) {
   const ref = useRef<HTMLDialogElement>(null)
   const titleId = useId()
+  // o conteúdo fica montado até a animação de saída terminar (senão a janela esvazia antes de sumir)
+  const [keep, setKeep] = useState(open)
+  useEffect(() => {
+    if (open) {
+      setKeep(true)
+      return
+    }
+    const t = window.setTimeout(() => setKeep(false), 220)
+    return () => window.clearTimeout(t)
+  }, [open])
 
   useEffect(() => {
     const d = ref.current
@@ -43,7 +53,7 @@ export function Modal({
         className,
       )}
     >
-      {open && (
+      {(open || keep) && (
         <>
           <div className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-border bg-surface px-5 py-3">
             <h2 id={titleId} className="min-w-0 truncate text-base font-semibold">
