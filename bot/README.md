@@ -114,6 +114,12 @@ O modo antigo continua valendo: com a `SYNC_KEY` (endereço e chave colados no a
 
 Limites do plano grátis da Cloudflare, que valem para todas as contas somadas: 1.000 gravações por dia no KV e 50 chamadas internas por execução. O lembrete diário percorre as contas uma a uma, então com poucas contas funciona; com mais, o plano pago (US$ 5/mês) tira esses limites.
 
+## Lembretes (horário e o que ligar)
+
+Em **Configurações > Conta e nuvem > Lembretes do bot** dá para escolher a hora dos avisos (horário de Brasília, padrão 9h), ligar ou desligar o resumo do dia, o da semana (e em que dia), o do mês e os avisos para quem te deve. No Telegram o mesmo vale com `/lembretes` (por exemplo `/lembretes hora 8`). Cada conta tem as suas escolhas, guardadas no bot (`/api/prefs`).
+
+Para isso o cron do worker roda **de hora em hora** (`0 * * * *`). Às 9h ele faz o backup e as contas recorrentes; nas outras horas só confere quem pediu aviso naquela hora (uma leitura no KV por conta).
+
 Um amigo (quem te deve) que entra pelos lembretes fica ligado à conta que mandou o convite. Se a mesma pessoa entrar nos lembretes de duas contas, as mensagens dela vão para a mais recente.
 
 ## Instalação (uma vez só, dá para fazer pelo celular)

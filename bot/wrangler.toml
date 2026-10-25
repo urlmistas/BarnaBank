@@ -13,9 +13,9 @@ id = "__KV_ID__"
 SB_URL = "https://epsddfqunjqopylrbbyv.supabase.co"
 SB_KEY = "sb_publishable_W04BorQgNFQ2TMGxnaRYow_EwuzV5Ni"
 
-# lembrete diário no Telegram às 9h (horário de Brasília = 12h UTC)
+# de hora em hora: às 9h (Brasília) o bot faz backup e contas recorrentes; os lembretes saem na hora que cada conta escolheu
 [triggers]
-crons = ["0 12 * * *"]
+crons = ["0 * * * *"]
 
 # Workers AI: entender áudio e responder perguntas livres (opcional; se não der, o bot funciona sem)
 [ai]

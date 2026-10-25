@@ -103,11 +103,11 @@ async function accountToken(env: BotEnv): Promise<string> {
   }
 }
 
-async function call(env: BotEnv, cfg: Pick<BotCfg, 'url' | 'key'>, method: 'GET' | 'PUT', body?: unknown): Promise<BotState> {
+export async function call<T = BotState>(env: BotEnv, cfg: Pick<BotCfg, 'url' | 'key'>, method: 'GET' | 'PUT', body?: unknown, path = '/api/state'): Promise<T> {
   let r: Response
   try {
     const bearer = botByAccount(cfg) ? await accountToken(env) : (cfg.key ?? '')
-    r = await env.fetcher(base(cfg.url ?? '') + '/api/state', {
+    r = await env.fetcher(base(cfg.url ?? '') + path, {
       method,
       headers: { Authorization: 'Bearer ' + bearer, 'Content-Type': 'application/json' },
       body: body === undefined ? undefined : JSON.stringify(body),
@@ -118,9 +118,9 @@ async function call(env: BotEnv, cfg: Pick<BotCfg, 'url' | 'key'>, method: 'GET'
   }
   if (!r.ok) throw new BotError('Erro ' + r.status, r.status)
   try {
-    return (await r.json()) as BotState
+    return (await r.json()) as T
   } catch {
-    return {}
+    return {} as T
   }
 }
 

@@ -15,7 +15,7 @@ import { cn } from '@/lib/utils'
 import { Row, Section } from './layout'
 import { BackupSection, DefaultsSection, InstallSection, PixSection } from './sections'
 import { ShortcutsSection } from './atalhos'
-import { TelegramSection } from './telegram'
+import { BotPrefsSection, TelegramSection } from './telegram'
 import { BOT_URL } from '@/lib/sync/telegram-link'
 
 // Configurações, por categoria: conta e nuvem, visual, finanças, atalhos, dados e app.
@@ -151,8 +151,13 @@ export function Configuracoes() {
 function TelegramOrBot() {
   const { bot } = useAppData()
   const [own, setOwn] = useState(false)
-  if (BOT_URL && !own && (bot.status === 'off' || bot.account)) return <TelegramSection botUrl={BOT_URL} onOwnBot={() => setOwn(true)} />
-  return <BotSection />
+  const main = BOT_URL && !own && (bot.status === 'off' || bot.account) ? <TelegramSection botUrl={BOT_URL} onOwnBot={() => setOwn(true)} /> : <BotSection />
+  return (
+    <>
+      {main}
+      {bot.status !== 'off' && <BotPrefsSection />}
+    </>
+  )
 }
 
 function fmtWhen(iso?: string) {

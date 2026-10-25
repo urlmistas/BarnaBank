@@ -9,7 +9,7 @@
     "lint": "oxlint",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:bot": "node bot/tests/test_recurring.mjs && node bot/tests/test_put_views.mjs && node bot/tests/test_accounts.mjs"
+    "test:bot": "node bot/tests/test_recurring.mjs && node bot/tests/test_put_views.mjs && node bot/tests/test_accounts.mjs && node bot/tests/test_prefs.mjs"
   },
   "dependencies": {
     "@fontsource-variable/geist": "^5.3.0",

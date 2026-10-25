@@ -10,11 +10,12 @@ import {getEngine} from './engine.js';
 //   PUT  /api/state        o app envia os dados atualizados e confirma as mensagens aplicadas
 //   GET  /api/backups[/d]  backups diários (últimos 30 dias)
 //   GET|POST|DELETE /api/link  vincular o Telegram à conta do app (login do app, não a SYNC_KEY)
+//   GET|PUT /api/prefs     lembretes: o que ligar, a hora e o dia do resumo da semana (o app edita)
 //
 // Contas: cada conta do app (Supabase) tem os dados separados no KV, com o prefixo "u:<id>:" (scoped()).
 // A SYNC_KEY continua valendo para o bot antigo, de um dono só, com as chaves sem prefixo.
 // Vincular: o app pede um código (POST /api/link), a pessoa manda o código ao bot, e chat:<id> aponta para a conta.
-//   (cron diário)          contas recorrentes, backup, lembretes (seus e de quem te deve)
+//   (cron de hora em hora) às 9h: contas recorrentes e backup; na hora que cada conta escolheu: lembretes (seus e de quem te deve)
 //
 // O "motor" (engine.js, gerado do app.js por build-engine.mjs) roda aqui as mesmas regras do app:
 // o que chega pelo bot já entra nos dados da nuvem na hora. As mensagens ficam na fila até um app
@@ -35,6 +36,7 @@ export default {
     try {
       if (url.pathname === '/api/state') return await api(req, env, ctx, url);
       if (url.pathname === '/api/link') return await apiLink(req, url, env);
+      if (url.pathname === '/api/prefs') return await apiPrefs(req, url, env);
       if (url.pathname.startsWith('/api/photo/')) return await apiPhoto(req, url, env);
       if (url.pathname.startsWith('/api/claim/')) return await apiClaim(req, url, env);
       if (url.pathname === '/api/backups' || url.pathname.startsWith('/api/backups/')) return await apiBackups(req, url, env);
@@ -50,15 +52,19 @@ export default {
   },
   async scheduled(event, env, ctx) {
     const step = async (name, fn) => { try { await fn(); } catch (e) { await putJSON(env, 'lastError', {at: new Date().toISOString(), error: name + ': ' + String(e && (e.stack || e.message) || e).slice(0, 500)}); } };
+    const h = hourBR();
     const job = (async () => {
-      const origin = await env.BB.get('origin');
-      if (origin) await step('webhook', () => ensureWebhook(env, origin, true));
-      await step('backup', () => backupDaily(env));
-      // contas recorrentes do dia e resumo refeito com a data de hoje
-      await step('motor', () => cloudApply(env, e => e.runRecurring()));
-      await step('lembretes', () => dailyReminder(env));
-      await step('amigos', () => friendReminders(env));
-      await step('contas', () => accountsDaily(env, step));
+      // uma vez por dia (9h de Brasília): conferir o webhook, backup e contas recorrentes
+      if (h === DAILY_HOUR) {
+        const origin = await env.BB.get('origin');
+        if (origin) await step('webhook', () => ensureWebhook(env, origin, true));
+        await step('backup', () => backupDaily(env));
+        // contas recorrentes do dia e resumo refeito com a data de hoje
+        await step('motor', () => cloudApply(env, e => e.runRecurring()));
+      }
+      // lembretes: na hora que o dono escolheu (padrão 9h)
+      await step('lembretes', () => remindersFor(env, h));
+      await step('contas', () => accountsDaily(env, step, h));
     })();
     if (ctx && ctx.waitUntil) ctx.waitUntil(job);
     await job;
@@ -200,8 +206,8 @@ async function indexInvites(env, snap) {
   for (const c of gone) await root.delete('inv:' + c);
   await putJSON(env, 'invIdx', now);
 }
-// cron: o que o bot faz por dia, uma vez para cada conta vinculada
-async function accountsDaily(env, step) {
+// cron: o que o bot faz para cada conta vinculada (a cada hora o cron confere se chegou a vez dela)
+async function accountsDaily(env, step, h) {
   const root = rootOf(env);
   let cursor;
   do {
@@ -210,14 +216,56 @@ async function accountsDaily(env, step) {
       const uid = k.name.slice(5);
       const sc = scoped(env, uid);
       await step('conta ' + uid.slice(0, 8), async () => {
-        await backupDaily(sc);
-        await cloudApply(sc, e => e.runRecurring());
-        await dailyReminder(sc);
-        await friendReminders(sc);
+        if (h === DAILY_HOUR) {
+          await backupDaily(sc);
+          await cloudApply(sc, e => e.runRecurring());
+        }
+        await remindersFor(sc, h);
       });
     }
     cursor = page.list_complete ? undefined : page.cursor;
   } while (cursor);
+}
+
+// ---------------------------------------------------------------- preferências dos lembretes
+const DAILY_HOUR = 9;
+const PREF_FLAGS = ['daily', 'weekly', 'monthly', 'friends'];
+// tudo ligado, 9h (Brasília), resumo da semana no domingo
+const PREFS_DEFAULT = {daily: true, weekly: true, monthly: true, friends: true, hour: DAILY_HOUR, weekday: 0};
+function normPrefs(p) {
+  const o = {...PREFS_DEFAULT}, src = p && typeof p === 'object' ? p : {};
+  for (const k of PREF_FLAGS) if (src[k] === false) o[k] = false;
+  if (Number.isInteger(src.hour) && src.hour >= 0 && src.hour <= 23) o.hour = src.hour;
+  if (Number.isInteger(src.weekday) && src.weekday >= 0 && src.weekday <= 6) o.weekday = src.weekday;
+  return o;
+}
+const getPrefs = async env => normPrefs(await getJSON(env, 'prefs', {}));
+// hora de Brasília (UTC−3), 0 a 23
+const hourBR = () => new Date(Date.now() - 3 * 3600 * 1000).getUTCHours();
+// chegou a hora de avisar esta conta? (o cron roda de hora em hora)
+async function remindersFor(env, h) {
+  const prefs = await getPrefs(env);
+  if (prefs.hour !== h) return;
+  await dailyReminder(env);
+  if (prefs.friends !== false) await friendReminders(env);
+}
+// o app lê e grava as preferências (login da conta ou SYNC_KEY)
+async function apiPrefs(req, url, env) {
+  const w = await who(req, url, env);
+  if (!w) return json({error: 'unauthorized'}, 401);
+  const sc = scoped(env, w.uid);
+  if (req.method === 'GET') return json({prefs: await getPrefs(sc), linked: !!(await sc.BB.get('owner'))});
+  if (req.method === 'PUT') {
+    const body = await req.json().catch(() => null);
+    if (!body || typeof body !== 'object') return json({error: 'bad body'}, 400);
+    const cur = await getPrefs(sc), next = {...cur};
+    for (const k of PREF_FLAGS) if (k in body) { if (typeof body[k] !== 'boolean') return json({error: k}, 400); next[k] = body[k]; }
+    if ('hour' in body) { if (!Number.isInteger(body.hour) || body.hour < 0 || body.hour > 23) return json({error: 'hour'}, 400); next.hour = body.hour; }
+    if ('weekday' in body) { if (!Number.isInteger(body.weekday) || body.weekday < 0 || body.weekday > 6) return json({error: 'weekday'}, 400); next.weekday = body.weekday; }
+    await putIfChanged(sc, 'prefs', next);
+    return json({prefs: next});
+  }
+  return json({error: 'method'}, 405);
 }
 
 const brl = v => 'R$ ' + Number(v || 0).toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, '.');
@@ -676,15 +724,20 @@ async function handleText(env, chat, text, photo) {
   if (cmd === 'semana') return say(env, chat, semanaText(summary, 7));
   if (cmd === 'semanal') return say(env, chat, weekText(summary));
   if (cmd === 'lembretes') {
-    const prefs = await getJSON(env, 'prefs', {daily: true, weekly: true});
+    const prefs = await getPrefs(env);
     const arg = norm(text.replace(/^\/lembretes(@\w+)?\s*/i, ''));
+    const hr = /^(hora|horario)\s+(\d{1,2})/.exec(arg);
     if (/^(desliga|off|parar|nao)/.test(arg)) { prefs.daily = false; prefs.weekly = false; prefs.monthly = false; }
     else if (/^(liga|on|sim)/.test(arg)) { prefs.daily = true; prefs.weekly = true; prefs.monthly = true; }
     else if (/^diario/.test(arg)) prefs.daily = !prefs.daily;
     else if (/^semanal/.test(arg)) prefs.weekly = !prefs.weekly;
-    else if (/^mensal/.test(arg)) prefs.monthly = prefs.monthly === false;
+    else if (/^mensal/.test(arg)) prefs.monthly = !prefs.monthly;
+    else if (/^amigos/.test(arg)) prefs.friends = !prefs.friends;
+    else if (hr && +hr[2] <= 23) prefs.hour = +hr[2];
     await putJSON(env, 'prefs', prefs);
-    return say(env, chat, '<b>Lembretes</b>\n☀️ Diário às 9h (hoje, amanhã e atrasados): <b>' + (prefs.daily !== false ? 'ligado' : 'desligado') + '</b>\n📆 Resumo de domingo: <b>' + (prefs.weekly !== false ? 'ligado' : 'desligado') + '</b>\n🗓️ Resumo do mês (dia 1): <b>' + (prefs.monthly !== false ? 'ligado' : 'desligado') + '</b>\n\n<code>/lembretes diario</code>, <code>/lembretes semanal</code> ou <code>/lembretes mensal</code> liga/desliga cada um. <code>/lembretes desligar</code> desliga tudo.');
+    const on = v => v !== false ? 'ligado' : 'desligado';
+    const DIAS = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado'];
+    return say(env, chat, '<b>Lembretes</b> (às ' + prefs.hour + 'h)\n☀️ Diário (hoje, amanhã e atrasados): <b>' + on(prefs.daily) + '</b>\n📆 Resumo de ' + DIAS[prefs.weekday] + ': <b>' + on(prefs.weekly) + '</b>\n🗓️ Resumo do mês (dia 1): <b>' + on(prefs.monthly) + '</b>\n📨 Avisar quem te deve: <b>' + on(prefs.friends) + '</b>\n\n<code>/lembretes diario</code>, <code>semanal</code>, <code>mensal</code> ou <code>amigos</code> liga/desliga cada um. <code>/lembretes hora 8</code> muda a hora. <code>/lembretes desligar</code> desliga tudo. Também dá para mudar tudo em Configurações no app.');
   }
   if (cmd === 'saldo') return say(env, chat, saldoText(summary));
   if (cmd === 'cobrar' || /^cobrar\b/i.test(text)) return cobrar(env, chat, summary, text.replace(/^\/?cobrar(@\w+)?\s*/i, ''));
@@ -983,7 +1036,7 @@ async function dailyReminder(env) {
   const owner = await env.BB.get('owner');
   const s = await getJSON(env, 'summary', null);
   if (!owner || !s) return;
-  const prefs = await getJSON(env, 'prefs', {daily: true, weekly: true});
+  const prefs = await getPrefs(env);
   const today = todayBR(), tomorrow = addDays(today, 1);
   const items = s.due || [];
   const dueToday = items.filter(i => i.date === today), late = items.filter(i => i.date < today), dueTomorrow = items.filter(i => i.date === tomorrow);
@@ -1024,7 +1077,7 @@ async function dailyReminder(env) {
     await putJSON(env, 'alertsSent', sentA);
   }
   // domingo: resumo da semana
-  if (prefs.weekly !== false && new Date(Date.parse(today + 'T12:00:00Z')).getUTCDay() === 0) await say(env, owner, weekText(s));
+  if (prefs.weekly !== false && new Date(Date.parse(today + 'T12:00:00Z')).getUTCDay() === prefs.weekday) await say(env, owner, weekText(s));
 }
 function monthText(m) {
   const net = m.in - m.out;

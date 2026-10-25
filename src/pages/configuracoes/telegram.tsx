@@ -2,10 +2,12 @@ import { useCallback, useEffect, useState } from 'react'
 import { Check, Copy, ExternalLink, Loader2, RefreshCw } from 'lucide-react'
 import { useAppData } from '@/app/data-context'
 import { Button } from '@/components/ui/button'
+import { Select } from '@/components/ui/select'
 import { botErrorText } from '@/lib/sync/worker'
 import { codeLabel, linkCreate, linkRemove, linkStatus, type LinkCode, type LinkStatus } from '@/lib/sync/telegram-link'
 import { cn } from '@/lib/utils'
-import { Row, Section } from './layout'
+import { DEFAULT_BOT_PREFS, WEEKDAYS, getBotPrefs, hourLabel, putBotPrefs, type BotPrefs } from '@/lib/sync/bot-prefs'
+import { Row, Section, Switch } from './layout'
 
 // Telegram por conta: o app gera um código, a pessoa manda no Telegram e o bot passa a guardar os dados dela.
 // Só aparece quando o build tem VITE_BOT_URL (bot compartilhado); sem isso fica o modo antigo, com endereço e chave.
@@ -234,5 +236,83 @@ function OwnBotRow({ onClick }: { onClick: () => void }) {
         Conectar com endereço e chave
       </button>
     </p>
+  )
+}
+
+// ---------------------------------------------------------------- lembretes do bot
+
+const HOURS = Array.from({ length: 24 }, (_, h) => ({ value: String(h), label: hourLabel(h) }))
+const DAYS = WEEKDAYS.map((d, i) => ({ value: String(i), label: d }))
+
+/** quais avisos o bot manda e a que horas (valem para o Telegram desta conta; o bot guarda a escolha) */
+export function BotPrefsSection() {
+  const { botToken } = useAppData()
+  const [prefs, setPrefs] = useState<BotPrefs | null>(null)
+  const [err, setErr] = useState<string | null>(null)
+  const env = useCallback(() => ({ fetcher: (url: string, init?: RequestInit) => fetch(url, init), token: botToken }), [botToken])
+
+  useEffect(() => {
+    let live = true
+    getBotPrefs(env())
+      .then((p) => live && setPrefs(p))
+      .catch((e) => live && setErr(botErrorText(e)))
+    return () => {
+      live = false
+    }
+  }, [env])
+
+  // muda na tela já e confirma com o bot; se ele recusar, volta ao que era
+  async function change(patch: Partial<BotPrefs>) {
+    const before = prefs
+    setErr(null)
+    setPrefs((p) => (p ? { ...p, ...patch } : p))
+    try {
+      setPrefs(await putBotPrefs(env(), patch))
+    } catch (e) {
+      setPrefs(before)
+      setErr(botErrorText(e))
+    }
+  }
+
+  const p = prefs ?? DEFAULT_BOT_PREFS
+  const off = !prefs
+  return (
+    <Section title="Lembretes do bot" hint="O bot manda estes avisos no Telegram. Horário de Brasília.">
+      <Row label="Horário dos avisos" hint="Hora em que o bot manda os avisos do dia.">
+        <Select
+          aria-label="Horário dos avisos"
+          value={String(p.hour)}
+          onChange={(v) => void change({ hour: Number(v) })}
+          options={HOURS}
+          disabled={off}
+          className="sm:w-32"
+        />
+      </Row>
+      <Row label="Resumo do dia" hint="O que vence hoje e amanhã, e o que está atrasado.">
+        <Switch label="Resumo do dia" checked={p.daily} onChange={(v) => void change({ daily: v })} />
+      </Row>
+      <Row label="Resumo da semana" hint="Entradas, gastos e vencimentos dos próximos 7 dias.">
+        <div className="flex items-center gap-3">
+          <Select
+            aria-label="Dia do resumo da semana"
+            value={String(p.weekday)}
+            onChange={(v) => void change({ weekday: Number(v) })}
+            options={DAYS}
+            disabled={off || !p.weekly}
+            className="w-36"
+          />
+          <Switch label="Resumo da semana" checked={p.weekly} onChange={(v) => void change({ weekly: v })} />
+        </div>
+      </Row>
+      <Row label="Resumo do mês" hint="No dia 1, como foi o mês que passou.">
+        <Switch label="Resumo do mês" checked={p.monthly} onChange={(v) => void change({ monthly: v })} />
+      </Row>
+      <Row label="Avisar quem me deve" hint="Lembrete no Telegram para quem entrou pelo seu convite: véspera, dia do vencimento e a cada 3 dias de atraso.">
+        <Switch label="Avisar quem me deve" checked={p.friends} onChange={(v) => void change({ friends: v })} />
+      </Row>
+      <p role="alert" aria-live="assertive" className={cn('px-4 text-xs text-neg sm:px-5', err ? 'py-2.5' : 'hidden')}>
+        {err}
+      </p>
+    </Section>
   )
 }

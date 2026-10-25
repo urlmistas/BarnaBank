@@ -64,6 +64,8 @@ O bot aplica sozinho as mensagens do Telegram (ele tem as mesmas regras do app);
 quando mudam e adota a versão do bot quando só o bot mudou. A chave só viaja no cabeçalho `Authorization`, nunca na
 URL, e não aparece em mensagens de erro. Instalação e detalhes: [bot/README.md](bot/README.md).
 
+Os avisos do bot (resumo do dia, da semana e do mês, e o lembrete para quem te deve) têm a hora e o que ligar em **Configurações → Conta e nuvem → Lembretes do bot**.
+
 ### O que o app novo grava no navegador
 
 | Chave | Conteúdo |
