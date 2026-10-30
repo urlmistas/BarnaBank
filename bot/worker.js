@@ -43,6 +43,7 @@ export default {
       if (url.pathname === '/setup') return await setup(req, url, env);
       if (url.pathname === '/status') return await status(req, url, env);
       if (url.pathname.startsWith('/tg/')) return await telegram(req, env, url);
+      if (url.pathname === '/asaas') return await asaasHook(req, env);
       if (url.pathname.startsWith('/s/')) return await shareRoute(req, url, env, ctx);
       if (url.pathname === '/') return json({app: 'BarnaBank', ok: true});
       return json({error: 'not found'}, 404);
@@ -340,6 +341,22 @@ async function webhookInfo(env, origin) {
     pending: r.pending_update_count || 0,
     lastError: r.last_error_message || '', lastErrorAt: r.last_error_date ? new Date(r.last_error_date * 1000).toISOString() : ''
   };
+}
+// Asaas avisa aqui quando um Pix é pago (evento PAYMENT_RECEIVED); o aviso vai para o dono do bot no Telegram
+async function asaasHook(req, env) {
+  if (req.method !== 'POST') return json({error: 'method not allowed'}, 405);
+  const token = env.ASAAS_WEBHOOK_TOKEN;
+  if (!token || req.headers.get('asaas-access-token') !== token) return json({error: 'forbidden'}, 403);
+  const body = await req.json().catch(() => null);
+  const p = body && body.payment;
+  if (!p || body.event !== 'PAYMENT_RECEIVED') return json({ok: true, ignored: true});
+  // o Asaas pode reenviar o mesmo aviso: só avisa uma vez por pagamento
+  const key = 'asaas:' + p.id;
+  if (await env.BB.get(key)) return json({ok: true, duplicate: true});
+  await env.BB.put(key, '1', {expirationTtl: 60 * 60 * 24 * 7});
+  const owner = await env.BB.get('owner');
+  if (owner) await say(env, owner, '💰 Pix recebido: <b>' + brl(p.value) + '</b>' + (p.description ? '\n' + esc(p.description) : ''));
+  return json({ok: true});
 }
 async function say(env, chat, text, extra) {
   const r = await tg(env, 'sendMessage', {chat_id: chat, text, parse_mode: 'HTML', disable_web_page_preview: true, ...(extra || {})});
