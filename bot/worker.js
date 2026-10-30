@@ -44,6 +44,7 @@ export default {
       if (url.pathname === '/status') return await status(req, url, env);
       if (url.pathname.startsWith('/tg/')) return await telegram(req, env, url);
       if (url.pathname === '/asaas') return await asaasHook(req, env);
+      if (url.pathname === '/api/estoque-alerta') return await apiEstoqueAlerta(req, url, env);
       if (url.pathname.startsWith('/s/')) return await shareRoute(req, url, env, ctx);
       if (url.pathname === '/') return json({app: 'BarnaBank', ok: true});
       return json({error: 'not found'}, 404);
@@ -341,6 +342,22 @@ async function webhookInfo(env, origin) {
     pending: r.pending_update_count || 0,
     lastError: r.last_error_message || '', lastErrorAt: r.last_error_date ? new Date(r.last_error_date * 1000).toISOString() : ''
   };
+}
+// o site de estoque (barna-inventory) chama aqui quando um produto está acabando; o aviso vai para o Telegram da conta
+async function apiEstoqueAlerta(req, url, env) {
+  if (req.method !== 'POST') return json({error: 'method'}, 405);
+  const w = await who(req, url, env);
+  if (!w || !w.uid) return json({error: 'unauthorized'}, 401);
+  const body = await req.json().catch(() => null);
+  const nome = String(body && body.produto || '').trim().slice(0, 40);
+  const est = Number(body && body.estoque);
+  if (!nome || !Number.isInteger(est) || est < 0 || est > 1000) return json({error: 'bad body'}, 400);
+  const owner = await scoped(env, w.uid).BB.get('owner');
+  if (!owner) return json({ok: true, linked: false});
+  await say(env, owner, est === 0
+    ? '🚨 <b>' + esc(nome) + '</b> acabou! Hora de comprar mais.'
+    : '⚠️ <b>' + esc(nome) + '</b> está acabando: só ' + est + (est === 1 ? ' lata.' : ' latas.'));
+  return json({ok: true});
 }
 // Asaas avisa aqui quando um Pix é pago (evento PAYMENT_RECEIVED); o aviso vai para o dono do bot no Telegram
 async function asaasHook(req, env) {
