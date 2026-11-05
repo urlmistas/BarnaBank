@@ -58,18 +58,36 @@ describe('debtPlan', () => {
     }
   })
 
-  it('com valor mensal, diz em que mês cada dívida fecha e quando termina tudo', () => {
+  it('com valor mensal: paga a parcela de cada uma e a sobra vai para a primeira da fila', () => {
     const plano = debtPlan(
       dados([
-        divida({ id: 'a', name: 'A', principal: 300 }),
-        divida({ id: 'b', name: 'B', principal: 700 }),
+        divida({ id: 'a', name: 'A', principal: 300, installments: 3 }),
+        divida({ id: 'b', name: 'B', principal: 700, installments: 7 }),
       ]),
       TODAY,
       'menor',
       400,
     )
+    expect(plano.debts.map((d) => d.installment)).toEqual([100, 100])
+    expect(plano.minMonthly).toBe(200)
     expect(plano.debts.map((d) => [d.name, d.paidInMonth])).toEqual([['A', 1], ['B', 3]])
     expect(plano.months).toBe(3)
+    expect(plano.belowMin).toBe(false)
+  })
+
+  it('valor mensal abaixo da soma das parcelas não gera prazo', () => {
+    const plano = debtPlan(
+      dados([
+        divida({ id: 'a', name: 'A', principal: 300, installments: 3 }),
+        divida({ id: 'b', name: 'B', principal: 700, installments: 7 }),
+      ]),
+      TODAY,
+      'menor',
+      150,
+    )
+    expect(plano.belowMin).toBe(true)
+    expect(plano.months).toBeNull()
+    expect(plano.debts.every((d) => d.paidInMonth === null)).toBe(true)
   })
 
   it('sem valor mensal, não inventa prazo', () => {

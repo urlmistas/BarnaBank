@@ -195,7 +195,8 @@ function DebtPlanCard({ data, today }: { data: AppData; today: string }) {
     <section aria-label="Plano para quitar dívidas" className="rounded-md border border-border bg-surface px-4 py-3">
       <h2 className="text-sm font-medium">Plano para quitar dívidas</h2>
       <p className="mt-0.5 text-xs text-fg-muted">
-        Você deve <span className="num">{money(plan.totalRemaining)}</span>
+        Parcelas somam <span className="num">{money(plan.minMonthly)}</span> por mês · falta pagar{' '}
+        <span className="num">{money(plan.totalRemaining)}</span>
         {plan.totalOverdue > 0.005 && <> · <span className="num">{money(plan.totalOverdue)}</span> já vencido</>}
       </p>
       <Segmented<PlanStrategy>
@@ -221,7 +222,12 @@ function DebtPlanCard({ data, today }: { data: AppData; today: string }) {
                 {d.paidInMonth !== null && <> · quita {d.paidInMonth === 1 ? 'neste mês' : `em ${d.paidInMonth} meses`}</>}
               </span>
             </p>
-            <span className="num shrink-0 font-medium">{money(d.remaining)}</span>
+            <p className="shrink-0 text-right">
+              <span className="num block font-medium">{money(d.installment)}</span>
+              <span className="block text-xs text-fg-muted">
+                {d.installment < d.remaining - 0.005 ? <>parcela · falta <span className="num">{money(d.remaining)}</span></> : 'última parcela'}
+              </span>
+            </p>
           </li>
         ))}
       </ol>
@@ -239,12 +245,17 @@ function DebtPlanCard({ data, today }: { data: AppData; today: string }) {
           onBlur={() => Number.isFinite(monthlyNum) && update({ monthly: formatMoneyInput(monthlyNum) })}
         />
       </div>
+      {plan.belowMin && (
+        <p role="status" className="mt-2 text-sm font-medium text-neg">
+          Não cobre as parcelas: o mínimo é {money(plan.minMonthly)} por mês.
+        </p>
+      )}
       {plan.months !== null && (
         <p role="status" className="mt-2 text-sm font-medium">
           {plan.months === 1 ? 'Quita tudo em 1 mês.' : `Quita tudo em ${plan.months} meses.`}
         </p>
       )}
-      <p className="mt-2 text-xs text-fg-subtle">Estimativa com o saldo atual. Não projeta juros novos nem renegociação.</p>
+      <p className="mt-2 text-xs text-fg-subtle">Paga a parcela de cada dívida todo mês e usa a sobra na primeira da fila. Não projeta juros novos nem renegociação.</p>
     </section>
   )
 }

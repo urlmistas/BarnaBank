@@ -4,6 +4,7 @@ import { makeDebtCalc } from './debts'
 
 // Plano para quitar as dívidas que EU devo (kind 'payable'): em que ordem pagar e em quanto tempo
 // dá para quitar com um valor mensal. É organização, não aconselhamento financeiro.
+// A simulação paga a parcela de cada dívida todo mês e manda a sobra do valor mensal para a primeira da fila.
 // Limite: usa o saldo em aberto que o app já calcula e NÃO projeta juros novos de atraso nem de renegociação.
 
 export type PlanStrategy = 'juros' | 'menor'
@@ -15,6 +16,8 @@ export interface PlanDebt {
   remaining: number
   /** parte já vencida */
   overdue: number
+  /** valor da próxima parcela em aberto (o que sai todo mês); no máximo o saldo */
+  installment: number
   /** juros por mês (%) informados na dívida; 0 se não há ou se o plano é por parcelas fixas */
   monthlyRate: number
   /** mora por mês (%) que corre sobre o atrasado */
@@ -31,8 +34,12 @@ export interface DebtPlan {
   debts: PlanDebt[]
   totalRemaining: number
   totalOverdue: number
-  /** meses para quitar tudo com o valor mensal; null sem valor mensal */
+  /** soma das parcelas: o mínimo que sai por mês */
+  minMonthly: number
+  /** meses para quitar tudo com o valor mensal; null sem valor mensal ou se ele não cobre as parcelas */
   months: number | null
+  /** o valor mensal informado não cobre as parcelas */
+  belowMin: boolean
 }
 
 /** juros mensais efetivos para ordenar: atrasada paga mora; senão vale a taxa da dívida */
@@ -51,6 +58,7 @@ export function debtPlan(data: AppData, today: ISODate, strategy: PlanStrategy =
       name: d.name,
       remaining,
       overdue: round2(calc.overdueAmount(d)),
+      installment: Math.min(remaining, round2(calc.schedule(d).firstOpen?.open ?? remaining)),
       // com plano de parcelas fixas a taxa não vale: os valores já vêm prontos
       monthlyRate: d.plan ? 0 : Math.max(0, d.rate || 0),
       lateRate: Math.max(0, d.lateInterestPct || 0),
@@ -75,15 +83,34 @@ export function debtPlan(data: AppData, today: ISODate, strategy: PlanStrategy =
   })
   for (const r of rows) r.reason = r.overdue > EPS ? 'atrasada' : strategy === 'juros' && cost(r) > EPS ? 'juros' : 'menor'
 
+  const minMonthly = round2(rows.reduce((t, r) => t + r.installment, 0))
   let months: number | null = null
+  let belowMin = false
   if (monthly > EPS && rows.length) {
-    // o valor mensal vai quitando uma dívida por vez, na ordem do plano
-    let cum = 0
-    for (const r of rows) {
-      cum += r.remaining
-      r.paidInMonth = Math.ceil(round2(cum / monthly))
+    if (monthly + EPS < minMonthly) belowMin = true
+    else {
+      // todo mês paga a parcela de cada dívida; o que sobra do valor mensal vai para a primeira da fila
+      const rem = rows.map((r) => r.remaining)
+      let m = 0
+      while (rem.some((v) => v > EPS) && m < 600) {
+        m++
+        let extra = monthly
+        rem.forEach((v, i) => {
+          const pay = Math.min(v, rows[i].installment)
+          rem[i] = round2(v - pay)
+          extra -= pay
+        })
+        for (let i = 0; i < rem.length && extra > EPS; i++) {
+          const pay = Math.min(rem[i], extra)
+          rem[i] = round2(rem[i] - pay)
+          extra -= pay
+        }
+        rows.forEach((r, i) => {
+          if (r.paidInMonth === null && rem[i] <= EPS) r.paidInMonth = m
+        })
+      }
+      months = m
     }
-    months = rows[rows.length - 1].paidInMonth
   }
 
   return {
@@ -91,7 +118,9 @@ export function debtPlan(data: AppData, today: ISODate, strategy: PlanStrategy =
     debts: rows,
     totalRemaining: round2(rows.reduce((s, r) => s + r.remaining, 0)),
     totalOverdue: round2(rows.reduce((s, r) => s + r.overdue, 0)),
+    minMonthly,
     months,
+    belowMin,
   }
 }
 
