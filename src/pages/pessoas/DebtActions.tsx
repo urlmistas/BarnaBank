@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { CalendarClock, Check, Coins, Ellipsis, FileText, Handshake, MessageCircle, Pencil, Percent, Receipt, Trash2 } from 'lucide-react'
+import { CalendarClock, Check, Coins, Ellipsis, FileText, Handshake, Laugh, MessageCircle, Pencil, Percent, Receipt, Trash2 } from 'lucide-react'
 import { useAppData } from '@/app/data-context'
 import { useWrite } from '@/app/write'
 import { Button } from '@/components/ui/button'
@@ -12,7 +12,8 @@ import { openPrintWindow } from '@/lib/print/html'
 import { useDocCtx } from '@/lib/print/use-doc-ctx'
 import { replaceDebt } from '@/lib/store'
 import type { Debt } from '@/lib/types'
-import { whatsappLink } from '@/lib/finance/whatsapp'
+import { funnyReceipt } from '@/lib/finance/comedy'
+import { whatsPhone, whatsappLink } from '@/lib/finance/whatsapp'
 import { nameKey } from '@/lib/finance/people'
 import { chargeLinkFor } from './charge-link'
 import { ConfirmDialog, DebtFormDialog, PartialPayDialog, SettleDialog } from './dialogs'
@@ -64,6 +65,24 @@ export function DebtActions({ debt, paid }: { debt: Debt; paid: boolean }) {
   const print = (html: string) => {
     if (!openPrintWindow(html)) toast.show(BLOCKED)
   }
+  const pixKey = typeof baseSettings.pixKey === 'string' ? baseSettings.pixKey : undefined
+  // comprovante de brincadeira: sempre copia; com telefone cadastrado, abre o WhatsApp já com o texto
+  const funny = async () => {
+    const text = funnyReceipt(debt, { today, money, date, pixKey })
+    let copied = false
+    try {
+      await navigator.clipboard.writeText(text)
+      copied = true
+    } catch {
+      /* sem permissão da área de transferência: segue só com o WhatsApp, se houver */
+    }
+    const phone = whatsPhone(contact)
+    if (phone) {
+      const w = window.open('https://wa.me/' + phone + '?text=' + encodeURIComponent(text), '_blank')
+      if (w) w.opener = null
+      else toast.show(copied ? 'Comprovante copiado. Seu navegador bloqueou o WhatsApp.' : BLOCKED)
+    } else toast.show(copied ? 'Comprovante copiado. Cole na conversa.' : 'Não consegui copiar o comprovante.')
+  }
   const close = () => setDlg(null)
 
   return (
@@ -101,6 +120,7 @@ export function DebtActions({ debt, paid }: { debt: Debt; paid: boolean }) {
         label="Mais ações"
         trigger={<Ellipsis aria-hidden="true" />}
         items={[
+          { label: 'Comprovante engraçado', icon: <Laugh aria-hidden="true" />, hidden: pay || paid, onSelect: funny },
           { label: 'Só uma parte', icon: <Coins aria-hidden="true" />, hidden: !canEdit || paid, onSelect: () => setDlg('partial') },
           { label: 'Quitar com desconto', icon: <Percent aria-hidden="true" />, hidden: !canEdit || paid, onSelect: () => setDlg('settle') },
           { label: 'Mais prazo', icon: <CalendarClock aria-hidden="true" />, hidden: !canEdit || paid, onSelect: () => setDlg('extend') },
