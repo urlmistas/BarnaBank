@@ -6,7 +6,11 @@ import { useAppData } from '@/app/data-context'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Input } from '@/components/ui/input'
+import { Segmented } from '@/components/ui/segmented'
 import { dashboardAlert, dashboardSummary, upcomingItems, type DashboardAlert, type UpcomingItem } from '@/lib/finance/dashboard'
+import { REASON_TEXT, debtPlan, type PlanStrategy } from '@/lib/finance/debt-plan'
+import { formatMoneyInput, parseMoney } from '@/lib/money-input'
 import { briefHeadline, monthBrief, type MonthBrief } from '@/lib/finance/month-brief'
 import { alertText, hideAlert, readHiddenAlerts, spendingAlerts, type SpendingAlert } from '@/lib/finance/alerts'
 import { balanceSeries } from '@/lib/finance/wallets'
@@ -50,6 +54,7 @@ function InicioReady({ data, today }: { data: AppData; today: string }) {
           <Hero summary={view.summary} />
           {view.alert && <AlertRow alert={view.alert} />}
           <MonthBriefCard brief={view.brief} today={today} />
+          <DebtPlanCard data={data} today={today} />
           <SpendingAlerts alerts={view.spending} today={today} />
           <Upcoming items={view.items} />
         </div>
@@ -151,6 +156,95 @@ function MonthBriefCard({ brief, today }: { brief: MonthBrief; today: string }) 
           {brief.lateInCount > 0 && <>{plural(brief.lateInCount, 'recebimento atrasado ficou', 'recebimentos atrasados ficaram')} fora da conta.</>}
         </p>
       )}
+    </section>
+  )
+}
+
+const PLAN_KEY = 'barnabank_debt_plan'
+
+function readPlanPrefs(): { strategy: PlanStrategy; monthly: string } {
+  try {
+    const v = JSON.parse(localStorage.getItem(PLAN_KEY) || '{}')
+    return { strategy: v.strategy === 'menor' ? 'menor' : 'juros', monthly: typeof v.monthly === 'string' ? v.monthly : '' }
+  } catch {
+    return { strategy: 'juros', monthly: '' }
+  }
+}
+
+/** ordem sugerida para quitar as dívidas que eu devo, e em quantos meses fecha com um valor mensal */
+function DebtPlanCard({ data, today }: { data: AppData; today: string }) {
+  const { money } = useAppData()
+  const [prefs, setPrefs] = useState(readPlanPrefs)
+  const monthlyNum = parseMoney(prefs.monthly)
+  const plan = useMemo(
+    () => debtPlan(data, today, prefs.strategy, Number.isFinite(monthlyNum) ? monthlyNum : 0),
+    [data, today, prefs.strategy, monthlyNum],
+  )
+  const inputId = useId()
+  if (!plan.debts.length) return null
+  const update = (next: Partial<typeof prefs>) => {
+    const v = { ...prefs, ...next }
+    setPrefs(v)
+    try {
+      localStorage.setItem(PLAN_KEY, JSON.stringify(v))
+    } catch {
+      /* sem armazenamento: vale só nesta sessão */
+    }
+  }
+  return (
+    <section aria-label="Plano para quitar dívidas" className="rounded-md border border-border bg-surface px-4 py-3">
+      <h2 className="text-sm font-medium">Plano para quitar dívidas</h2>
+      <p className="mt-0.5 text-xs text-fg-muted">
+        Você deve <span className="num">{money(plan.totalRemaining)}</span>
+        {plan.totalOverdue > 0.005 && <> · <span className="num">{money(plan.totalOverdue)}</span> já vencido</>}
+      </p>
+      <Segmented<PlanStrategy>
+        id="plano-estrategia"
+        label="Ordem do plano"
+        className="mt-3"
+        value={prefs.strategy}
+        onChange={(strategy) => update({ strategy })}
+        options={[
+          { value: 'juros', label: 'Juros primeiro' },
+          { value: 'menor', label: 'Menor saldo primeiro' },
+        ]}
+      />
+      <ol className="mt-3 divide-y divide-border text-sm">
+        {plan.debts.map((d, i) => (
+          <li key={d.id} className="flex items-center gap-3 py-2">
+            <span className="num w-5 shrink-0 text-fg-subtle">{i + 1}</span>
+            <p className="min-w-0 flex-1">
+              <b className="font-medium">{d.name}</b>
+              <span className="block text-xs text-fg-muted">
+                {REASON_TEXT[d.reason]}
+                {d.monthlyRate > 0 && <> · {String(d.monthlyRate).replace('.', ',')}% ao mês</>}
+                {d.paidInMonth !== null && <> · quita {d.paidInMonth === 1 ? 'neste mês' : `em ${d.paidInMonth} meses`}</>}
+              </span>
+            </p>
+            <span className="num shrink-0 font-medium">{money(d.remaining)}</span>
+          </li>
+        ))}
+      </ol>
+      <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2">
+        <label htmlFor={inputId} className="text-sm text-fg-muted">
+          Posso pagar por mês
+        </label>
+        <Input
+          id={inputId}
+          inputMode="decimal"
+          placeholder="0,00"
+          className="w-32"
+          value={prefs.monthly}
+          onChange={(e) => update({ monthly: e.target.value })}
+          onBlur={() => Number.isFinite(monthlyNum) && update({ monthly: formatMoneyInput(monthlyNum) })}
+        />
+      </div>
+      {plan.months !== null && (
+        <p role="status" className="mt-2 text-sm font-medium">
+          {plan.months === 1 ? 'Quita tudo em 1 mês.' : `Quita tudo em ${plan.months} meses.`}
+        </p>
+      )}
+      <p className="mt-2 text-xs text-fg-subtle">Estimativa com o saldo atual. Não projeta juros novos nem renegociação.</p>
     </section>
   )
 }
