@@ -1,12 +1,13 @@
 import { lazy, Suspense, useId, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
-import { ArrowRight, CircleAlert, Clock, Inbox, TriangleAlert, X } from 'lucide-react'
+import { ArrowRight, CalendarCheck, CircleAlert, Clock, Inbox, TriangleAlert, X } from 'lucide-react'
 import { useAppData } from '@/app/data-context'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { dashboardAlert, dashboardSummary, upcomingItems, type DashboardAlert, type UpcomingItem } from '@/lib/finance/dashboard'
+import { briefHeadline, monthBrief, type MonthBrief } from '@/lib/finance/month-brief'
 import { alertText, hideAlert, readHiddenAlerts, spendingAlerts, type SpendingAlert } from '@/lib/finance/alerts'
 import { balanceSeries } from '@/lib/finance/wallets'
 import { addDaysISO, parseISO, ymOf } from '@/lib/finance/dates'
@@ -38,6 +39,7 @@ function InicioReady({ data, today }: { data: AppData; today: string }) {
         items,
         alert: dashboardAlert(items, today),
         summary: dashboardSummary(data, today),
+        brief: monthBrief(data, today),
         spending: spendingAlerts(data, today),
         series: data.wallets.length ? balanceSeries(data, addDaysISO(today, -29), today) : [],
       }
@@ -47,6 +49,7 @@ function InicioReady({ data, today }: { data: AppData; today: string }) {
         <div className="flex min-w-0 flex-col gap-6">
           <Hero summary={view.summary} />
           {view.alert && <AlertRow alert={view.alert} />}
+          <MonthBriefCard brief={view.brief} today={today} />
           <SpendingAlerts alerts={view.spending} today={today} />
           <Upcoming items={view.items} />
         </div>
@@ -111,6 +114,44 @@ function AlertRow({ alert }: { alert: DashboardAlert }) {
         </Link>
       </Button>
     </div>
+  )
+}
+
+/** resumo do mês: o que ainda vence até o fim do mês e se o saldo cobre */
+function MonthBriefCard({ brief, today }: { brief: MonthBrief; today: string }) {
+  const { money } = useAppData()
+  if (brief.verdict === 'empty') return null
+  const bad = brief.verdict === 'no'
+  const Icon = bad ? CircleAlert : brief.verdict === 'tight' ? TriangleAlert : CalendarCheck
+  const stats: [string, string][] = [
+    ['A pagar até o fim do mês', money(brief.outTotal)],
+    ['A receber', money(brief.inTotal)],
+    ['Saldo previsto', money(brief.endBalance)],
+  ]
+  if (brief.perDay > 0) stats.push(['Livre por dia', money(brief.perDay)])
+  return (
+    <section aria-label={`Resumo de ${MONTHS[parseISO(today).getMonth()]}`} className="rounded-md border border-border bg-surface px-4 py-3">
+      <p role="status" className="flex items-start gap-3 text-sm">
+        <Icon aria-hidden="true" className={cn('mt-0.5 size-4 shrink-0', bad ? 'text-neg' : 'text-accent-text')} />
+        <span className="font-medium">{briefHeadline(brief, money)}</span>
+      </p>
+      {brief.count > 0 && (
+        <dl className="mt-3 grid grid-cols-2 gap-x-6 gap-y-2 text-sm sm:grid-cols-4">
+          {stats.map(([k, v]) => (
+            <div key={k}>
+              <dt className="text-xs text-fg-muted">{k}</dt>
+              <dd className={cn('num font-medium', k === 'Saldo previsto' && brief.endBalance < 0 && 'text-neg')}>{v}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
+      {(brief.lateOut > 0 || brief.lateInCount > 0) && (
+        <p className="mt-3 text-xs text-fg-muted">
+          {brief.lateOut > 0 && <>Já vencido e ainda não pago: <span className="num">{money(brief.lateOut)}</span>. </>}
+          {brief.lateInCount > 0 && <>{plural(brief.lateInCount, 'recebimento atrasado ficou', 'recebimentos atrasados ficaram')} fora da conta.</>}
+        </p>
+      )}
+    </section>
   )
 }
 
