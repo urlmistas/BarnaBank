@@ -4,6 +4,11 @@ import assert from 'node:assert/strict';
 import path from 'node:path';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 
+// Relógio fixo: os valores esperados assumem dia >= 10 (o vencimento do dia 10 já passou no mês).
+// Sem isso o teste falhava nos dias 1 a 9 de cada mês.
+const FIXO = Date.UTC(2026, 9, 20, 15, 0, 0);
+Date.now = () => FIXO;
+
 const here = path.dirname(fileURLToPath(import.meta.url));
 const {getEngine} = await import(pathToFileURL(path.join(here, '..', 'engine.js')).href);
 const E = getEngine();
