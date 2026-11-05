@@ -122,7 +122,7 @@ describe('Pessoas: WhatsApp', () => {
     seed()
     mount()
     fireEvent.click(await screen.findByRole('button', { name: /WhatsApp/ }))
-    expect(await screen.findByText(/Cadastre o telefone em "Editar"/)).toBeTruthy()
+    expect(await screen.findByText(/Cadastre o telefone em "Editar pessoa"/)).toBeTruthy()
   })
 
   it('o link de cobrança já criado entra no rodapé', async () => {
@@ -138,7 +138,7 @@ describe('Pessoas: etiquetas, notas e confiança', () => {
   it('salva etiquetas e notas no contato, sem perder o telefone', async () => {
     seed({ contacts: { 'ana souza': { phone: '11999998888' } } })
     mount()
-    fireEvent.click(await screen.findByRole('button', { name: /Etiquetas e notas/ }))
+    fireEvent.click(await screen.findByRole('button', { name: /Editar pessoa/ }))
     const dlg = openDialog()
     fireEvent.click(within(dlg).getByRole('button', { name: 'Família' }))
     fireEvent.change(within(dlg).getByLabelText('Outra etiqueta'), { target: { value: 'Vizinha' } })
@@ -147,6 +147,71 @@ describe('Pessoas: etiquetas, notas e confiança', () => {
     await waitFor(() => expect(stored().contacts['ana souza'].tags).toEqual(['Família', 'Vizinha']))
     expect(stored().contacts['ana souza']).toMatchObject({ phone: '11999998888', notes: 'recebe dia 5' })
     expect(await screen.findByText('recebe dia 5')).toBeTruthy()
+  })
+
+  it('edita o telefone da pessoa, mostra formatado e permite apagar', async () => {
+    seed({ contacts: { 'ana souza': { phone: '11999998888', tags: ['Amigo'] } } })
+    mount()
+    expect(await screen.findByText('(11) 99999-8888')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: /Editar pessoa/ }))
+    let dlg = openDialog()
+    const campo = within(dlg).getByLabelText('Telefone') as HTMLInputElement
+    expect(campo.value).toBe('(11) 99999-8888')
+    fireEvent.change(campo, { target: { value: '(43) 98888-7777' } })
+    fireEvent.click(within(dlg).getByRole('button', { name: 'Salvar' }))
+    await waitFor(() => expect(stored().contacts['ana souza'].phone).toBe('43988887777'))
+    expect(stored().contacts['ana souza'].tags).toEqual(['Amigo'])
+    expect(await screen.findByText('(43) 98888-7777')).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: /Editar pessoa/ }))
+    dlg = openDialog()
+    fireEvent.change(within(dlg).getByLabelText('Telefone'), { target: { value: '' } })
+    fireEvent.click(within(dlg).getByRole('button', { name: 'Salvar' }))
+    await waitFor(() => expect(stored().contacts['ana souza'].phone).toBe(''))
+  })
+
+  it('renomear a pessoa muda todas as dívidas, leva o contato e abre a página nova', async () => {
+    seed({
+      debts: [debt(), debt({ id: 'd2', name: 'ana souza', principal: 50, installments: 1 })],
+      contacts: { 'ana souza': { phone: '11999998888', tags: ['Amigo'] } },
+      shares: { abcdefghijklmnop: { type: 'person', ref: 'ana souza', created: '2026-01-01' } },
+    })
+    mount()
+    fireEvent.click(await screen.findByRole('button', { name: /Editar pessoa/ }))
+    const dlg = openDialog()
+    fireEvent.change(within(dlg).getByLabelText('Nome'), { target: { value: 'Ana Maria Souza' } })
+    fireEvent.click(within(dlg).getByRole('button', { name: 'Salvar' }))
+    await waitFor(() => expect(stored().debts.map((d: { name: string }) => d.name)).toEqual(['Ana Maria Souza', 'Ana Maria Souza']))
+    expect(stored().contacts['ana souza']).toBeUndefined()
+    expect(stored().contacts['ana maria souza']).toMatchObject({ phone: '11999998888', tags: ['Amigo'] })
+    expect(stored().shares.abcdefghijklmnop.ref).toBe('ana maria souza')
+    // a rota trocou para a chave nova: a página da pessoa continua aberta, sem "não encontrada"
+    expect((await screen.findAllByText('Ana Maria Souza')).length).toBeGreaterThan(0)
+  })
+
+  it('nome de outra pessoa pede para juntar antes de salvar', async () => {
+    seed({ debts: [debt(), debt({ id: 'd2', name: 'Bia Lima' })] })
+    mount()
+    fireEvent.click(await screen.findByRole('button', { name: /Editar pessoa/ }))
+    const dlg = openDialog()
+    fireEvent.change(within(dlg).getByLabelText('Nome'), { target: { value: 'bia lima' } })
+    fireEvent.click(within(dlg).getByRole('button', { name: 'Salvar' }))
+    expect(await within(dlg).findByText(/Marque a opção para juntar/)).toBeTruthy()
+    expect(stored().debts[0].name).toBe('Ana Souza')
+    fireEvent.click(within(dlg).getByRole('checkbox'))
+    fireEvent.click(within(dlg).getByRole('button', { name: 'Salvar' }))
+    await waitFor(() => expect(stored().debts.map((d: { name: string }) => d.name)).toEqual(['Bia Lima', 'Bia Lima']))
+  })
+
+  it('nome vazio não salva', async () => {
+    seed()
+    mount()
+    fireEvent.click(await screen.findByRole('button', { name: /Editar pessoa/ }))
+    const dlg = openDialog()
+    fireEvent.change(within(dlg).getByLabelText('Nome'), { target: { value: '   ' } })
+    fireEvent.click(within(dlg).getByRole('button', { name: 'Salvar' }))
+    expect(await within(dlg).findByText('Informe o nome.')).toBeTruthy()
+    expect(stored().debts[0].name).toBe('Ana Souza')
   })
 
   it('mostra a nota de confiança quando há parcela vencida', async () => {

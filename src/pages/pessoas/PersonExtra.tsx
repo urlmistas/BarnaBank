@@ -1,13 +1,15 @@
 import { useState } from 'react'
-import { ShieldCheck, Tag, Pencil } from 'lucide-react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
+import { Phone, ShieldCheck, Tag, Pencil } from 'lucide-react'
 import { useAppData } from '@/app/data-context'
 import { Button } from '@/components/ui/button'
 import { EPS } from '@/lib/finance/dates'
-import { notesOf, tagsOf } from '@/lib/finance/person-extra'
+import { formatPhone, notesOf, tagsOf } from '@/lib/finance/person-extra'
 import { trustInfo, type Trust } from '@/lib/finance/trust'
 import { plural } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { TagsDialog } from './dialogs-extra'
+import { personHref } from './links'
 
 const TONE: Record<Trust['cls'], string> = {
   great: 'text-pos',
@@ -20,16 +22,25 @@ const TONE: Record<Trust['cls'], string> = {
 export function PersonExtra({ personKey, name }: { personKey: string; name: string }) {
   const { result, today, money, canEdit } = useAppData()
   const [editing, setEditing] = useState(false)
+  const navigate = useNavigate()
+  const [params] = useSearchParams()
   const contact = result?.data.contacts[personKey]
   const tags = tagsOf(contact)
   const notes = notesOf(contact)
+  const phone = formatPhone(contact?.phone)
   const t = trustInfo(result?.data.debts ?? [], personKey, today)
 
   return (
     <section aria-label={`Confiança e anotações de ${name}`} className="mt-3 flex flex-col gap-3 rounded-md border border-border px-4 py-3">
       {t ? <TrustLine t={t} money={money} /> : <NoTrust />}
-      {(tags.length > 0 || notes || canEdit) && (
+      {(tags.length > 0 || notes || phone || canEdit) && (
         <div className="flex flex-wrap items-center gap-1.5">
+          {phone && (
+            <span className="inline-flex h-6 items-center gap-1 rounded-full border border-border px-2.5 text-xs text-fg-muted">
+              <Phone aria-hidden="true" className="size-3" />
+              <span className="num">{phone}</span>
+            </span>
+          )}
           {tags.map((tag) => (
             <span key={tag} className="inline-flex h-6 items-center gap-1 rounded-full border border-border px-2.5 text-xs text-fg-muted">
               <Tag aria-hidden="true" className="size-3" />
@@ -38,14 +49,20 @@ export function PersonExtra({ personKey, name }: { personKey: string; name: stri
           ))}
           {canEdit && (
             <Button size="sm" variant="ghost" className="h-6 px-2" onClick={() => setEditing(true)}>
-              {tags.length || notes ? <Pencil aria-hidden="true" /> : <Tag aria-hidden="true" />}
-              {tags.length || notes ? 'Editar' : 'Etiquetas e notas'}
+              <Pencil aria-hidden="true" />
+              Editar pessoa
             </Button>
           )}
         </div>
       )}
       {notes && <p className="text-xs whitespace-pre-line text-fg-muted">{notes}</p>}
-      {canEdit && <TagsDialog open={editing} onClose={() => setEditing(false)} personKey={personKey} name={name} />}
+      {canEdit && <TagsDialog
+          open={editing}
+          onClose={() => setEditing(false)}
+          personKey={personKey}
+          name={name}
+          onRenamed={(k) => navigate(personHref(k, params.toString()), { replace: true })}
+        />}
     </section>
   )
 }

@@ -8,7 +8,8 @@ import { addDaysISO, EPS, round2 } from '@/lib/finance/dates'
 import {
   applyReneg, buildReneg, extendDefault, extendTargets, planSegments, remainingLabel, renegDefaults, rescheduleDebt, segLabel, type RenegMode,
 } from '@/lib/finance/renegotiation'
-import { allTags, notesOf, tagsOf, withTagsNotes } from '@/lib/finance/person-extra'
+import { allTags, formatPhone, notesOf, tagsOf, withTagsNotes } from '@/lib/finance/person-extra'
+import { MAX_NAME, cleanName, nameError, nameTaken, renamePerson } from '@/lib/finance/person-rename'
 import { boardData } from '@/lib/finance/trust'
 import { firstName } from '@/lib/format'
 import { formatMoneyInput, parseMoney } from '@/lib/money-input'
@@ -225,38 +226,78 @@ function ExtendForm({ debt, onClose }: { debt: Debt; onClose: () => void }) {
 
 // ---------------------------------------------------------------- etiquetas e notas
 
-export function TagsDialog({ open, onClose, personKey, name }: { open: boolean; onClose: () => void; personKey: string; name: string }) {
+export function TagsDialog({
+  open, onClose, personKey, name, onRenamed,
+}: { open: boolean; onClose: () => void; personKey: string; name: string; onRenamed?: (newKey: string) => void }) {
   return (
-    <Modal open={open} onClose={onClose} title={`${firstName(name)}: etiquetas e notas`}>
-      <TagsForm personKey={personKey} name={name} onClose={onClose} />
+    <Modal open={open} onClose={onClose} title={`${firstName(name)}: editar pessoa`}>
+      <TagsForm personKey={personKey} name={name} onClose={onClose} onRenamed={onRenamed} />
     </Modal>
   )
 }
 
-function TagsForm({ personKey, name, onClose }: { personKey: string; name: string; onClose: () => void }) {
+function TagsForm({ personKey, name, onClose, onRenamed }: { personKey: string; name: string; onClose: () => void; onRenamed?: (newKey: string) => void }) {
   const { result } = useAppData()
   const write = useWrite()
   const contacts = result?.data.contacts
   const c = contacts?.[personKey]
-  const ids = { other: useId(), notes: useId() }
+  const ids = { name: useId(), phone: useId(), other: useId(), notes: useId() }
   const [tags, setTags] = useState<string[]>(() => tagsOf(c))
+  const [nome, setNome] = useState(name)
+  const [merge, setMerge] = useState(false)
+  const [erro, setErro] = useState('')
+  const [phone, setPhone] = useState(() => formatPhone(c?.phone))
   const [other, setOther] = useState('')
   const [notes, setNotes] = useState(() => notesOf(c))
   const all = useMemo(() => allTags(contacts ?? {}, tagsOf(c)), [contacts, c])
   const toggle = (t: string) => setTags((cur) => (cur.includes(t) ? cur.filter((x) => x !== t) : [...cur, t]))
 
+  const taken = !!result && nameTaken(result.data, personKey, nome)
+
   function submit(e: FormEvent) {
     e.preventDefault()
+    const bad = nameError(nome)
+    if (bad) return setErro(bad)
+    if (taken && !merge) return setErro('Já existe uma pessoa com esse nome. Marque a opção para juntar as duas.')
     const final = other.trim() && !tags.includes(other.trim()) ? [...tags, other.trim()] : tags
+    let newKey = personKey
     const ok = write('Salvo', (api) => {
-      api.contacts[personKey] = withTagsNotes(api.contacts[personKey], final, notes) as Record<string, unknown>
+      newKey = renamePerson(api, personKey, nome)
+      api.contacts[newKey] = withTagsNotes(api.contacts[newKey], final, notes, phone) as Record<string, unknown>
     })
-    if (ok) onClose()
+    if (ok) {
+      onClose()
+      if (newKey !== personKey) onRenamed?.(newKey)
+    }
   }
 
   return (
     <form onSubmit={submit} className="px-5 py-4">
-      <p className="text-xs font-medium text-fg-muted">Etiquetas</p>
+      <Field
+        label="Nome"
+        htmlFor={ids.name}
+        hint="Trocar o nome muda em todas as dívidas dessa pessoa."
+      >
+        <Input id={ids.name} value={nome} maxLength={MAX_NAME} onChange={(e) => { setNome(e.target.value); setErro('') }} autoComplete="off" />
+      </Field>
+      {erro && (
+        <p role="alert" className="mt-1 text-xs text-neg">
+          {erro}
+        </p>
+      )}
+      {taken && (
+        <label className="mt-2 flex cursor-pointer items-start gap-2 text-xs text-fg-muted">
+          <input type="checkbox" className="mt-0.5" checked={merge} onChange={(e) => setMerge(e.target.checked)} />
+          <span>
+            Já existe uma pessoa chamada <b className="font-medium text-fg">{cleanName(nome)}</b>. Juntar as duas: as dívidas ficam na mesma pessoa, e
+            telefone, etiquetas e notas ficam como estão neste formulário.
+          </span>
+        </label>
+      )}
+      <Field label="Telefone" className="mt-3" htmlFor={ids.phone} hint="Com DDD. Usado para cobrar pelo WhatsApp.">
+        <Input id={ids.phone} type="tel" inputMode="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="(11) 99999-9999" autoComplete="off" />
+      </Field>
+      <p className="mt-3 text-xs font-medium text-fg-muted">Etiquetas</p>
       <div className="mt-1.5 flex flex-wrap gap-1.5">
         {all.map((t) => (
           <button

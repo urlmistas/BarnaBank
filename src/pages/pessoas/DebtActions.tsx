@@ -109,7 +109,7 @@ export function DebtActions({ debt, paid }: { debt: Debt; paid: boolean }) {
             </a>
           </Button>
         ) : (
-          <Button size="sm" variant="outline" onClick={() => toast.show('Cadastre o telefone em "Editar" para cobrar pelo WhatsApp.')}>
+          <Button size="sm" variant="outline" onClick={() => toast.show('Cadastre o telefone em "Editar pessoa" na página dela.')}>
             <MessageCircle aria-hidden="true" />
             WhatsApp
           </Button>

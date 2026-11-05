@@ -8,6 +8,14 @@ export const TAG_SUGGESTIONS = ['Paga em dia', 'Atrasa', 'Prefere PIX', 'Paga em
 export const tagsOf = (c: Contact | undefined): string[] => (Array.isArray(c?.tags) ? (c.tags as unknown[]).filter((t): t is string => typeof t === 'string') : [])
 export const notesOf = (c: Contact | undefined): string => (typeof c?.notes === 'string' ? c.notes : '')
 
+/** "43999998888" → "(43) 99999-8888"; fora do padrão, devolve como veio */
+export function formatPhone(raw: unknown): string {
+  const d = String(raw ?? '').replace(/\D/g, '')
+  if (d.length === 11) return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`
+  if (d.length === 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`
+  return d
+}
+
 /** sugestões + etiquetas já usadas por qualquer pessoa + as da pessoa, sem repetir */
 export function allTags(contacts: Record<string, Contact>, mine: string[] = []): string[] {
   const all = TAG_SUGGESTIONS.slice()
@@ -19,9 +27,10 @@ export function allTags(contacts: Record<string, Contact>, mine: string[] = []):
   return all
 }
 
-/** contato novo com etiquetas e notas trocadas; o resto (telefone etc.) fica */
-export function withTagsNotes(c: Contact | undefined, tags: string[], notes: string): Contact {
+/** contato novo com etiquetas e notas trocadas; `phone` (só dígitos) também, se vier; o resto fica */
+export function withTagsNotes(c: Contact | undefined, tags: string[], notes: string, phone?: string): Contact {
   const out: Contact = { ...(c ?? { phone: '' }) }
+  if (phone !== undefined) out.phone = phone.replace(/\D/g, '')
   const clean = [...new Set(tags.map((t) => t.trim().slice(0, 24)).filter(Boolean))]
   out.tags = clean
   out.notes = notes.trim().slice(0, 400)
