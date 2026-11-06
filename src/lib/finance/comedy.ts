@@ -18,12 +18,12 @@ export interface ComedyCtx {
 const MAX_PARCELAS = 12
 
 const FINAIS = [
-  '+ um brownie',
-  '+ um açaí',
-  '+ uma gratidão eterna',
-  '+ um "valeu, parceiro"',
-  '+ um lanche no fim de semana',
-  '+ um café com bolo',
+  '+ um brigadeiro',
+  '+ um bolo de chocolate',
+  '+ um pão na chapa',
+  '+ um churrasco',
+  '+ uma coxinha',
+  '+ um quibe',
 ]
 
 const ZERO = [

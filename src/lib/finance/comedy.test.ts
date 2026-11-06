@@ -20,7 +20,7 @@ describe('funnyReceipt', () => {
     expect(t).toContain('Valor solicitado: *R$100,00*')
     expect(t).toContain('Juros: 0% (você é sortudo')
     expect(t).toContain('Plano: 1x sem juros')
-    expect(t).toContain('VALOR A PAGAR: R$100,00* + um brownie')
+    expect(t).toContain('VALOR A PAGAR: R$100,00* + um brigadeiro')
     expect(t).not.toContain('IOFF')
   })
 
