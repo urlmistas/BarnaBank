@@ -2115,14 +2115,22 @@ async function cartaoCreate(req, env, token, v, origin) {
   if (k.erro) return k.erro;
   const tot = valorCartao(k.base, taxaCartao(env));
   const pref = await criarPreferenciaCartao(env, {titulo: 'Cobrança ' + k.c.name, valor: tot, base: k.base, ref: montarRef(env.uid, k.c.key), aviso: origin + '/mp', volta: origin + '/s/' + token});
-  if (pref.erro) return json({error: 'Não consegui abrir o pagamento. Tente de novo ou use o Pix.'}, 502);
+  if (pref.erro) {
+    console.log('mp cartão link:', pref.erro);
+    await putJSON(env, 'lastError', {at: new Date().toISOString(), error: 'cartão do link: ' + pref.erro});
+    return json({error: 'Não consegui abrir o pagamento. Tente de novo ou use o Pix.'}, 502);
+  }
   return json({ok: true, url: pref.url, total: pref.valor});
 }
 async function pixCreate(req, env, token, v, origin) {
   const k = await linkCharge(req, env, token, v);
   if (k.erro) return k.erro;
   const pix = await criarPix(env, {valor: k.base, descricao: 'Cobrança ' + k.c.name, ref: montarRef(env.uid, k.c.key), aviso: origin + '/mp'});
-  if (pix.erro) return json({error: 'Não consegui gerar o Pix. Tente de novo ou use o cartão.'}, 502);
+  if (pix.erro) {
+    console.log('mp pix link:', pix.erro);
+    await putJSON(env, 'lastError', {at: new Date().toISOString(), error: 'pix do link: ' + pix.erro});
+    return json({error: 'Não consegui gerar o Pix. Tente de novo ou use o cartão.'}, 502);
+  }
   return json({ok: true, code: pix.qr, svg: qrSvg(pix.qr), total: pix.valor});
 }
 async function trackView(env, token, v) {
