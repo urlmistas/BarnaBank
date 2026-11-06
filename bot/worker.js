@@ -2077,13 +2077,14 @@ async function shareRoute(req, url, env, ctx) {
 // nunca vem do navegador. O Pix não tem taxa para quem paga (quem recebe absorve). O aviso cai em /mp, que dá baixa só no valor da dívida.
 const mpLinkOk = (env, v) => mpLigado(env) && !!v && v.type !== 'group' && v.dir !== 'owe' && v.remaining > 0;
 function payNowBlock(env, v, amount) {
-  if (!mpLinkOk(env, v)) return '';
+  if (!mpLinkOk(env, v)) return null;
   const ch = payChoices(v);
   const sel = ch.length ? '<label class="lbl" for="dwhich">O que você vai pagar</label><select id="dwhich">' +
     ch.map((c, i) => '<option value="' + c.value + '" data-amt="' + Number(c.amt).toFixed(2) + '"' + (Math.abs(c.amt - amount) < 0.005 ? ' selected' : '') + '>' + esc(c.label) + '</option>').join('') + '</select>' : '';
-  return '<style>#pdlg{background:#14171f;color:#eee9da;border:1px solid #252a36;border-radius:18px;padding:18px;width:min(420px,92vw)}#pdlg::backdrop{background:rgba(0,0,0,.65)}' +
-    '.opt{display:block;width:100%;text-align:left;margin-top:10px;padding:14px 16px}.opt span,.opt small{display:block;font-weight:500}.opt small{font-size:12px;opacity:.8}.paybtn{padding:16px}.paybtn span{display:block;font-weight:500;font-size:13px;margin-top:3px}</style>' +
-    '<div class="card paybox" id="pagar"><button class="wide paybtn" id="payja" onclick="openPay()">Pague já!<span>Evite atrasar esta dívida pagando já!</span></button></div>' +
+  const head = '<div class="payhead" id="pagar"><h2>Pague agora!</h2><p class="muted">Evite atrasar esta dívida pagando agora!</p><button class="wide paybtn" id="payja" onclick="openPay()">Pague</button></div>';
+  const extra = '<style>#pdlg{background:rgba(16,16,20,.78);-webkit-backdrop-filter:blur(18px) saturate(160%);backdrop-filter:blur(18px) saturate(160%);color:#f4f4f5;border:1px solid rgba(255,255,255,.1);border-radius:22px;padding:20px;width:min(420px,92vw);box-shadow:0 24px 80px rgba(0,0,0,.55),inset 0 1px 0 rgba(255,255,255,.08)}' +
+    '#pdlg::backdrop{background:rgba(8,8,11,.62);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}#pdlg[open]{animation:dlgin .28s cubic-bezier(.16,1,.3,1)}@keyframes dlgin{from{opacity:0;transform:translateY(10px) scale(.98)}}' +
+    '.opt{width:100%;margin-top:10px;padding:14px 16px}.opt span,.opt small{display:block;font-weight:500}.opt small{font-size:12px;opacity:.8}.paybtn{padding:16px}</style>' +
     '<dialog id="pdlg"><h2>Como você quer pagar?</h2>' + sel +
     '<label class="lbl" for="damt">Valor da dívida</label><div class="amt"><span>R$</span><input id="damt" inputmode="decimal" autocomplete="off" value="' + Number(amount).toFixed(2).replace('.', ',') + '"></div>' +
     '<button class="opt" id="optPix" onclick="payPix()">Pix<span id="ptot"></span><small>Pagamento na hora, sem taxa</small></button>' +
@@ -2092,6 +2093,7 @@ function payNowBlock(env, v, amount) {
     '<div id="pixres" hidden><div class="qr"><img id="pqr" alt="QR Code do PIX"></div><div class="cc"><code id="pcc"></code></div>' +
     '<button class="wide" onclick="copyEl(\'pcc\',this)">Copiar código PIX</button><p class="muted small center-t">No app do banco: PIX → <b>Copia e cola</b> (ou leia o QR). Depois de pagar, a baixa é automática.</p></div>' +
     '<button class="wide ghost" onclick="closePay()">Fechar</button></dialog>';
+  return {head, extra};
 }
 // valida o pedido do popup e acha a cobrança; devolve {erro: Response} ou {base, c}
 async function linkCharge(req, env, token, v) {
@@ -2187,6 +2189,8 @@ function paidBlock(v, claims) {
     '<label class="lbl" for="pnote">Mensagem (opcional)</label><input id="pnote" maxlength="140" placeholder="Ex: paguei a parcela de outubro">' +
     '<button class="wide" id="psend" type="submit">Enviar</button><p class="muted small" id="pmsg"></p></form></div>';
 }
+const cardInner = h => String(h || '').replace(/^<div class="card">/, '').replace(/<\/div>$/, '');
+const joinCards = (a, b) => a && b ? '<div class="card">' + cardInner(a) + '<hr class="sep">' + cardInner(b) + '</div>' : (a || '') + (b || '');
 async function sharePage(env, token, v) {
   const owner = v.owner ? esc(v.owner) : 'quem te mandou';
   const claims = await claimsFor(env, token);
@@ -2194,7 +2198,8 @@ async function sharePage(env, token, v) {
   const open = v.type === 'group' ? v.remaining > 0 : v.remaining > 0;
   const suggest = v.type === 'group' ? ((v.members.find(m => m.remaining > 0) || {}).remaining || 0) : (v.suggest || v.remaining || 0);
   const owe = v.dir === 'owe';
-  const pay = owe ? '' : open ? (mpLinkOk(env, v) ? payNowBlock(env, v, suggest) : pixBlock(token, v, suggest, owner)) + paidBlock(v, claims) + prazoBlock(v, claims) : (claims.some(c => c.kind !== 'prazo') ? paidBlock(v, claims) : '');
+  const pn = !owe && open ? payNowBlock(env, v, suggest) : null;
+  const pay = owe ? '' : open ? (pn ? pn.extra : pixBlock(token, v, suggest, owner)) + joinCards(paidBlock(v, claims), prazoBlock(v, claims)) : (claims.some(c => c.kind !== 'prazo') ? paidBlock(v, claims) : '');
   const script = '<script>var TK=' + JSON.stringify(token) + ';var TX=' + taxaCartao(env) + ';' + PAGE_JS + '</script>';
   if (v.type === 'group') {
     const pct = v.owed > 0 ? Math.min(100, Math.round(v.paid / v.owed * 100)) : 0;
@@ -2236,6 +2241,7 @@ async function sharePage(env, token, v) {
     (v.remaining > 0
       ? '<h1>' + brl(v.remaining) + '</h1><p class="muted">em aberto comigo' + (v.late > 0 ? ' · <span class="latec">' + brl(v.late) + ' atrasado</span>' : '') + '</p>'
       : '<h1>Tudo quitado 🎉</h1><p class="muted">Você não deve nada para ' + owner + '. Valeu!</p>') +
+    (pn ? pn.head : '') +
     (v.doneCount ? '<p class="muted small">' + v.doneCount + ' dívida(s) já quitada(s), ' + brl(v.donePaid) + ' pagos.</p>' : '') + '</div>';
   if (owe) return owePage(v, v.owner || '');
   return page('Resumo para ' + v.name, hero + pay + debts + upd + script, v.remaining > 0 ? brl(v.remaining) + ' em aberto' : 'Tudo quitado');
@@ -2243,6 +2249,7 @@ async function sharePage(env, token, v) {
 const PAGE_JS = `
 function copyEl(id,b){var t=document.getElementById(id).textContent;var done=function(){b.textContent="Copiado ✓";setTimeout(function(){b.textContent=b.getAttribute("data-l")||"Copiar"},2500)};b.setAttribute("data-l",b.getAttribute("data-l")||b.textContent);(navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(done,function(){var r=document.createRange();r.selectNode(document.getElementById(id));getSelection().removeAllRanges();getSelection().addRange(r);b.textContent="Selecionado: copie"})}
 function num(s){s=String(s||"").replace(/[^0-9,\\.]/g,"");if(s.indexOf(",")>=0)s=s.replace(/\\./g,"").replace(",",".");var v=parseFloat(s);return isNaN(v)?0:v}
+document.addEventListener("pointermove",function(e){var b=e.target.closest?e.target.closest("button"):null;if(!b)return;var r=b.getBoundingClientRect();b.style.setProperty("--x",(e.clientX-r.left)+"px");b.style.setProperty("--y",(e.clientY-r.top)+"px")});
 var amt=document.getElementById("amt"),tm;
 var dmt=document.getElementById("damt"),dw=document.getElementById("dwhich");
 function brl2(n){return n.toFixed(2).replace(".",",")}
@@ -2643,39 +2650,59 @@ details.lk-insts[open]::details-content{animation:lkDrop .26s ease}
 @media (max-width:480px){.lk-upd{display:none}.lk-dhh span{display:none}.lk-ico{width:42px;height:42px}.lk-nv{padding-left:0}}
 `;
 
+const BTN_CSS = `
+button{font-family:Geist,Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;--x:50%;--y:50%;position:relative;isolation:isolate;overflow:hidden;display:inline-flex;align-items:center;justify-content:center;gap:6px;border:0;border-radius:999px;color:#1c1408;font-weight:600;font-size:14px;cursor:pointer;-webkit-backdrop-filter:blur(14px) saturate(160%);backdrop-filter:blur(14px) saturate(160%);background:linear-gradient(100deg,rgba(226,122,10,.68),rgba(250,170,20,.5) 50%,rgba(255,220,90,.62));box-shadow:inset 0 0 0 1px rgba(255,224,140,0);transition:transform .5s cubic-bezier(.34,1.56,.64,1),color .4s,box-shadow .4s}
+button::before{content:"";position:absolute;inset:0;z-index:-1;border-radius:inherit;transition:opacity .4s;background:linear-gradient(135deg,#fcd34d,#f59e0b 55%,#ea8a06);box-shadow:inset 0 1px 0 rgba(255,255,255,.45),inset 0 -1px 0 rgba(0,0,0,.12)}
+button::after{content:"";position:absolute;inset:-10% 0;z-index:-1;pointer-events:none;opacity:0;transition:opacity .35s;border-radius:inherit;background:radial-gradient(120px circle at var(--x) var(--y),rgba(255,255,255,.4),rgba(253,200,60,.25) 42%,transparent 72%),linear-gradient(100deg,transparent,rgba(255,255,255,.32),transparent);background-size:100% 100%,38% 100%;background-repeat:no-repeat;background-position:0 0,-60% 0}
+button:hover:not(:disabled){color:#fff;transform:scale(1.02,1.03);box-shadow:inset 0 0 0 1px rgba(255,224,140,.4),inset 2px 2px 1px -.5px rgba(255,255,255,.7),inset -2px -2px 1px -.5px rgba(255,255,255,.4)}
+button:hover:not(:disabled)::before{opacity:0}
+button:hover:not(:disabled)::after{opacity:1;animation:brilho .8s ease-out}
+button:active:not(:disabled){transform:scale(.97,.94);transition-duration:.12s}
+button:disabled{opacity:.6;cursor:progress}
+@keyframes brilho{to{background-position:0 0,160% 0}}
+button.ghost{color:#fbb13c;background:rgba(255,255,255,.04);box-shadow:inset 0 0 0 1px rgba(255,255,255,.1)}
+button.ghost::before{display:none}
+button.ghost:hover:not(:disabled){color:#fff;background:rgba(245,158,11,.1);box-shadow:inset 0 0 0 1px rgba(251,177,60,.5),inset 1px 1px 1px -.5px rgba(255,255,255,.5)}
+button.ghost:hover:not(:disabled)::after{animation:none}
+.wide{display:flex;border-radius:18px}.paybtn,.opt{flex-direction:column;gap:2px;border-radius:18px}.paybtn{align-items:center;font-size:17px}.opt{align-items:flex-start;text-align:left;font-size:16px}
+.paybtn span,.opt span,.opt small{font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+.sep{border:0;border-top:1px solid rgba(255,255,255,.08);margin:18px 0}.payhead{margin-top:16px;padding-top:16px;border-top:1px solid rgba(255,255,255,.08)}.payhead h2{font-size:20px}.payhead .muted{margin-top:3px}.paybtn{font-size:17px}
+input,select{background:rgba(255,255,255,.04)}
+`;
+
 function page(title, body, desc, status, bodyClass) {
   const html = '<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">' +
     '<meta name="robots" content="noindex,nofollow"><meta name="referrer" content="no-referrer">' +
     '<title>' + esc(title) + ' · BarnaBank</title><meta property="og:title" content="' + esc(title) + '"><meta property="og:description" content="' + esc(desc || 'BarnaBank') + '">' +
     '<meta name="theme-color" content="#0a0c11"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Geist:wght@500;600;700;800&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">' +
-    '<style>' + CSS + (bodyClass === 'lk' ? LK_CSS : '') + '</style></head><body' + (bodyClass ? ' class="' + bodyClass + '"' : '') + '><main>' +
+    '<style>' + CSS + (bodyClass === 'lk' ? LK_CSS : BTN_CSS) + '</style></head><body' + (bodyClass ? ' class="' + bodyClass + '"' : '') + '><main>' +
     '<div class="brand"><span class="mark">B</span>BarnaBank</div>' + body + '</main>' +
     '</body></html>';
   return new Response(html, {status: status || 200, headers: {'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex'}});
 }
 const CSS = `
-*{box-sizing:border-box}:root{color-scheme:dark}body{margin:0;background:radial-gradient(900px 500px at 0% -10%,rgba(201,162,74,.07),transparent 60%),#0a0c11;color:#eee9da;font:15px/1.45 Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;font-variant-numeric:tabular-nums;min-height:100vh}
-main{max-width:560px;margin:0 auto;padding:20px 16px 40px}.brand{display:flex;align-items:center;gap:10px;font-weight:700;color:#8c92a3;margin:4px 0 16px}
-.mark{width:32px;height:32px;border-radius:9px;background:linear-gradient(155deg,#e8cd8a,#c9a24a);color:#1b1404;display:grid;place-items:center;font-weight:800}
-.card{background:#14171f;border:1px solid #252a36;border-radius:18px;padding:16px;margin-bottom:12px}.center{text-align:center;padding:32px 16px}
-h1,h2,h3{font-family:Geist,Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}.hero h1{font-size:34px;margin:4px 0 2px;line-height:1.15}h1{font-size:24px;margin:6px 0}h2{font-size:16px;margin:0}h3{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:#5a6072;margin:16px 0 4px}
-.muted{color:#8c92a3;display:block;font-size:13px}.small{font-size:12.5px;margin:8px 0 0}p{margin:4px 0}
-.big{display:flex;align-items:baseline;gap:6px;margin:14px 0 8px;flex-wrap:wrap}.big b{font-size:24px;color:#e8cd8a}.big .muted{display:inline}.pct{margin-left:auto;font-weight:700;font-size:18px}
-.bar{display:flex;gap:3px;height:9px}.seg{background:#101319;border-radius:5px;overflow:hidden;min-width:6px}.seg i{display:block;height:100%;background:#c9a24a}.seg.pago i{background:#57b98a}.seg.atrasado{background:rgba(226,102,92,.25)}
-.q-badge{display:inline-flex;align-items:center;gap:4px;flex-shrink:0;border-radius:5px;border:1px solid rgba(87,185,138,.35);background:rgba(87,185,138,.10);color:#57b98a;font-size:11.5px;font-weight:600;line-height:16px;padding:1px 7px;white-space:nowrap}
-.row{display:flex;align-items:center;gap:12px;padding:10px 0;border-top:1px solid #252a36}.row:first-child{border-top:none}.row.slim{padding:8px 0}.grow{flex:1;min-width:0}.grow b{display:block}
-.av{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;font-weight:700;font-size:13px;background:#c9a24a;color:#0a0c11;flex-shrink:0}.av.pago{background:#57b98a}.av.atrasado{background:#e2665c}
-.tag{font-size:12.5px;font-weight:700;padding:4px 10px;border-radius:999px;background:#101319;color:#e8cd8a;white-space:nowrap}.tag.ok{color:#57b98a;background:rgba(87,185,138,.12)}.tag.late{color:#e2665c;background:rgba(226,102,92,.12)}.tag.part{color:#e8cd8a}
-.n{width:30px;color:#8c92a3;font-weight:700}.dh{display:flex;justify-content:space-between;gap:12px}.right{text-align:right}.right b{font-size:18px}
-.prog{height:7px;background:#101319;border-radius:4px;overflow:hidden;margin-top:12px}.prog i{display:block;height:100%;background:#57b98a}
-.okc{color:#57b98a}.latec{color:#e2665c}.pix{display:flex;align-items:center;gap:12px;border-color:rgba(201,162,74,.45)}.pix div{flex:1;min-width:0}.pix code{display:block;font-size:15px;color:#e8cd8a;overflow-wrap:anywhere;margin-top:2px}
-button{background:linear-gradient(155deg,#e8cd8a,#c9a24a);color:#1b1404;border:none;border-radius:12px;padding:10px 16px;font-weight:700;font-size:14px;cursor:pointer}button:disabled{opacity:.6}
-.wide{width:100%;margin-top:10px;padding:13px}.ghost{background:#101319;color:#e8cd8a;border:1px solid rgba(201,162,74,.45)}
-.lbl{display:block;font-size:12.5px;color:#8c92a3;margin:12px 0 5px}.amt{display:flex;align-items:center;gap:8px;background:#101319;border:1px solid #252a36;border-radius:12px;padding:4px 12px}.amt span{color:#8c92a3;font-weight:700}
-input,select{width:100%;background:#101319;border:1px solid #252a36;border-radius:12px;color:#eee9da;font:inherit;padding:11px 12px}.amt input{border:none;padding:8px 0;font-size:20px;font-weight:700;background:transparent}.amt input:focus{outline:none}.amt:focus-within{border-color:#c9a24a}input:focus,select:focus{outline:none;border-color:#c9a24a}
+*{box-sizing:border-box}:root{color-scheme:dark}body{margin:0;background:radial-gradient(900px 500px at 0% -10%,rgba(245,158,11,.07),transparent 60%),#08080b;color:#f4f4f5;font:15px/1.45 Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;font-variant-numeric:tabular-nums;min-height:100vh}
+main{max-width:560px;margin:0 auto;padding:20px 16px 40px}.brand{display:flex;align-items:center;gap:10px;font-weight:700;color:#a1a1aa;margin:4px 0 16px}
+.mark{width:32px;height:32px;border-radius:9px;background:linear-gradient(155deg,#fbb13c,#f59e0b);color:#1c1408;display:grid;place-items:center;font-weight:800}
+.card{background:linear-gradient(180deg,rgba(255,255,255,.04),rgba(255,255,255,.015)),#101014;border:1px solid rgba(255,255,255,.08);box-shadow:inset 0 1px 0 rgba(255,255,255,.05);border-radius:18px;padding:16px;margin-bottom:12px}.center{text-align:center;padding:32px 16px}
+h1,h2,h3{font-family:Geist,Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}.hero h1{font-size:34px;margin:4px 0 2px;line-height:1.15}h1{font-size:24px;margin:6px 0}h2{font-size:16px;margin:0}h3{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:#71717a;margin:16px 0 4px}
+.muted{color:#a1a1aa;display:block;font-size:13px}.small{font-size:12.5px;margin:8px 0 0}p{margin:4px 0}
+.big{display:flex;align-items:baseline;gap:6px;margin:14px 0 8px;flex-wrap:wrap}.big b{font-size:24px;color:#fbb13c}.big .muted{display:inline}.pct{margin-left:auto;font-weight:700;font-size:18px}
+.bar{display:flex;gap:3px;height:9px}.seg{background:rgba(255,255,255,.04);border-radius:5px;overflow:hidden;min-width:6px}.seg i{display:block;height:100%;background:#f59e0b}.seg.pago i{background:#54c79b}.seg.atrasado{background:rgba(239,107,115,.25)}
+.q-badge{display:inline-flex;align-items:center;gap:4px;flex-shrink:0;border-radius:5px;border:1px solid rgba(84,199,155,.35);background:rgba(84,199,155,.10);color:#54c79b;font-size:11.5px;font-weight:600;line-height:16px;padding:1px 7px;white-space:nowrap}
+.row{display:flex;align-items:center;gap:12px;padding:10px 0;border-top:1px solid rgba(255,255,255,.08)}.row:first-child{border-top:none}.row.slim{padding:8px 0}.grow{flex:1;min-width:0}.grow b{display:block}
+.av{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;font-weight:700;font-size:13px;background:#f59e0b;color:#08080b;flex-shrink:0}.av.pago{background:#54c79b}.av.atrasado{background:#ef6b73}
+.tag{font-size:12.5px;font-weight:700;padding:4px 10px;border-radius:999px;background:rgba(255,255,255,.04);color:#fbb13c;white-space:nowrap}.tag.ok{color:#54c79b;background:rgba(84,199,155,.12)}.tag.late{color:#ef6b73;background:rgba(239,107,115,.12)}.tag.part{color:#fbb13c}
+.n{width:30px;color:#a1a1aa;font-weight:700}.dh{display:flex;justify-content:space-between;gap:12px}.right{text-align:right}.right b{font-size:18px}
+.prog{height:7px;background:rgba(255,255,255,.04);border-radius:4px;overflow:hidden;margin-top:12px}.prog i{display:block;height:100%;background:#54c79b}
+.okc{color:#54c79b}.latec{color:#ef6b73}.pix{display:flex;align-items:center;gap:12px;border-color:rgba(245,158,11,.45)}.pix div{flex:1;min-width:0}.pix code{display:block;font-size:15px;color:#fbb13c;overflow-wrap:anywhere;margin-top:2px}
+button{background:linear-gradient(155deg,#fbb13c,#f59e0b);color:#1c1408;border:none;border-radius:12px;padding:10px 16px;font-weight:700;font-size:14px;cursor:pointer}button:disabled{opacity:.6}
+.wide{width:100%;margin-top:10px;padding:13px}.ghost{background:rgba(255,255,255,.04);color:#fbb13c;border:1px solid rgba(245,158,11,.45)}
+.lbl{display:block;font-size:12.5px;color:#a1a1aa;margin:12px 0 5px}.amt{display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:4px 12px}.amt span{color:#a1a1aa;font-weight:700}
+input,select{width:100%;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:12px;color:#f4f4f5;font:inherit;padding:11px 12px}.amt input{border:none;padding:8px 0;font-size:20px;font-weight:700;background:transparent}.amt input:focus{outline:none}.amt:focus-within{border-color:#f59e0b}input:focus,select:focus{outline:none;border-color:#f59e0b}
 input[type=file]{padding:9px}.qr{background:#fff;border-radius:16px;padding:10px;margin:14px auto 10px;width:230px;max-width:80%}.qr img{display:block;width:100%;height:auto}
-.cc code{display:block;font-size:11px;color:#8c92a3;background:#101319;border-radius:10px;padding:9px 10px;overflow-wrap:anywhere;max-height:62px;overflow:hidden}.center-t{text-align:center}
-.cl{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font-weight:700;background:#101319;color:#e8cd8a;flex-shrink:0}.cl.ok{color:#57b98a}.cl.no{color:#e2665c}.claims{margin-top:6px}.okmsg{color:#57b98a;font-weight:700;text-align:center;padding:10px 0}.foot{text-align:center;color:#5a6072;font-size:12px;margin-top:18px}
+.cc code{display:block;font-size:11px;color:#a1a1aa;background:rgba(255,255,255,.04);border-radius:10px;padding:9px 10px;overflow-wrap:anywhere;max-height:62px;overflow:hidden}.center-t{text-align:center}
+.cl{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font-weight:700;background:rgba(255,255,255,.04);color:#fbb13c;flex-shrink:0}.cl.ok{color:#54c79b}.cl.no{color:#ef6b73}.claims{margin-top:6px}.okmsg{color:#54c79b;font-weight:700;text-align:center;padding:10px 0}.foot{text-align:center;color:#71717a;font-size:12px;margin-top:18px}
 `;
 
 // ---------------------------------------------------------------- áudio (Workers AI / Whisper)

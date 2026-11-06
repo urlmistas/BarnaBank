@@ -139,8 +139,12 @@ const pagina = await worker.fetch(new Request('https://x.workers.dev/s/' + tk, {
 const html = await pagina.text();
 assert.equal(pagina.status, 200);
 assert.match(html, /id="payja"/);
-assert.match(html, /Pague já!/);
-assert.match(html, /Evite atrasar esta dívida pagando já!/);
+assert.match(html, /Pague agora!/);
+assert.match(html, /Evite atrasar esta dívida pagando agora!/);
+assert.match(html, /<button class="wide paybtn" id="payja"[^>]*>Pague<\/button>/, 'o botão só diz Pague');
+assert.match(html, /class="card hero"[\s\S]*?<h2>Pague agora!<\/h2>[\s\S]*?id="payja"/, 'título e botão no mesmo card do topo');
+assert.ok(!html.includes('class="card paybox" id="pagar"'), 'sem card separado para o botão');
+assert.match(html, /<h2>Já pagou\?<\/h2>[\s\S]*?<hr class="sep">[\s\S]*?<h2>Precisa de mais prazo\?<\/h2>/, 'Já pagou e prazo no mesmo card');
 assert.match(html, /<dialog id="pdlg">/);
 assert.match(html, /Oi, Bia! Você ainda tem/);
 assert.match(html, /em aberto comigo/);
