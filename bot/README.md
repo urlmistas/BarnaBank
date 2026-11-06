@@ -188,4 +188,7 @@ Para ligar, crie um aplicativo em mercadopago.com.br/developers e cadastre estes
 - `MP_WEBHOOK_SECRET`: a "assinatura secreta" da notificação Webhooks (evento Pagamentos), com a URL `https://<seu-worker>.workers.dev/mp`
 - `MP_UIDS` (opcional): ids das contas que podem gerar Pix, separados por vírgula. O dinheiro cai na conta Mercado Pago dona do token, então use isto se mais de uma pessoa usa o bot.
 
+### Cartão no link de cobrança
+Com os mesmos segredos, o link `/s/<token>` de uma pessoa ganha **Pagar com cartão** (Checkout Pro, só cartão). O valor cobrado é o da dívida mais a taxa do cartão (`base ÷ (1 - 0,0498)`, arredondado para cima); o PIX continua direto, sem taxa. O aviso cai no mesmo `/mp` e a baixa é só o valor da dívida (`metadata.base_amount`). Links de grupo e de "eu devo" não têm cartão. `MP_TAXA_CARTAO` (opcional, ex.: `0.0498`) muda a taxa quando o Mercado Pago mudar.
+
 Cada aviso só dá baixa uma vez por pagamento. O aviso é conferido pela assinatura e pela consulta do pagamento na API do Mercado Pago. Teste: `node bot/tests/test_mercadopago.mjs`.
