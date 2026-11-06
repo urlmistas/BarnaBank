@@ -142,6 +142,11 @@ assert.match(html, /id="payja"/);
 assert.match(html, /Pague já!/);
 assert.match(html, /Evite atrasar esta dívida pagando já!/);
 assert.match(html, /<dialog id="pdlg">/);
+assert.match(html, /Oi, Bia! Você ainda tem/);
+assert.match(html, /em aberto comigo/);
+assert.match(html, /Proponha uma nova data para o pagamento, iremos analisá-la\./);
+assert.match(html, /family=Geist:[^"]*family=Inter:/, 'Geist nos títulos e Inter no resto');
+assert.match(html, /h1,h2,h3\{font-family:Geist/);
 assert.match(html, /var TX=0\.0498;/);
 assert.ok(!html.includes('id="cc"'), 'sem o Pix direto quando o Mercado Pago está ligado');
 for (const m of html.matchAll(/<script>([\s\S]*?)<\/script>/g)) new Function(m[1]); // o JS da página tem de compilar

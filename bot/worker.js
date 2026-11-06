@@ -2232,9 +2232,9 @@ async function sharePage(env, token, v) {
         ? '<h1>' + brl(v.remaining) + '</h1><p class="muted">falta pagar' + (v.late > 0 ? ' · <span class="latec">' + brl(v.late) + ' atrasado</span>' : '') + '</p>'
         : '<h1>Tudo pago 🎉</h1><p class="muted">Não deve mais nada por enquanto.</p>') +
       (v.donePaid > 0 || v.debts.some(d => d.paid > 0) ? '<p class="muted small">Já pago: ' + brl(v.donePaid + v.debts.reduce((a, d) => a + d.paid, 0)) + '</p>' : '') + '</div>'
-    : '<div class="card hero"><span class="muted">Oi, ' + esc(v.name) + '!</span>' +
+    : '<div class="card hero"><span class="muted">Oi, ' + esc(v.name) + '!' + (v.remaining > 0 ? ' Você ainda tem' : '') + '</span>' +
     (v.remaining > 0
-      ? '<h1>' + brl(v.remaining) + '</h1><p class="muted">em aberto com ' + owner + (v.late > 0 ? ' · <span class="latec">' + brl(v.late) + ' atrasado</span>' : '') + '</p>'
+      ? '<h1>' + brl(v.remaining) + '</h1><p class="muted">em aberto comigo' + (v.late > 0 ? ' · <span class="latec">' + brl(v.late) + ' atrasado</span>' : '') + '</p>'
       : '<h1>Tudo quitado 🎉</h1><p class="muted">Você não deve nada para ' + owner + '. Valeu!</p>') +
     (v.doneCount ? '<p class="muted small">' + v.doneCount + ' dívida(s) já quitada(s), ' + brl(v.donePaid) + ' pagos.</p>' : '') + '</div>';
   if (owe) return owePage(v, v.owner || '');
@@ -2325,7 +2325,7 @@ function prazoBlock(v, claims) {
   const list = mine.map(c => '<div class="row slim"><span class="cl ' + c.status + '">' + (c.status === 'ok' ? '✓' : c.status === 'no' ? '✕' : '⏳') + '</span><div class="grow"><b>Até ' + fmtFull(c.newDate) + (c.whoName && v.type === 'group' ? ' · ' + esc(c.whoName) : '') + '</b><span class="muted">pedido em ' + fmtFull(c.at.slice(0, 10)) +
     (c.status === 'ok' ? ' · aceito, a nova data já vale' : c.status === 'no' ? ' · não aceito, fale com quem te mandou' : ' · aguardando resposta') + '</span></div></div>').join('');
   const pendingAll = v.type !== 'group' && mine.some(c => c.status === 'pending');
-  return '<div class="card"><h2>Precisa de mais prazo?</h2><p class="muted small">Proponha uma nova data. A pessoa recebe o pedido e a resposta aparece aqui.</p>' +
+  return '<div class="card"><h2>Precisa de mais prazo?</h2><p class="muted small">Proponha uma nova data para o pagamento, iremos analisá-la.</p>' +
     (list ? '<div class="claims">' + list + '</div>' : '') +
     (pendingAll ? '' : '<button class="wide ghost" id="przOpen" onclick="document.getElementById(\'przForm\').hidden=false;this.hidden=true">Pedir mais prazo</button>' +
     '<form id="przForm" hidden onsubmit="return sendPrazo(event)">' +
@@ -2647,7 +2647,7 @@ function page(title, body, desc, status, bodyClass) {
   const html = '<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">' +
     '<meta name="robots" content="noindex,nofollow"><meta name="referrer" content="no-referrer">' +
     '<title>' + esc(title) + ' · BarnaBank</title><meta property="og:title" content="' + esc(title) + '"><meta property="og:description" content="' + esc(desc || 'BarnaBank') + '">' +
-    '<meta name="theme-color" content="#0a0c11"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">' +
+    '<meta name="theme-color" content="#0a0c11"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Geist:wght@500;600;700;800&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">' +
     '<style>' + CSS + (bodyClass === 'lk' ? LK_CSS : '') + '</style></head><body' + (bodyClass ? ' class="' + bodyClass + '"' : '') + '><main>' +
     '<div class="brand"><span class="mark">B</span>BarnaBank</div>' + body + '</main>' +
     '</body></html>';
@@ -2658,7 +2658,7 @@ const CSS = `
 main{max-width:560px;margin:0 auto;padding:20px 16px 40px}.brand{display:flex;align-items:center;gap:10px;font-weight:700;color:#8c92a3;margin:4px 0 16px}
 .mark{width:32px;height:32px;border-radius:9px;background:linear-gradient(155deg,#e8cd8a,#c9a24a);color:#1b1404;display:grid;place-items:center;font-weight:800}
 .card{background:#14171f;border:1px solid #252a36;border-radius:18px;padding:16px;margin-bottom:12px}.center{text-align:center;padding:32px 16px}
-.hero h1{font-size:34px;margin:4px 0 2px;line-height:1.15}h1{font-size:24px;margin:6px 0}h2{font-size:16px;margin:0}h3{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:#5a6072;margin:16px 0 4px}
+h1,h2,h3{font-family:Geist,Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}.hero h1{font-size:34px;margin:4px 0 2px;line-height:1.15}h1{font-size:24px;margin:6px 0}h2{font-size:16px;margin:0}h3{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:#5a6072;margin:16px 0 4px}
 .muted{color:#8c92a3;display:block;font-size:13px}.small{font-size:12.5px;margin:8px 0 0}p{margin:4px 0}
 .big{display:flex;align-items:baseline;gap:6px;margin:14px 0 8px;flex-wrap:wrap}.big b{font-size:24px;color:#e8cd8a}.big .muted{display:inline}.pct{margin-left:auto;font-weight:700;font-size:18px}
 .bar{display:flex;gap:3px;height:9px}.seg{background:#101319;border-radius:5px;overflow:hidden;min-width:6px}.seg i{display:block;height:100%;background:#c9a24a}.seg.pago i{background:#57b98a}.seg.atrasado{background:rgba(226,102,92,.25)}
