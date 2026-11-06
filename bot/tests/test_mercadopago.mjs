@@ -115,7 +115,7 @@ assert.equal(r.status, 200);
 const dep = JSON.parse(store.get('snapshot')).debts[0];
 assert.equal(dep.payments.length, 1);
 assert.equal(dep.payments[0].amount, 100);
-assert.ok(sent.some(m => String(m.chat_id) === '111' && /Recebido/.test(m.text)), 'avisou no Telegram: ' + JSON.stringify(sent.map(m => m.text)));
+assert.ok(sent.some(m => String(m.chat_id) === '111' && /Pagamento recebido!/.test(m.text) && /Recebido/.test(m.text)), 'avisou no Telegram: ' + JSON.stringify(sent.map(m => m.text)));
 
 // ---- o Mercado Pago repete o aviso: não dá baixa duas vezes
 r = await aviso(777, assinar(777, 'req-3'), 'req-3');
@@ -132,46 +132,80 @@ assert.equal(valorCartao(100), 105.25);
 assert.equal(valorCartao(0.01), 0.02);
 assert.ok(valorCartao(237.9) * (1 - 0.0498) >= 237.9 - 1e-9);
 
-// ---- cartão pelo link de cobrança: página, valor com taxa, referência e baixa só do valor da dívida
+// ---- link de cobrança: um botão "Pague já!" que abre o popup Pix / cartão
 const tk = 'TOKENBIA1234567890AB';
 store.set('share:' + tk, JSON.stringify({type: 'person', name: 'Bia', owner: 'Dono', remaining: 200, suggest: 200, late: 0, debts: [], updatedAt: new Date().toISOString()}));
 const pagina = await worker.fetch(new Request('https://x.workers.dev/s/' + tk, {headers: {'User-Agent': 'Mozilla/5.0'}}), env, ctx);
 const html = await pagina.text();
 assert.equal(pagina.status, 200);
-assert.match(html, /id="cartao"/);
+assert.match(html, /id="payja"/);
+assert.match(html, /Pague já!/);
+assert.match(html, /Evite atrasar esta dívida pagando já!/);
+assert.match(html, /<dialog id="pdlg">/);
 assert.match(html, /var TX=0\.0498;/);
+assert.ok(!html.includes('id="cc"'), 'sem o Pix direto quando o Mercado Pago está ligado');
+for (const m of html.matchAll(/<script>([\s\S]*?)<\/script>/g)) new Function(m[1]); // o JS da página tem de compilar
 const cartao = (amount, h = {}) => call('/s/' + tk + '/cartao', 'POST', h, {amount});
-let rc = await cartao(0.5);
-assert.equal(rc.status, 400);
-rc = await cartao(250);
-assert.equal(rc.status, 400, 'acima do que falta');
+const pixLink = (amount, h = {}) => call('/s/' + tk + '/pix', 'POST', h, {amount});
+
+// valores inválidos: nada é criado
+assert.equal((await cartao(0.5)).status, 400);
+assert.equal((await cartao(250)).status, 400, 'acima do que falta');
+assert.equal((await pixLink(250)).status, 400, 'acima do que falta');
 assert.equal(prefCalls.length, 0);
-rc = await cartao(200);
+
+// cartão: valor com a taxa, referência e só cartão
+let rc = await cartao(120);
 assert.equal(rc.status, 200);
 assert.match(rc.body.url, /^https:\/\/www\.mercadopago\.com\.br\/checkout/);
-assert.equal(rc.body.total, 210.49);
+assert.equal(rc.body.total, valorCartao(120));
 assert.equal(prefCalls.length, 1);
 const pref = prefCalls[0].body;
-assert.equal(pref.items[0].unit_price, 210.49);
-assert.equal(pref.metadata.base_amount, 200);
+assert.equal(pref.items[0].unit_price, valorCartao(120));
+assert.equal(pref.metadata.base_amount, 120);
 assert.equal(pref.external_reference, 'bb:-:' + keyBia);
 assert.equal(pref.notification_url, 'https://x.workers.dev/mp');
 assert.deepEqual(pref.payment_methods.excluded_payment_types.map(t => t.id).sort(), ['atm', 'bank_transfer', 'ticket']);
 assert.equal(prefCalls[0].headers.Authorization, 'Bearer ' + env.MP_ACCESS_TOKEN);
 
-// cartão aprovado: cobrou 210,48, mas a dívida baixa R$ 200,00
-pagamento = {id: 901, status: 'approved', transaction_amount: 210.49, metadata: {base_amount: 200}, external_reference: 'bb:-:' + keyBia};
+// Pix pelo link: o valor da dívida, sem taxa
+const antesPix = mpCalls.length;
+const rp = await pixLink(80);
+assert.equal(rp.status, 200);
+assert.equal(rp.body.code, '00020126PIXCOPIAECOLA');
+assert.match(rp.body.svg, /<svg/);
+assert.equal(mpCalls.length, antesPix + 1);
+const pixBody = mpCalls[mpCalls.length - 1].body;
+assert.equal(pixBody.transaction_amount, 80);
+assert.equal(pixBody.payment_method_id, 'pix');
+assert.equal(pixBody.external_reference, 'bb:-:' + keyBia);
+
+// cartão aprovado: cobrou com a taxa, mas a dívida baixa só R$ 120,00 e o aviso diz que foi no cartão
+pagamento = {id: 901, status: 'approved', transaction_amount: valorCartao(120), payment_type_id: 'credit_card', payment_method_id: 'visa', metadata: {base_amount: 120}, external_reference: 'bb:-:' + keyBia};
+sent.length = 0;
 r = await aviso(901, assinar(901, 'req-c1'), 'req-c1');
 assert.equal(r.status, 200);
-const bia = JSON.parse(store.get('snapshot')).debts[1];
+let bia = JSON.parse(store.get('snapshot')).debts[1];
 assert.equal(bia.payments.length, 1);
-assert.equal(bia.payments[0].amount, 200);
+assert.equal(bia.payments[0].amount, 120);
+assert.ok(sent.some(m => /Pagamento recebido no cartão!/.test(m.text)), 'aviso do cartão: ' + JSON.stringify(sent.map(m => m.text)));
 
-// link de grupo não oferece cartão
+// Pix aprovado: baixa o valor, e o aviso diz que foi no Pix
+pagamento = {id: 902, status: 'approved', transaction_amount: 80, payment_type_id: 'bank_transfer', payment_method_id: 'pix', external_reference: 'bb:-:' + keyBia};
+sent.length = 0;
+r = await aviso(902, assinar(902, 'req-p1'), 'req-p1');
+assert.equal(r.status, 200);
+bia = JSON.parse(store.get('snapshot')).debts[1];
+assert.equal(bia.payments.length, 2);
+assert.equal(bia.payments[1].amount, 80);
+assert.ok(sent.some(m => /Pagamento recebido no Pix!/.test(m.text)), 'aviso do Pix: ' + JSON.stringify(sent.map(m => m.text)));
+
+// link de grupo não tem o botão nem as rotas
 store.set('share:TOKENGRUPO1234567890', JSON.stringify({type: 'group', title: 'Churrasco', owner: 'Dono', members: [{name: 'X', total: 10, paid: 0, remaining: 10, state: 'pendente'}], remaining: 10, owed: 10, paid: 0, total: 10, myShare: 0, date: today, updatedAt: new Date().toISOString()}));
 const pg = await worker.fetch(new Request('https://x.workers.dev/s/TOKENGRUPO1234567890', {headers: {'User-Agent': 'Mozilla/5.0'}}), env, ctx);
-assert.ok(!(await pg.text()).includes('id="cartao"'));
+assert.ok(!(await pg.text()).includes('id="payja"'));
 assert.equal((await call('/s/TOKENGRUPO1234567890/cartao', 'POST', {}, {amount: 10})).status, 400);
+assert.equal((await call('/s/TOKENGRUPO1234567890/pix', 'POST', {}, {amount: 10})).status, 400);
 
 // ---- recurso desligado (sem segredos): sem botão e o /mp recusa
 const ligado = {t: env.MP_ACCESS_TOKEN, s: env.MP_WEBHOOK_SECRET};
@@ -180,6 +214,7 @@ assert.equal((await aviso(999, 'ts=1,v1=aa')).status, 403);
 out = await tgUpdate({message: {message_id: 2, chat: {id: 111}, from: {first_name: 'T'}, text: '/cobrar Ana'}});
 assert.ok(!out.flatMap(m => (m.reply_markup && m.reply_markup.inline_keyboard || []).flat()).some(b => /^pix:/.test(b.callback_data || '')), 'sem botão quando desligado');
 assert.equal((await cartao(10)).status, 400, 'sem segredos, sem cartão');
+assert.equal((await pixLink(10)).status, 400, 'sem segredos, sem Pix');
 env.MP_ACCESS_TOKEN = ligado.t; env.MP_WEBHOOK_SECRET = ligado.s;
 
 console.log('ok test_mercadopago');

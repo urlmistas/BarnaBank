@@ -421,7 +421,9 @@ async function mpHook(req, env, url) {
     // cartão: a taxa vai junto no valor cobrado, mas a baixa é só o valor da dívida (metadata.base_amount)
     const base = Number(p.metadata && p.metadata.base_amount);
     const valor = Math.round((base > 0 ? base : Number(p.transaction_amount)) * 100) / 100;
-    await launchOp(sc, owner, {type: 'pay', kind: 'receivable', name: c.name, amount: valor}, 'Pix Mercado Pago #' + p.id);
+    const tipo = String(p.payment_type_id || '');
+    const via = p.payment_method_id === 'pix' || tipo === 'bank_transfer' ? 'pix' : /card/.test(tipo) ? 'cartao' : '';
+    await launchOp(sc, owner, {type: 'pay', kind: 'receivable', name: c.name, amount: valor, via}, 'Mercado Pago #' + p.id);
   } catch (e) {
     if (sc.BB.delete) await sc.BB.delete(dedupe);
     return json({error: 'falhou'}, 500);
@@ -1380,7 +1382,7 @@ async function launchOp(env, chat, op, text) {
     return say(env, chat, '🎯 <b>' + esc(gl.name) + '</b>: ' + brl(gl.saved) + ' de ' + brl(gl.target) + ' (' + gl.pct + '%)' + (gl.pct >= 100 ? ' 🎉 Meta batida!' : '') + extra, {reply_markup: {inline_keyboard: [undoBtn]}});
   }
   // notificação do banco
-  const head = op.repeat ? '🔁 Repetido' : '🏦 ' + (op.bank ? esc(op.bank) + ' · ' : '') + (op.type === 'pay' ? 'pagamento' : op.card ? 'compra no cartão' : op.kind === 'entrada' ? 'entrada' : 'gasto');
+  const head = op.repeat ? '🔁 Repetido' : op.type === 'pay' && op.kind === 'receivable' ? (op.via === 'pix' ? '💰 <b>Pagamento recebido no Pix!</b>' : op.via === 'cartao' ? '💳 <b>Pagamento recebido no cartão!</b>' : '💰 <b>Pagamento recebido!</b>') : '🏦 ' + (op.bank ? esc(op.bank) + ' · ' : '') + (op.type === 'pay' ? 'pagamento' :op.card ? 'compra no cartão' : op.kind === 'entrada' ? 'entrada' : 'gasto');
   await pushRecent(env, op, r ? esc(r.msg) : describe(op));
   return say(env, chat, head + '\n✅ ' + (r ? esc(r.msg) : describe(op)) + later, {reply_markup: {inline_keyboard: [undoBtn]}});
 }
@@ -2062,6 +2064,7 @@ async function shareRoute(req, url, env, ctx) {
     return json({code, svg: qrSvg(code)});
   }
   if (parts[2] === 'cartao' && req.method === 'POST') return cartaoCreate(req, env, token, v, url.origin);
+  if (parts[2] === 'pix' && req.method === 'POST') return pixCreate(req, env, token, v, url.origin);
   if (parts[2] === 'pago' && req.method === 'POST') return claimCreate(req, env, token, v);
   if (parts[2] === 'prazo' && req.method === 'POST') return prazoCreate(req, env, token, v);
   if (parts.length > 2) return json({error: 'not found'}, 404);
@@ -2069,35 +2072,56 @@ async function shareRoute(req, url, env, ctx) {
   if (!BOT_UA.test(req.headers.get('User-Agent') || '') && ctx && ctx.waitUntil) ctx.waitUntil(trackView(env, token, v).catch(() => {}));
   return sharePage(env, token, v);
 }
-// ---------------------------------------------------------------- cartão pelo Mercado Pago (Checkout Pro)
+// ---------------------------------------------------------------- "Pague já!": Pix e cartão pelo Mercado Pago
 // Só em link de uma pessoa (não grupo, não "eu devo"). O valor da dívida vem do link; a taxa do cartão é somada aqui,
-// nunca vem do navegador. O aviso do pagamento cai em /mp, que dá baixa só no valor da dívida.
-const cartaoOk = (env, v) => mpLigado(env) && !!v && v.type !== 'group' && v.dir !== 'owe' && v.remaining > 0;
-function cardBlock(env, v, amount) {
-  if (!cartaoOk(env, v)) return '';
-  return '<div class="card paybox" id="cartao"><h2>Pagar com cartão</h2>' +
-    '<label class="lbl" for="camt">Valor da dívida</label><div class="amt"><span>R$</span><input id="camt" inputmode="decimal" autocomplete="off" value="' + Number(amount).toFixed(2).replace('.', ',') + '"></div>' +
-    '<p class="muted small" id="ctot"></p>' +
-    '<button class="wide" id="cardgo" onclick="payCard()">Pagar com cartão</button><p class="muted small" id="cmsg"></p>' +
-    '<p class="muted small center-t">O cartão tem a taxa do Mercado Pago somada ao valor. No PIX não tem taxa.</p></div>';
+// nunca vem do navegador. O Pix não tem taxa para quem paga (quem recebe absorve). O aviso cai em /mp, que dá baixa só no valor da dívida.
+const mpLinkOk = (env, v) => mpLigado(env) && !!v && v.type !== 'group' && v.dir !== 'owe' && v.remaining > 0;
+function payNowBlock(env, v, amount) {
+  if (!mpLinkOk(env, v)) return '';
+  const ch = payChoices(v);
+  const sel = ch.length ? '<label class="lbl" for="dwhich">O que você vai pagar</label><select id="dwhich">' +
+    ch.map((c, i) => '<option value="' + c.value + '" data-amt="' + Number(c.amt).toFixed(2) + '"' + (Math.abs(c.amt - amount) < 0.005 ? ' selected' : '') + '>' + esc(c.label) + '</option>').join('') + '</select>' : '';
+  return '<style>#pdlg{background:#14171f;color:#eee9da;border:1px solid #252a36;border-radius:18px;padding:18px;width:min(420px,92vw)}#pdlg::backdrop{background:rgba(0,0,0,.65)}' +
+    '.opt{display:block;width:100%;text-align:left;margin-top:10px;padding:14px 16px}.opt span,.opt small{display:block;font-weight:500}.opt small{font-size:12px;opacity:.8}.paybtn{padding:16px}.paybtn span{display:block;font-weight:500;font-size:13px;margin-top:3px}</style>' +
+    '<div class="card paybox" id="pagar"><button class="wide paybtn" id="payja" onclick="openPay()">Pague já!<span>Evite atrasar esta dívida pagando já!</span></button></div>' +
+    '<dialog id="pdlg"><h2>Como você quer pagar?</h2>' + sel +
+    '<label class="lbl" for="damt">Valor da dívida</label><div class="amt"><span>R$</span><input id="damt" inputmode="decimal" autocomplete="off" value="' + Number(amount).toFixed(2).replace('.', ',') + '"></div>' +
+    '<button class="opt" id="optPix" onclick="payPix()">Pix<span id="ptot"></span><small>Pagamento na hora, sem taxa</small></button>' +
+    '<button class="opt ghost" id="optCard" onclick="payCard()">Cartão de crédito ou débito<span id="ctot"></span></button>' +
+    '<p class="muted small" id="pmsg2"></p>' +
+    '<div id="pixres" hidden><div class="qr"><img id="pqr" alt="QR Code do PIX"></div><div class="cc"><code id="pcc"></code></div>' +
+    '<button class="wide" onclick="copyEl(\'pcc\',this)">Copiar código PIX</button><p class="muted small center-t">No app do banco: PIX → <b>Copia e cola</b> (ou leia o QR). Depois de pagar, a baixa é automática.</p></div>' +
+    '<button class="wide ghost" onclick="closePay()">Fechar</button></dialog>';
 }
-async function cartaoCreate(req, env, token, v, origin) {
-  if (!v) return json({error: 'Link desativado.'}, 404);
-  if (!cartaoOk(env, v)) return json({error: 'Cartão indisponível neste link.'}, 400);
+// valida o pedido do popup e acha a cobrança; devolve {erro: Response} ou {base, c}
+async function linkCharge(req, env, token, v) {
+  if (!v) return {erro: json({error: 'Link desativado.'}, 404)};
+  if (!mpLinkOk(env, v)) return {erro: json({error: 'Pagamento online indisponível neste link.'}, 400)};
   const rate = await getJSON(env, 'crate:' + token, {n: 0, t: 0});
   if (Date.now() - rate.t > 3600000) { rate.n = 0; rate.t = Date.now(); }
-  if (rate.n >= 10) return json({error: 'Muitas tentativas seguidas. Tente de novo em uma hora.'}, 429);
+  if (rate.n >= 10) return {erro: json({error: 'Muitas tentativas seguidas. Tente de novo em uma hora.'}, 429)};
   const body = await req.json().catch(() => null);
   const base = Math.round((+(body && body.amount) || 0) * 100) / 100;
-  if (!(base >= 1 && base <= v.remaining + 0.005 && base <= 100000)) return json({error: 'Valor inválido. Use de R$ 1,00 até o que falta pagar.'}, 400);
+  if (!(base >= 1 && base <= v.remaining + 0.005 && base <= 100000)) return {erro: json({error: 'Valor inválido. Use de R$ 1,00 até o que falta pagar.'}, 400)};
   const c = findCharge(await getJSON(env, 'summary', null), v.name);
-  if (!c) return json({error: 'Não achei essa cobrança. Fale com quem te mandou.'}, 404);
+  if (!c) return {erro: json({error: 'Não achei essa cobrança. Fale com quem te mandou.'}, 404)};
   rate.n++; await putJSON(env, 'crate:' + token, rate);
-  const tot = valorCartao(base, taxaCartao(env));
-  const volta = origin + '/s/' + token;
-  const pref = await criarPreferenciaCartao(env, {titulo: 'Cobrança ' + c.name, valor: tot, base, ref: montarRef(env.uid, c.key), aviso: origin + '/mp', volta});
-  if (pref.erro) return json({error: 'Não consegui abrir o pagamento. Tente de novo ou use o PIX.'}, 502);
+  return {base, c};
+}
+async function cartaoCreate(req, env, token, v, origin) {
+  const k = await linkCharge(req, env, token, v);
+  if (k.erro) return k.erro;
+  const tot = valorCartao(k.base, taxaCartao(env));
+  const pref = await criarPreferenciaCartao(env, {titulo: 'Cobrança ' + k.c.name, valor: tot, base: k.base, ref: montarRef(env.uid, k.c.key), aviso: origin + '/mp', volta: origin + '/s/' + token});
+  if (pref.erro) return json({error: 'Não consegui abrir o pagamento. Tente de novo ou use o Pix.'}, 502);
   return json({ok: true, url: pref.url, total: pref.valor});
+}
+async function pixCreate(req, env, token, v, origin) {
+  const k = await linkCharge(req, env, token, v);
+  if (k.erro) return k.erro;
+  const pix = await criarPix(env, {valor: k.base, descricao: 'Cobrança ' + k.c.name, ref: montarRef(env.uid, k.c.key), aviso: origin + '/mp'});
+  if (pix.erro) return json({error: 'Não consegui gerar o Pix. Tente de novo ou use o cartão.'}, 502);
+  return json({ok: true, code: pix.qr, svg: qrSvg(pix.qr), total: pix.valor});
 }
 async function trackView(env, token, v) {
   const now = new Date().toISOString();
@@ -2170,7 +2194,7 @@ async function sharePage(env, token, v) {
   const open = v.type === 'group' ? v.remaining > 0 : v.remaining > 0;
   const suggest = v.type === 'group' ? ((v.members.find(m => m.remaining > 0) || {}).remaining || 0) : (v.suggest || v.remaining || 0);
   const owe = v.dir === 'owe';
-  const pay = owe ? '' : open ? pixBlock(token, v, suggest, owner) + cardBlock(env, v, suggest) + paidBlock(v, claims) + prazoBlock(v, claims) : (claims.some(c => c.kind !== 'prazo') ? paidBlock(v, claims) : '');
+  const pay = owe ? '' : open ? (mpLinkOk(env, v) ? payNowBlock(env, v, suggest) : pixBlock(token, v, suggest, owner)) + paidBlock(v, claims) + prazoBlock(v, claims) : (claims.some(c => c.kind !== 'prazo') ? paidBlock(v, claims) : '');
   const script = '<script>var TK=' + JSON.stringify(token) + ';var TX=' + taxaCartao(env) + ';' + PAGE_JS + '</script>';
   if (v.type === 'group') {
     const pct = v.owed > 0 ? Math.min(100, Math.round(v.paid / v.owed * 100)) : 0;
@@ -2220,15 +2244,19 @@ const PAGE_JS = `
 function copyEl(id,b){var t=document.getElementById(id).textContent;var done=function(){b.textContent="Copiado ✓";setTimeout(function(){b.textContent=b.getAttribute("data-l")||"Copiar"},2500)};b.setAttribute("data-l",b.getAttribute("data-l")||b.textContent);(navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(done,function(){var r=document.createRange();r.selectNode(document.getElementById(id));getSelection().removeAllRanges();getSelection().addRange(r);b.textContent="Selecionado: copie"})}
 function num(s){s=String(s||"").replace(/[^0-9,\\.]/g,"");if(s.indexOf(",")>=0)s=s.replace(/\\./g,"").replace(",",".");var v=parseFloat(s);return isNaN(v)?0:v}
 var amt=document.getElementById("amt"),tm;
-var camt=document.getElementById("camt");
+var dmt=document.getElementById("damt"),dw=document.getElementById("dwhich");
 function brl2(n){return n.toFixed(2).replace(".",",")}
 function cardTot(b){return Math.ceil(b/(1-TX)*100-1e-9)/100}
-function showCard(){var t=document.getElementById("ctot");if(!camt||!t)return;var b=num(camt.value);t.textContent=b>=1?"Total no cartão: R$ "+brl2(cardTot(b))+" (dívida R$ "+brl2(b)+" + taxa R$ "+brl2(cardTot(b)-b)+")":"Informe o valor (mínimo R$ 1,00)."}
-function syncCard(){if(camt&&amt){camt.value=amt.value}showCard()}
-if(camt){camt.addEventListener("input",showCard);showCard()}
-function payCard(){var b=document.getElementById("cardgo"),m=document.getElementById("cmsg"),v=num(camt.value);if(!(v>=1)){m.textContent="Informe o valor (mínimo R$ 1,00).";return}b.disabled=true;b.textContent="Abrindo…";m.textContent="";
-fetch("/s/"+TK+"/cartao",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({amount:v})}).then(function(r){return r.json().then(function(j){return{ok:r.ok,j:j}})}).then(function(x){if(x.ok&&x.j.url){location.href=x.j.url}else{m.textContent=x.j.error||"Não deu certo, tente de novo.";b.disabled=false;b.textContent="Pagar com cartão"}}).catch(function(){m.textContent="Sem conexão, tente de novo.";b.disabled=false;b.textContent="Pagar com cartão"})}
-function upd(){syncCard();clearTimeout(tm);tm=setTimeout(function(){fetch("/s/"+TK+"/pix.json?v="+num(amt.value)).then(function(r){return r.json()}).then(function(j){if(!j.code)return;document.getElementById("cc").textContent=j.code;document.getElementById("qr").src="data:image/svg+xml;base64,"+btoa(j.svg)})},350)}
+function showTot(){var p=document.getElementById("ptot"),c=document.getElementById("ctot");if(!dmt||!p)return;var b=num(dmt.value);if(b>=1){p.textContent="R$ "+brl2(b);c.textContent="R$ "+brl2(cardTot(b))+" (com a taxa do cartão)"}else{p.textContent="Informe o valor (mínimo R$ 1,00)";c.textContent=""}}
+function openPay(){var d=document.getElementById("pdlg");document.getElementById("pixres").hidden=true;document.getElementById("pmsg2").textContent="";showTot();if(d.showModal)d.showModal();else d.setAttribute("open","")}
+function closePay(){var d=document.getElementById("pdlg");if(d.close)d.close();else d.removeAttribute("open")}
+if(dmt)dmt.addEventListener("input",showTot);
+if(dw)dw.addEventListener("change",function(){dmt.value=dw.options[dw.selectedIndex].getAttribute("data-amt").replace(".",",");showTot()});
+function payGo(kind,btn){var m=document.getElementById("pmsg2"),v=num(dmt.value);if(!(v>=1)){m.textContent="Informe o valor (mínimo R$ 1,00).";return}btn.disabled=true;m.textContent="Aguarde…";
+fetch("/s/"+TK+"/"+kind,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({amount:v})}).then(function(r){return r.json().then(function(j){return{ok:r.ok,j:j}})}).then(function(x){btn.disabled=false;if(!x.ok){m.textContent=x.j.error||"Não deu certo, tente de novo.";return}m.textContent="";if(kind==="cartao"&&x.j.url){location.href=x.j.url}else if(x.j.code){document.getElementById("pqr").src="data:image/svg+xml;base64,"+btoa(x.j.svg);document.getElementById("pcc").textContent=x.j.code;document.getElementById("pixres").hidden=false}}).catch(function(){btn.disabled=false;m.textContent="Sem conexão, tente de novo."})}
+function payPix(){payGo("pix",document.getElementById("optPix"))}
+function payCard(){payGo("cartao",document.getElementById("optCard"))}
+function upd(){clearTimeout(tm);tm=setTimeout(function(){fetch("/s/"+TK+"/pix.json?v="+num(amt.value)).then(function(r){return r.json()}).then(function(j){if(!j.code)return;document.getElementById("cc").textContent=j.code;document.getElementById("qr").src="data:image/svg+xml;base64,"+btoa(j.svg)})},350)}
 if(amt)amt.addEventListener("input",upd);
 var who=document.getElementById("who");if(who)who.addEventListener("change",function(){amt.value=who.options[who.selectedIndex].getAttribute("data-amt").replace(".",",");upd()});
 var which=document.getElementById("which");function useWhich(){amt.value=which.options[which.selectedIndex].getAttribute("data-amt").replace(".",",");var pa=document.getElementById("pamt");if(pa)pa.value=amt.value;var pl=document.getElementById("pwhichl");if(pl)pl.textContent=which.options[which.selectedIndex].textContent;upd()}
