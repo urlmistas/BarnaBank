@@ -100,21 +100,21 @@ function PessoasReady({ data, today }: { data: AppData; today: string }) {
           <div className="flex items-center gap-2">
             {data.debts.some((d) => d.kind === 'receivable') && (
               <Button
-                size="sm"
-                variant="outline"
+                size="icon"
+                variant="ghost"
+                aria-label="Ranking"
+                title="Ranking dos pagadores"
                 onClick={() => {
                   const html = rankingHtml(rankingRows(data.debts, today), { ...doc, issuedAt: new Date() })
                   if (!openPrintWindow(html)) toast.show('Seu navegador bloqueou a nova janela. Permita pop-ups para este site e tente de novo.')
                 }}
               >
                 <Trophy aria-hidden="true" />
-                Ranking
               </Button>
             )}
             {data.debts.some((d) => d.kind === 'receivable') && (
-              <Button size="sm" variant="outline" onClick={() => setBoard(true)}>
+              <Button size="icon" variant="ghost" aria-label="Placar" title="Placar" onClick={() => setBoard(true)}>
                 <Medal aria-hidden="true" />
-                Placar
               </Button>
             )}
             {canCreate && (

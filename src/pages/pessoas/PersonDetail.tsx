@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
-import { ArrowLeft, Check, ChevronDown, Circle, CircleAlert, CircleDashed, Image, Inbox, Paperclip, Pencil, Trash2, UserRound, X } from 'lucide-react'
+import { ArrowLeft, Check, ChevronDown, Circle, CircleAlert, CircleDashed, Image, Inbox, Paperclip, Pencil, Plus, Trash2, UserRound, X } from 'lucide-react'
 import { useAppData } from '@/app/data-context'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -16,7 +16,7 @@ import { Avatar, SignedMoney } from './parts'
 import { DebtActions } from './DebtActions'
 import { ShareButton } from './share-dialog'
 import { PersonExtra } from './PersonExtra'
-import { ConfirmDialog, EditPaymentDialog } from './dialogs'
+import { ConfirmDialog, DebtFormDialog, EditPaymentDialog } from './dialogs'
 import { useDebtActions } from './use-debt-actions'
 import { ReceiptDialog } from './receipt-ui'
 import { useReceiptActions } from './use-receipts'
@@ -40,9 +40,10 @@ export function PersonDetailView({
   backHref: string
   fullPage?: boolean
 }) {
-  const { today, date } = useAppData()
+  const { today, date, canCreate } = useAppData()
   const p = useMemo(() => personDetail(data, personKey, today, date, calc), [data, personKey, today, date, calc])
   const headingRef = useRef<HTMLHeadingElement>(null)
+  const [newDebt, setNewDebt] = useState(false)
 
   // página inteira (celular): o foco vai para o nome, como numa navegação nova
   useEffect(() => {
@@ -86,10 +87,17 @@ export function PersonDetailView({
         )}
       </header>
 
-      <div className={cn('mt-3 flex flex-wrap gap-1', !fullPage && 'mx-4')}>
+      <div className={cn('mt-4 flex flex-wrap items-center gap-2', !fullPage && 'mx-5')}>
+        {canCreate && (
+          <Button size="sm" onClick={() => setNewDebt(true)}>
+            <Plus aria-hidden="true" />
+            Nova dívida
+          </Button>
+        )}
         {p.hasReceivable && <ShareButton type="person" refKey={p.key} label={p.name} />}
         {p.hasPayable && <ShareButton type="owe" refKey={p.key} label={p.name} />}
       </div>
+      <DebtFormDialog open={newDebt} onClose={() => setNewDebt(false)} initialName={p.name} kind={p.hasReceivable || !p.hasPayable ? 'receivable' : 'payable'} />
 
       <PersonFigures p={p} className={cn('mt-5', !fullPage && 'mx-5')} />
       <div className={cn(!fullPage && 'mx-5')}>

@@ -48,21 +48,23 @@ function useWalletOptions(selected: string) {
 
 // ---------------------------------------------------------------- nova / editar dívida
 
-export function DebtFormDialog({ open, onClose, debt, kind = 'receivable', onSaved }: {
+export function DebtFormDialog({ open, onClose, debt, kind = 'receivable', initialName, onSaved }: {
   open: boolean
   onClose: () => void
   debt?: Debt
   kind?: DebtKind
+  /** nova dívida já com o nome da pessoa (botão no perfil) */
+  initialName?: string
   onSaved?: (debt: Debt) => void
 }) {
   return (
     <Modal open={open} onClose={onClose} title={debt ? 'Editar dívida' : 'Nova dívida'}>
-      <DebtForm debt={debt} kind={kind} onClose={onClose} onSaved={onSaved} />
+      <DebtForm debt={debt} kind={kind} initialName={initialName} onClose={onClose} onSaved={onSaved} />
     </Modal>
   )
 }
 
-function DebtForm({ debt, kind, onClose, onSaved }: { debt?: Debt; kind: DebtKind; onClose: () => void; onSaved?: (d: Debt) => void }) {
+function DebtForm({ debt, kind, initialName, onClose, onSaved }: { debt?: Debt; kind: DebtKind; initialName?: string; onClose: () => void; onSaved?: (d: Debt) => void }) {
   const { result, today, baseSettings } = useAppData()
   const write = useWrite()
   const ids = { name: useId(), subject: useId(), principal: useId(), date: useId(), rate: useId(), type: useId(), inst: useId(), due: useId(), fee: useId(), mora: useId(), phone: useId(), pub: useId(), notes: useId(), rec: useId(), recLabel: useId(), list: useId() }
@@ -70,6 +72,10 @@ function DebtForm({ debt, kind, onClose, onSaved }: { debt?: Debt; kind: DebtKin
   const start = (() => {
     if (debt) return debtToInput(debt, onlyDigits(String(contacts[contactKey(debt.name)]?.phone ?? '')))
     const i = emptyDebtInput(kind, today)
+    if (initialName) {
+      i.name = initialName
+      i.phone = onlyDigits(String(contacts[contactKey(initialName)]?.phone ?? ''))
+    }
     const rate = Number(baseSettings.defaultRate)
     if (rate > 0) i.rate = rate
     i.lateFeePct = Number(baseSettings.defaultLateFee) || 0

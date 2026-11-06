@@ -100,6 +100,19 @@ describe('Pessoas: escrita', () => {
     expect(stored().budgets).toEqual({ Mercado: 500 })
   })
 
+  it('"Nova dívida" no perfil da pessoa já vem com o nome dela e grava para ela', async () => {
+    seed()
+    mount()
+    const painel = await screen.findByRole('complementary', { name: 'Pessoa selecionada' })
+    fireEvent.click(within(painel).getByRole('button', { name: /Nova dívida/ }))
+    const dlg = document.querySelector<HTMLElement>('dialog[open]')!
+    expect((within(dlg).getByLabelText('Nome do amigo') as HTMLInputElement).value).toBe('Ana Souza')
+    fireEvent.change(within(dlg).getByLabelText('Valor (R$)'), { target: { value: '80' } })
+    fireEvent.click(within(dlg).getByRole('button', { name: 'Adicionar' }))
+    await waitFor(() => expect(stored().debts).toHaveLength(2))
+    expect(stored().debts[1]).toMatchObject({ name: 'Ana Souza', principal: 80, kind: 'receivable' })
+  })
+
   it('excluir dívida pede confirmação', async () => {
     seed()
     mount()

@@ -3,7 +3,7 @@ import { cn } from '@/lib/utils'
 
 // Base: shadcn/ui Card — borda 1px, sem sombra.
 function Card({ className, ...props }: React.ComponentProps<'section'>) {
-  return <section data-slot="card" className={cn('rounded-lg border border-border bg-surface', className)} {...props} />
+  return <section data-slot="card" className={cn('rounded-lg border border-border bg-surface bg-linear-to-b from-white/[.04] to-white/[.015] shadow-[inset_0_1px_0_rgba(255,255,255,.05)]', className)} {...props} />
 }
 
 function CardHeader({ className, ...props }: React.ComponentProps<'div'>) {

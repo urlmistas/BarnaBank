@@ -1,5 +1,6 @@
 @import 'tailwindcss';
 @import '@fontsource-variable/inter';
+@import '@fontsource-variable/geist';
 
 /* Tema escuro é o padrão (classe .dark no <html>). */
 @custom-variant dark (&:where(.dark, .dark *));
@@ -15,14 +16,14 @@
   --fg: #16171a;
   --fg-muted: #565961;
   --fg-subtle: #6a6d75;
-  --accent: #d4b46a;
-  --accent-fg: #1a1608;
-  --accent-text: #7f6420; /* dourado legível sobre fundo claro */
+  --accent: #f59e0b;
+  --accent-fg: #1c1408;
+  --accent-text: #9a5b06; /* âmbar legível sobre fundo claro */
   --pos: #1d7f53;
   --neg: #c2363b;
-  --ring: #7f6420;
-  /* gráficos: o dourado + dois cinzas (nunca arco-íris) */
-  --chart-accent: #a8852f;
+  --ring: #9a5b06;
+  /* gráficos: o âmbar + dois cinzas (nunca arco-íris) */
+  --chart-accent: #d97706;
   --chart-gray: #5c5f67;
   --chart-gray-2: #c4c6cb;
   --chart-grid: #ecece8;
@@ -30,21 +31,21 @@
 }
 
 .dark {
-  --bg: #0d0e10;
-  --surface: #131417;
-  --surface-2: #191a1e;
-  --border: #25272c;
-  --border-strong: #34363c;
-  --fg: #ededef;
-  --fg-muted: #a1a3aa;
-  --fg-subtle: #80838b;
-  --accent: #d4b46a;
-  --accent-fg: #1a1608;
-  --accent-text: #d4b46a;
-  --pos: #4cc38a;
-  --neg: #ec5d62;
-  --ring: #d4b46a;
-  --chart-accent: #d4b46a;
+  --bg: #08080b;
+  --surface: #101014;
+  --surface-2: #17171c;
+  --border: rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(255, 255, 255, 0.16);
+  --fg: #f4f4f5;
+  --fg-muted: #a1a1aa;
+  --fg-subtle: #8a8a93;
+  --accent: #f59e0b;
+  --accent-fg: #1c1408;
+  --accent-text: #fbb13c;
+  --pos: #54c79b;
+  --neg: #ef6b73;
+  --ring: #fbb13c;
+  --chart-accent: #f59e0b;
   --chart-gray: #8d9098;
   --chart-gray-2: #4f5259;
   --chart-grid: #1f2125;
@@ -53,6 +54,7 @@
 
 @theme inline {
   --font-sans: 'Inter Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-display: 'Geist Variable', 'Inter Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
 
   --color-bg: var(--bg);
   --color-surface: var(--surface);
@@ -109,6 +111,15 @@
     -moz-osx-font-smoothing: grayscale;
     font-feature-settings: 'cv11', 'ss01';
   }
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-display);
+    letter-spacing: -0.01em;
+  }
+  button {
+    font-family: inherit;
+  }
   :focus-visible {
     outline: 2px solid var(--ring);
     outline-offset: 2px;
@@ -122,6 +133,84 @@
 @utility num {
   font-variant-numeric: tabular-nums;
   font-feature-settings: 'tnum', 'cv11';
+}
+
+/* Botão principal em "liquid glass": âmbar que vira vidro no hover, luz que segue o ponteiro e um brilho que passa */
+@layer components {
+  [data-slot='button'][data-variant='default'] {
+    --x: 50%;
+    --y: 50%;
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+    color: var(--accent-fg);
+    -webkit-backdrop-filter: blur(14px) saturate(160%);
+    backdrop-filter: blur(14px) saturate(160%);
+    background: linear-gradient(100deg, rgba(226, 122, 10, 0.68), rgba(250, 170, 20, 0.5) 50%, rgba(255, 220, 90, 0.62));
+    box-shadow: inset 0 0 0 1px rgba(255, 224, 140, 0);
+    transition:
+      transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1),
+      color 0.4s,
+      box-shadow 0.4s;
+  }
+  [data-slot='button'][data-variant='default']::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+    transition: opacity 0.4s;
+    background: linear-gradient(135deg, #fcd34d, #f59e0b 55%, #ea8a06);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.45),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.12);
+  }
+  [data-slot='button'][data-variant='default']::after {
+    content: '';
+    position: absolute;
+    inset: -10% 0;
+    z-index: -1;
+    pointer-events: none;
+    opacity: 0;
+    border-radius: inherit;
+    transition: opacity 0.35s;
+    background:
+      radial-gradient(110px circle at var(--x) var(--y), rgba(255, 255, 255, 0.4), rgba(253, 200, 60, 0.25) 42%, transparent 72%),
+      linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.32), transparent);
+    background-size:
+      100% 100%,
+      38% 100%;
+    background-repeat: no-repeat;
+    background-position:
+      0 0,
+      -60% 0;
+  }
+  [data-slot='button'][data-variant='default']:hover:not(:disabled) {
+    color: #fff;
+    transform: scale(1.02, 1.03);
+    box-shadow:
+      inset 0 0 0 1px rgba(255, 224, 140, 0.4),
+      inset 2px 2px 1px -0.5px rgba(255, 255, 255, 0.7),
+      inset -2px -2px 1px -0.5px rgba(255, 255, 255, 0.4);
+  }
+  [data-slot='button'][data-variant='default']:hover:not(:disabled)::before {
+    opacity: 0;
+  }
+  [data-slot='button'][data-variant='default']:hover:not(:disabled)::after {
+    opacity: 1;
+    animation: bb-shine 0.8s ease-out;
+  }
+  [data-slot='button'][data-variant='default']:active:not(:disabled) {
+    transform: scale(0.97, 0.94);
+    transition-duration: 0.12s;
+  }
+}
+@keyframes bb-shine {
+  to {
+    background-position:
+      0 0,
+      160% 0;
+  }
 }
 
 /* Qualquer botão de excluir (ícone de lixeira) fica vermelho ao passar o mouse ou focar com o teclado */
@@ -181,6 +270,15 @@ dialog[open]::backdrop {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  [data-slot='button'][data-variant='default'],
+  [data-slot='button'][data-variant='default']::before,
+  [data-slot='button'][data-variant='default']::after {
+    transition: none;
+    animation: none;
+  }
+  [data-slot='button'][data-variant='default']:hover:not(:disabled) {
+    transform: none;
+  }
   dialog,
   dialog::backdrop,
   .bb-pop {

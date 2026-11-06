@@ -5,14 +5,14 @@ import { cn } from '@/lib/utils'
 
 // Base: shadcn/ui Button, adaptado aos tokens do BarnaBank (sem sombra, borda 1px).
 const buttonVariants = cva(
-  'inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-sm text-sm font-medium transition-colors disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 cursor-pointer',
+  'inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-full text-sm font-medium disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 cursor-pointer',
   {
     variants: {
       variant: {
-        default: 'bg-accent text-accent-fg hover:bg-accent/90',
-        outline: 'border border-border bg-transparent text-fg hover:bg-surface-2',
-        ghost: 'text-fg-muted hover:bg-surface-2 hover:text-fg',
-        link: 'h-auto px-0 text-fg-muted underline-offset-4 hover:text-fg hover:underline',
+        default: '',
+        outline: 'border border-border bg-surface-2/40 text-fg backdrop-blur-md transition-colors hover:border-border-strong hover:bg-surface-2',
+        ghost: 'text-fg-muted transition-colors hover:bg-surface-2 hover:text-fg',
+        link: 'h-auto px-0 text-fg-muted underline-offset-4 transition-colors hover:text-fg hover:underline',
       },
       size: {
         default: 'h-9 px-3',
@@ -32,7 +32,7 @@ function Button({
   ...props
 }: React.ComponentProps<'button'> & VariantProps<typeof buttonVariants> & { asChild?: boolean }) {
   const Comp = asChild ? Slot : 'button'
-  return <Comp data-slot="button" className={cn(buttonVariants({ variant, size, className }))} {...props} />
+  return <Comp data-slot="button" data-variant={variant ?? 'default'} className={cn(buttonVariants({ variant, size, className }))} {...props} />
 }
 
 // eslint-disable-next-line react-refresh/only-export-components

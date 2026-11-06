@@ -81,7 +81,8 @@ export function PeopleList({
   return (
     <section aria-label="Lista de pessoas" className="min-w-0">
       <div className="flex flex-col gap-3">
-        <div className="relative">
+        <div className="flex items-center gap-2">
+        <div className="relative min-w-0 flex-1">
           <label htmlFor={searchId} className="sr-only">
             Buscar pessoa
           </label>
@@ -107,6 +108,21 @@ export function PeopleList({
             </button>
           )}
         </div>
+        {onSort && (
+          <>
+            <label htmlFor={sortId} className="sr-only">
+              Ordenar por
+            </label>
+            <Select
+              id={sortId}
+              value={sort}
+              onChange={onSort}
+              options={PEOPLE_SORTS.map((s) => ({ value: s, label: SORT_LABEL[s] }))}
+              className="w-36 shrink-0 sm:w-44"
+            />
+          </>
+        )}
+        </div>
         {onSide && (
           <Segmented
             id="pessoas-lado"
@@ -127,20 +143,6 @@ export function PeopleList({
             count: f === 'atrasados' || f === 'quitados' ? counts[f] : undefined,
           }))}
         />
-        {onSort && (
-          <div className="flex items-center gap-2">
-            <label htmlFor={sortId} className="shrink-0 text-xs text-fg-muted">
-              Ordenar por
-            </label>
-            <Select
-              id={sortId}
-              value={sort}
-              onChange={onSort}
-              options={PEOPLE_SORTS.map((s) => ({ value: s, label: SORT_LABEL[s] }))}
-              className="sm:w-48"
-            />
-          </div>
-        )}
       </div>
 
       <p className="sr-only" role="status" aria-live="polite">

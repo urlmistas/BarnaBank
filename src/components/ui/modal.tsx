@@ -47,13 +47,13 @@ export function Modal({
       }}
       onClick={(e) => e.target === e.currentTarget && onClose()}
       className={cn(
-        'm-auto max-h-[calc(100dvh-32px)] w-[min(480px,calc(100vw-32px))] overflow-y-auto rounded-lg border border-border bg-surface p-0 text-fg backdrop:bg-black/50',
+        'm-auto max-h-[calc(100dvh-32px)] w-[min(480px,calc(100vw-32px))] overflow-y-auto rounded-lg border border-border-strong bg-surface/85 p-0 text-fg shadow-2xl backdrop-blur-xl backdrop:bg-black/60 backdrop:backdrop-blur-sm',
         className,
       )}
     >
       {(open || keep) && (
         <>
-          <div className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-border bg-surface px-5 py-3">
+          <div className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-border bg-surface/70 px-5 py-3 backdrop-blur-md">
             <h2 id={titleId} className="min-w-0 truncate text-base font-semibold">
               {title}
             </h2>
