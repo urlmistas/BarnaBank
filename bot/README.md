@@ -179,3 +179,13 @@ No BarnaBank: **Configurações** → **Nuvem e bot do Telegram** → **Testar b
 Se a ligação com o Telegram estiver falhando, toque em **Religar bot**. O bot também tenta se religar sozinho toda vez que o app sincroniza e todo dia às 9h.
 
 O caso mais comum: o endereço `*.workers.dev` era novo e levou alguns minutos para entrar no ar, e o Telegram recusou ligar nesse meio-tempo.
+
+### Pix com baixa automática (Mercado Pago, opcional)
+No `/cobrar` aparece o botão **Gerar Pix de R$ X**: o valor é o das parcelas atrasadas ou, sem atraso, o da próxima a vencer. O bot mostra o "copia e cola" e, quando o Mercado Pago confirma o pagamento, dá a baixa na dívida (como `recebi X do Fulano`) e avisa no Telegram, com o botão Desfazer.
+
+Para ligar, crie um aplicativo em mercadopago.com.br/developers e cadastre estes segredos em Settings > Secrets and variables > Actions (o workflow só grava os que existirem):
+- `MP_ACCESS_TOKEN`: token de produção do aplicativo
+- `MP_WEBHOOK_SECRET`: a "assinatura secreta" da notificação Webhooks (evento Pagamentos), com a URL `https://<seu-worker>.workers.dev/mp`
+- `MP_UIDS` (opcional): ids das contas que podem gerar Pix, separados por vírgula. O dinheiro cai na conta Mercado Pago dona do token, então use isto se mais de uma pessoa usa o bot.
+
+Cada aviso só dá baixa uma vez por pagamento. O aviso é conferido pela assinatura e pela consulta do pagamento na API do Mercado Pago. Teste: `node bot/tests/test_mercadopago.mjs`.

@@ -1,5 +1,6 @@
 import {pixCode, qrSvg, qrPng} from './pix.mjs';
 import {getEngine} from './engine.js';
+import {criarPix, buscarPagamento, assinaturaOk, montarRef, lerRef} from './mercadopago.mjs';
 // BarnaBank: bot do Telegram + nuvem para sincronizar o app.
 // Roda como Cloudflare Worker. Precisa de:
 //   KV "BB" (os dados), segredos TELEGRAM_TOKEN e SYNC_KEY.
@@ -44,6 +45,7 @@ export default {
       if (url.pathname === '/status') return await status(req, url, env);
       if (url.pathname.startsWith('/tg/')) return await telegram(req, env, url);
       if (url.pathname === '/asaas') return await asaasHook(req, env);
+      if (url.pathname === '/mp') return await mpHook(req, env, url);
       if (url.pathname === '/api/estoque-alerta') return await apiEstoqueAlerta(req, url, env);
       if (url.pathname.startsWith('/s/')) return await shareRoute(req, url, env, ctx);
       if (url.pathname === '/') return json({app: 'BarnaBank', ok: true});
@@ -375,6 +377,55 @@ async function asaasHook(req, env) {
   if (owner) await say(env, owner, '💰 Pix recebido: <b>' + brl(p.value) + '</b>' + (p.description ? '\n' + esc(p.description) : ''));
   return json({ok: true});
 }
+// ---------------------------------------------------------------- Pix pelo Mercado Pago (cobrança com baixa automática)
+// Liga com os segredos MP_ACCESS_TOKEN e MP_WEBHOOK_SECRET. MP_UIDS (opcional, ids de conta separados por vírgula) limita quem pode gerar Pix,
+// porque o dinheiro cai na conta Mercado Pago dona do token.
+const mpLigado = env => !!(env.MP_ACCESS_TOKEN && env.MP_WEBHOOK_SECRET) &&
+  (!env.MP_UIDS || String(env.MP_UIDS).split(',').map(x => x.trim()).includes(env.uid || ''));
+// quanto cobrar de uma vez: as parcelas atrasadas, ou só a próxima a vencer
+const mpValor = c => c && (c.late > 0 ? c.late : c.next && c.next.amount > 0 ? c.next.amount : 0);
+async function mpGerar(env, chat, key) {
+  const c = findCharge(await getJSON(env, 'summary', null), key);
+  const valor = mpValor(c);
+  if (!c || !(valor > 0)) return say(env, chat, 'Não achei nada a cobrar dessa pessoa agora.');
+  const origin = await env.BB.get('origin');
+  if (!origin) return say(env, chat, '⚠️ Não sei o endereço do bot. Abra o app uma vez e tente de novo.');
+  const pix = await criarPix(env, {valor, descricao: 'Cobrança ' + c.name, ref: montarRef(env.uid, c.key), aviso: origin + '/mp'});
+  if (pix.erro) return say(env, chat, '⚠️ ' + esc(pix.erro));
+  const wa = 'Oi ' + c.name.split(' ')[0] + '! Pix de ' + brl(pix.valor) + ' (copia e cola):\n' + pix.qr;
+  await say(env, chat, '💳 <b>Pix de ' + brl(pix.valor) + ' para ' + esc(c.name) + '</b>\nValido por 48 horas. Quando ele pagar, eu dou baixa sozinho.\n\n<code>' + esc(pix.qr) + '</code>',
+    {reply_markup: {inline_keyboard: [[{text: '💬 Mandar no WhatsApp', url: (c.phone ? 'https://wa.me/' + c.phone : 'https://wa.me/') + '?text=' + encodeURIComponent(wa)}]]}});
+}
+// o Mercado Pago avisa aqui que um pagamento mudou. Só vale o que a API confirma como aprovado.
+async function mpHook(req, env, url) {
+  if (req.method !== 'POST') return json({error: 'method not allowed'}, 405);
+  const body = await req.json().catch(() => null) || {};
+  const dataId = String(url.searchParams.get('data.id') || (body.data && body.data.id) || '');
+  const ok = await assinaturaOk({secret: env.MP_WEBHOOK_SECRET, assinatura: req.headers.get('x-signature'), requestId: req.headers.get('x-request-id'), dataId});
+  if (!ok) return json({error: 'forbidden'}, 403);
+  if (body.type && body.type !== 'payment') return json({ok: true, ignored: true});
+  const p = await buscarPagamento(env, dataId);
+  if (!p || p.falhou) return json({error: 'mp unavailable'}, 502); // o Mercado Pago tenta de novo
+  if (p.status !== 'approved') return json({ok: true, ignored: p.status});
+  const ref = lerRef(p.external_reference);
+  if (!ref) return json({ok: true, ignored: 'sem referência'});
+  const sc = scoped(env, ref.uid);
+  // aviso repetido: dá baixa uma vez só por pagamento
+  const dedupe = 'mp:' + p.id;
+  if (await sc.BB.get(dedupe)) return json({ok: true, duplicate: true});
+  await sc.BB.put(dedupe, '1', {expirationTtl: 60 * 60 * 24 * 30});
+  try {
+    const owner = await sc.BB.get('owner');
+    const c = findCharge(await getJSON(sc, 'summary', null), ref.key);
+    if (!owner || !c) { if (sc.BB.delete) await sc.BB.delete(dedupe); return json({ok: true, ignored: 'sem dono ou pessoa'}); }
+    const valor = Math.round(Number(p.transaction_amount) * 100) / 100;
+    await launchOp(sc, owner, {type: 'pay', kind: 'receivable', name: c.name, amount: valor}, 'Pix Mercado Pago #' + p.id);
+  } catch (e) {
+    if (sc.BB.delete) await sc.BB.delete(dedupe);
+    return json({error: 'falhou'}, 500);
+  }
+  return json({ok: true});
+}
 async function say(env, chat, text, extra) {
   const r = await tg(env, 'sendMessage', {chat_id: chat, text, parse_mode: 'HTML', disable_web_page_preview: true, ...(extra || {})});
   if (!r.ok) await putJSON(env, 'lastError', {at: new Date().toISOString(), error: 'sendMessage: ' + (r.description || 'falhou')});
@@ -700,6 +751,12 @@ async function onCallback(env, cq) {
   if (rm) {
     const r = await remindFriend(env, rm[1], 'manual');
     return tg(env, 'answerCallbackQuery', {callback_query_id: cq.id, text: r.ok ? 'Lembrete enviado pra ' + r.name : r.error, show_alert: !r.ok});
+  }
+  const px = /^pix:(.+)$/.exec(cq.data || '');
+  if (px) {
+    await tg(env, 'answerCallbackQuery', {callback_query_id: cq.id});
+    if (!mpLigado(env)) return say(env, chat, 'O Pix do Mercado Pago não está ligado nesta conta.');
+    return mpGerar(env, chat, px[1]);
   }
   const cb = /^cobrar:(.+)$/.exec(cq.data || '');
   if (cb) {
@@ -1162,6 +1219,7 @@ async function cobrar(env, chat, summary, who, fromButton) {
   if (c.phone) buttons.push([{text: '💬 Abrir no WhatsApp', url: 'https://wa.me/' + c.phone + '?text=' + encodeURIComponent(c.text)}]);
   else buttons.push([{text: '💬 Escolher conversa no WhatsApp', url: 'https://wa.me/?text=' + encodeURIComponent(c.text)}]);
   if (c.link) buttons.push([{text: '🔗 Ver o link de cobrança', url: c.link}]);
+  if (mpLigado(env) && mpValor(c) > 0) buttons.push([{text: '💳 Gerar Pix de ' + brl(mpValor(c)), callback_data: ('pix:' + c.key).slice(0, 64)}]);
   const fr = await friendFor(env, c.key);
   if (fr) buttons.push([{text: '📨 Mandar lembrete pro ' + c.name.split(' ')[0] + ' no Telegram', callback_data: ('remind:' + c.key).slice(0, 64)}]);
   await say(env, chat, '<b>Cobrança para ' + esc(c.name) + '</b> · ' + brl(c.remaining) + ' em aberto' + (c.late ? ', ' + brl(c.late) + ' atrasado' : '') +

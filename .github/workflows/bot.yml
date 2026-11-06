@@ -14,6 +14,9 @@ jobs:
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
       SYNC_KEY: ${{ secrets.SYNC_KEY }}
+      MP_ACCESS_TOKEN: ${{ secrets.MP_ACCESS_TOKEN }}
+      MP_WEBHOOK_SECRET: ${{ secrets.MP_WEBHOOK_SECRET }}
+      MP_UIDS: ${{ secrets.MP_UIDS }}
     steps:
       - uses: actions/checkout@v4
 
@@ -58,6 +61,7 @@ jobs:
           node bot/tests/test_put_views.mjs
           node bot/tests/test_accounts.mjs
           node bot/tests/test_prefs.mjs
+          node bot/tests/test_mercadopago.mjs
 
       - name: Publicar o Worker
         id: deploy
@@ -72,6 +76,10 @@ jobs:
           fi
           printf '%s' "$TELEGRAM_TOKEN" | npx -y wrangler@3 secret put TELEGRAM_TOKEN
           printf '%s' "$SYNC_KEY" | npx -y wrangler@3 secret put SYNC_KEY
+          # Pix do Mercado Pago é opcional: só grava os segredos que existem
+          for v in MP_ACCESS_TOKEN MP_WEBHOOK_SECRET MP_UIDS; do
+            if [ -n "${!v}" ]; then printf '%s' "${!v}" | npx -y wrangler@3 secret put "$v"; fi
+          done
           URL=$(grep -oE 'https://[a-zA-Z0-9.-]+\.workers\.dev' deploy.log | head -n1)
           echo "url=$URL" >> "$GITHUB_OUTPUT"
 
