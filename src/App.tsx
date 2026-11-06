@@ -3,6 +3,7 @@ import { HashRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { MotionConfig } from 'motion/react'
 import { DataProvider } from '@/app/data-context'
 import { AppShell } from '@/app/AppShell'
+import { LoginGate } from '@/app/LoginGate'
 import { ToastProvider } from '@/components/ui/toast'
 import { Inicio } from '@/pages/inicio/Inicio'
 
@@ -44,22 +45,24 @@ export default function App() {
     <MotionConfig reducedMotion="user">
       <DataProvider>
         <ToastProvider>
-          <HashRouter>
-            <Routes>
-              <Route element={<AppShell />}>
-                <Route index element={<Inicio />} />
-                <Route path="pessoas" element={pessoas} />
-                <Route path="pessoas/:id" element={pessoas} />
-                <Route path="carteiras" element={carteiras} />
-                <Route path="carteiras/:id" element={carteiras} />
-                <Route path="contas" element={contas} />
-                <Route path="contas/:id" element={contas} />
-                <Route path="relatorios" element={relatorios} />
-                <Route path="configuracoes" element={configuracoes} />
-                <Route path="*" element={<Navigate to="/" replace />} />
-              </Route>
-            </Routes>
-          </HashRouter>
+          <LoginGate>
+            <HashRouter>
+              <Routes>
+                <Route element={<AppShell />}>
+                  <Route index element={<Inicio />} />
+                  <Route path="pessoas" element={pessoas} />
+                  <Route path="pessoas/:id" element={pessoas} />
+                  <Route path="carteiras" element={carteiras} />
+                  <Route path="carteiras/:id" element={carteiras} />
+                  <Route path="contas" element={contas} />
+                  <Route path="contas/:id" element={contas} />
+                  <Route path="relatorios" element={relatorios} />
+                  <Route path="configuracoes" element={configuracoes} />
+                  <Route path="*" element={<Navigate to="/" replace />} />
+                </Route>
+              </Routes>
+            </HashRouter>
+          </LoginGate>
         </ToastProvider>
       </DataProvider>
     </MotionConfig>
