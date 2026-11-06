@@ -32,11 +32,7 @@ const ZERO = [
   'Juros: 0% (por enquanto)',
 ]
 
-const SERASA = [
-  'Evite a inclusão do seu nome no Serasa.',
-  'Evite o Serasa: pague em dia.',
-  'Evite a inclusão do seu nome no SPC e na minha lista de amigos.',
-]
+const SERASA = ['Evite a inclusão do seu nome no Serasa e na minha lista negra.']
 
 const pick = <T,>(list: T[], rand: () => number): T => list[Math.min(list.length - 1, Math.floor(rand() * list.length))]
 
@@ -50,7 +46,7 @@ export function funnyReceipt(d: Debt, ctx: ComedyCtx): string {
   const pct = (v: number) => (principal > 0 ? Math.round((v / principal) * 100) : 0)
 
   const out: string[] = []
-  out.push("🏦 *Barna's COBRANÇAS S.A.*")
+  out.push('🏦 *BARNA COBRANÇAS S.A.*')
   out.push('_Comprovante de Lançamento de Débito_')
   out.push('')
   out.push('📉 *Resumo da Operação:*')
@@ -69,18 +65,22 @@ export function funnyReceipt(d: Debt, ctx: ComedyCtx): string {
   const n = installments(d)
   out.push('• Plano: ' + n + 'x' + (juros > 0.005 ? ' com juros' : ' sem juros'))
 
-  const parcelas = sch.insts.filter((it) => it.open > 0.005)
+  // Cobra só a parcela da vez: as atrasadas, se houver; senão a próxima a vencer. Nunca o saldo todo.
+  const emAberto = sch.insts.filter((it) => it.open > 0.005)
+  const atrasadas = emAberto.filter((it) => it.late)
+  const parcelas = atrasadas.length ? atrasadas : emAberto.slice(0, 1)
   if (parcelas.length) {
     out.push('')
-    out.push('📊 *Plano de Parcelamento:*')
+    out.push(atrasadas.length ? '📊 *Parcela em atraso:*' : '📊 *Próxima parcela:*')
     for (const it of parcelas.slice(0, MAX_PARCELAS)) {
       out.push('• Parcela ' + String(it.i + 1).padStart(2, '0') + ' (' + ctx.date(it.dueISO) + '): *' + m(it.open) + '*')
     }
     if (parcelas.length > MAX_PARCELAS) out.push('• ... e mais ' + (parcelas.length - MAX_PARCELAS) + ' parcelas')
   }
 
+  const totalParcela = round2(parcelas.reduce((s, it) => s + it.open, 0))
   out.push('')
-  out.push('⚠️ *VALOR TOTAL A PAGAR: ' + m(round2(sch.open)) + '* ' + pick(FINAIS, rand))
+  out.push('⚠️ *VALOR A PAGAR: ' + m(totalParcela) + '* ' + pick(FINAIS, rand))
   out.push('')
   out.push('💡 ' + pick(SERASA, rand) + (ctx.pixKey ? ' Chave Pix: ' + ctx.pixKey : ''))
   return out.join('\n')
