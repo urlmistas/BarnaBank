@@ -1,6 +1,7 @@
 import {pixCode, qrSvg, qrPng} from './pix.mjs';
 import {getEngine} from './engine.js';
-import {criarPix, criarPreferenciaCartao, taxaCartao, valorCartao, buscarPagamento, assinaturaOk, montarRef, lerRef} from './mercadopago.mjs';
+import {criarPix, criarPreferenciaCartao, taxaCartao, valorCartao, buscarPagamento, assinaturaOk, montarRef, lerRef, MP_API} from './mercadopago.mjs';
+import {estadoNovo, aplicar, rendimento, visao, descobrirCaixinhas, lerCdi} from './mpconta.mjs';
 // BarnaBank: bot do Telegram + nuvem para sincronizar o app.
 // Roda como Cloudflare Worker. Precisa de:
 //   KV "BB" (os dados), segredos TELEGRAM_TOKEN e SYNC_KEY.
@@ -38,6 +39,7 @@ export default {
       if (url.pathname === '/api/state') return await api(req, env, ctx, url);
       if (url.pathname === '/api/link') return await apiLink(req, url, env);
       if (url.pathname === '/api/prefs') return await apiPrefs(req, url, env);
+      if (url.pathname === '/api/mpconta') return await apiMpConta(req, url, env);
       if (url.pathname.startsWith('/api/photo/')) return await apiPhoto(req, url, env);
       if (url.pathname.startsWith('/api/claim/')) return await apiClaim(req, url, env);
       if (url.pathname === '/api/backups' || url.pathname.startsWith('/api/backups/')) return await apiBackups(req, url, env);
@@ -67,6 +69,7 @@ export default {
         await step('motor', () => cloudApply(env, e => e.runRecurring()));
       }
       // lembretes: na hora que o dono escolheu (padrão 9h)
+      await step('mercadopago', () => mpSync(env, {min: 0}));
       await step('lembretes', () => remindersFor(env, h));
       await step('contas', () => accountsDaily(env, step, h));
     })();
@@ -429,6 +432,97 @@ async function mpHook(req, env, url) {
     return json({error: 'falhou'}, 500);
   }
   return json({ok: true});
+}
+// ---------------------------------------------------------------- conta Mercado Pago (saldo e caixinhas estimados)
+// Só o dono (a conta que configurou primeiro) vê: o token é o da conta dele. Estado inteiro em uma chave do KV raiz.
+const MP_CONTA = 'mpconta', MP_CONTA_DONO = 'mpconta:owner';
+async function mpGet(env, path) {
+  const token = String(env.MP_ACCESS_TOKEN || '').trim();
+  if (!token) return null;
+  const r = await fetch(MP_API + path, {headers: {Authorization: 'Bearer ' + token}});
+  return r.ok ? await r.json().catch(() => null) : null;
+}
+// pagamentos dos últimos `dias` dias, até 5 páginas de 100. null se o Mercado Pago não respondeu.
+async function mpPagamentos(env, dias) {
+  const out = [];
+  for (let off = 0, pg = 0; pg < 5; pg++, off += 100) {
+    const j = await mpGet(env, '/v1/payments/search?sort=date_created&criteria=asc&limit=100&offset=' + off + '&range=date_created&begin_date=NOW-' + Math.max(1, Math.min(365, Math.ceil(dias))) + 'DAYS&end_date=NOW');
+    if (!j || !Array.isArray(j.results)) return null;
+    out.push(...j.results);
+    if (off + 100 >= Number(j.paging && j.paging.total || 0)) break;
+  }
+  return out;
+}
+const brDate = iso => iso.slice(8, 10) + '/' + iso.slice(5, 7) + '/' + iso.slice(0, 4);
+// CDI diário (série 12 do Banco Central) depois da data dada
+async function mpCdi(desde) {
+  try {
+    const d = new Date(Date.parse(desde + 'T12:00:00Z') + 86400000).toISOString().slice(0, 10);
+    const r = await fetch('https://api.bcb.gov.br/dados/serie/bcdata.sgs.12/dados?formato=json&dataInicial=' + brDate(d) + '&dataFinal=' + brDate(todayBR()));
+    return r.ok ? lerCdi(await r.json().catch(() => [])) : null;
+  } catch (e) { return null; }
+}
+// busca o que há de novo, aplica ao estado e grava. min = segundos sem buscar de novo.
+async function mpSync(env, {min = 60} = {}) {
+  const kv = {BB: rootOf(env)};
+  const st = await getJSON(kv, MP_CONTA, null);
+  if (!st) return null;
+  const idade = st.syncedAt ? Date.now() - Date.parse(st.syncedAt) : Infinity;
+  if (idade < min * 1000) return st;
+  const velho = JSON.stringify(st);
+  const desde = Math.max(Date.parse(st.anchor) - 86400000, (st.syncedAt ? Date.parse(st.syncedAt) : Date.parse(st.anchor)) - 8 * 86400000);
+  const pagamentos = await mpPagamentos(env, (Date.now() - desde) / 86400000);
+  if (!pagamentos) return st; // Mercado Pago fora do ar: tenta na próxima
+  aplicar(st, pagamentos, st.me);
+  if (st.yieldDate < todayBR()) {
+    const cdi = await mpCdi(st.yieldDate);
+    if (cdi) rendimento(st, cdi);
+  }
+  st.syncedAt = new Date().toISOString();
+  // o plano grátis do KV tem 1000 gravações por dia: sem mudança, só atualiza o carimbo de vez em quando
+  if (JSON.stringify({...st, syncedAt: 0}) !== JSON.stringify({...JSON.parse(velho), syncedAt: 0}) || idade > 600000) await putJSON(kv, MP_CONTA, st);
+  return st;
+}
+const mpNum = (v, max) => { const n = Number(v); return Number.isFinite(n) && Math.abs(n) <= max ? n : null; };
+async function apiMpConta(req, url, env) {
+  const w = await who(req, url, env);
+  if (!w || !w.uid) return json({error: 'unauthorized'}, 401);
+  if (!String(env.MP_ACCESS_TOKEN || '').trim()) return json({error: 'off'}, 404);
+  const kv = {BB: rootOf(env)};
+  const dono = await kv.BB.get(MP_CONTA_DONO);
+  if (dono && dono !== w.uid) return json({error: 'forbidden'}, 403);
+  if (req.method === 'GET') {
+    if (!dono) return json({configured: false});
+    const st = await mpSync(env);
+    return json(st ? visao(st) : {configured: false});
+  }
+  if (req.method === 'DELETE') {
+    if (dono) { await kv.BB.delete(MP_CONTA); }
+    return json({ok: true});
+  }
+  if (req.method !== 'POST') return json({error: 'method'}, 405);
+  const body = await req.json().catch(() => null) || {};
+  if (body.acao === 'descobrir') {
+    if (!dono) await kv.BB.put(MP_CONTA_DONO, w.uid);
+    const lista = await mpPagamentos(env, 365);
+    if (!lista) return json({error: 'Mercado Pago não respondeu'}, 502);
+    return json({pots: descobrirCaixinhas(lista)});
+  }
+  if (!dono) return json({error: 'descubra as caixinhas antes'}, 409);
+  const saldo = mpNum(body.saldo, 1e9), saldoPct = mpNum(body.saldoPct == null ? 0 : body.saldoPct, 300);
+  if (saldo === null || saldoPct === null) return json({error: 'saldo inválido'}, 400);
+  const pots = {};
+  for (const [id, p] of Object.entries(body.pots && typeof body.pots === 'object' ? body.pots : {})) {
+    const valor = mpNum(p && p.valor, 1e9), pct = mpNum(p && p.pct == null ? 120 : p.pct, 300);
+    if (!/^[0-9a-f-]{36}$/i.test(id) || valor === null || pct === null) return json({error: 'caixinha inválida'}, 400);
+    pots[id] = {name: p.name, valor, pct};
+  }
+  const eu = await mpGet(env, '/users/me');
+  if (!eu || !eu.id) return json({error: 'Mercado Pago não respondeu'}, 502);
+  const st = estadoNovo({agora: new Date(), hoje: todayBR(), saldo, saldoPct, pots});
+  st.uid = w.uid; st.me = eu.id;
+  await putJSON(kv, MP_CONTA, st);
+  return json(visao(await mpSync(env, {min: 0}) || st));
 }
 async function say(env, chat, text, extra) {
   const r = await tg(env, 'sendMessage', {chat_id: chat, text, parse_mode: 'HTML', disable_web_page_preview: true, ...(extra || {})});

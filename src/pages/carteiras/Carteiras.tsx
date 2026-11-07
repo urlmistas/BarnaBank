@@ -15,6 +15,7 @@ import { WalletList } from './WalletList'
 import { WalletDetailView } from './WalletDetail'
 import { TxFormDialog, WalletFormDialog } from './dialogs'
 import { ImportStatementButton } from './import-dialog'
+import { MercadoPago } from './MercadoPago'
 
 // Carteiras: saldo total em destaque, uma linha por carteira. No PC (≥1024px) a carteira
 // abre num painel ao lado; no celular /carteiras/:id é uma página inteira (como Pessoas).
@@ -132,6 +133,7 @@ function CarteirasReady({ data, today }: { data: AppData; today: string }) {
           </aside>
         )}
       </div>
+      <MercadoPago />
       <WalletFormDialog open={dlg === 'wallet'} onClose={() => setDlg(null)} />
       <TxFormDialog open={dlg === 'tx'} onClose={() => setDlg(null)} />
     </div>
