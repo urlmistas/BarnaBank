@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useId, useState, type FormEvent } from 'react'
-import { Handshake, Loader2, RefreshCw, Settings2 } from 'lucide-react'
+import { Loader2, RefreshCw, Settings2 } from 'lucide-react'
 import { useAppData } from '@/app/data-context'
 import { Button } from '@/components/ui/button'
+import { MercadoPagoLogo } from '@/components/mercado-pago-logo'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Field, Modal } from '@/components/ui/modal'
@@ -68,10 +69,7 @@ export function MercadoPago() {
     <Card className="mt-8">
       <CardHeader>
         <CardTitle className="flex items-center gap-2.5">
-          {/* selo azul com o aperto de mão, no estilo do ícone do Mercado Pago */}
-          <span aria-hidden="true" className="grid size-7 place-items-center rounded-full bg-[#009ee3] text-white ring-2 ring-[#00bcff]/40">
-            <Handshake className="size-4" />
-          </span>
+          <MercadoPagoLogo className="size-7 text-[#00b1ea]" />
           Mercado Pago
         </CardTitle>
         <div className="flex items-center gap-1">
