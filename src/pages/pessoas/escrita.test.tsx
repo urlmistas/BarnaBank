@@ -141,6 +141,21 @@ describe('Pessoas: escrita', () => {
     expect(screen.getByRole('region', { name: 'Pontualidade' })).toBeTruthy()
   })
 
+  it('os cards do topo têm ícone e cor: recebido verde, atraso vermelho, o resto neutro', async () => {
+    seed({ debts: [debt({ payments: [{ date: '2020-02-01', amount: 30 }] })] })
+    mount()
+    const cor = (rotulo: string) => {
+      const dt = screen.getAllByText(rotulo).map((e) => e.closest('dt')).find(Boolean)!
+      return { icone: dt.querySelector('svg')?.getAttribute('class') ?? '', valor: dt.nextElementSibling?.getAttribute('class') ?? '' }
+    }
+    await screen.findByRole('heading', { level: 1, name: 'Ana Souza' })
+    expect(cor('Falta receber').icone).toContain('text-fg-subtle')
+    expect(cor('Total emprestado').icone).toContain('text-fg-subtle')
+    expect(cor('Já recebi').icone).toContain('text-pos')
+    expect(cor('Já recebi').valor).toContain('text-pos')
+    expect(cor('Em atraso').icone).toContain('text-neg')
+  })
+
   it('a aba da pessoa diz "Me deve", tem Linha do tempo e o gráfico traz a evolução do saldo', async () => {
     seed({ debts: [debt({ payments: [{ date: '2026-10-05', amount: 40 }] })] })
     mount()

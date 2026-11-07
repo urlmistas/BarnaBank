@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
-import { ArrowLeft, Check, ChevronDown, Circle, CircleAlert, CircleDashed, FileDown, Image, Inbox, MessageCircle, Paperclip, Pencil, Plus, Trash2, UserRound } from 'lucide-react'
+import { ArrowLeft, BanknoteArrowUp, CalendarClock, Check, ChevronDown, Circle, CircleAlert, CircleDashed, ClockAlert, FileDown, HandCoins, Image, Inbox, MessageCircle, Paperclip, Pencil, PiggyBank, Plus, ReceiptText, Trash2, UserRound, type LucideIcon } from 'lucide-react'
 import { useAppData } from '@/app/data-context'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -64,16 +64,16 @@ export function PersonDetailView({
   const f = personFacts(p, today)
   const phone = whatsPhone(data.contacts[p.key]?.phone)
   const t = p.totals
-  const tiles: { label: string; value: number; tone?: string }[] = []
+  const tiles: { label: string; value: number; icon: LucideIcon; tone?: string }[] = []
   if (p.hasReceivable) {
-    tiles.push({ label: 'Falta receber', value: t.toReceive })
-    tiles.push({ label: 'Em atraso', value: t.overdue, tone: t.overdue > 0.005 ? 'text-neg' : undefined })
-    tiles.push({ label: 'Já recebi', value: t.received })
-    tiles.push({ label: 'Total emprestado', value: t.lent })
+    tiles.push({ label: 'Falta receber', value: t.toReceive, icon: CalendarClock })
+    tiles.push({ label: 'Em atraso', value: t.overdue, icon: ClockAlert, tone: t.overdue > 0.005 ? 'text-neg' : undefined })
+    tiles.push({ label: 'Já recebi', value: t.received, icon: HandCoins, tone: t.received > 0.005 ? 'text-pos' : undefined })
+    tiles.push({ label: 'Total emprestado', value: t.lent, icon: PiggyBank })
   }
   if (p.hasPayable) {
-    tiles.push({ label: 'Eu devo', value: t.owe })
-    tiles.push({ label: 'Já paguei', value: t.paidOut })
+    tiles.push({ label: 'Eu devo', value: t.owe, icon: ReceiptText })
+    tiles.push({ label: 'Já paguei', value: t.paidOut, icon: BanknoteArrowUp })
   }
 
   return (
@@ -142,7 +142,10 @@ export function PersonDetailView({
           >
             {tiles.map((it) => (
               <div key={it.label} className="min-w-0 bg-surface px-4 py-3">
-                <dt className="text-xs text-fg-muted">{it.label}</dt>
+                <dt className="flex items-center gap-1.5 text-xs text-fg-muted">
+                  <it.icon aria-hidden="true" className={cn('size-3.5 shrink-0', it.tone ?? 'text-fg-subtle')} />
+                  {it.label}
+                </dt>
                 <dd className={cn('num mt-1 truncate text-lg font-semibold tracking-tight', it.tone)} title={money(it.value)}>
                   {money(it.value)}
                 </dd>
