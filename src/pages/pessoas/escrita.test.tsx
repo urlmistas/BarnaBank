@@ -165,8 +165,8 @@ describe('Pessoas: escrita', () => {
     expect(h1.compareDocumentPosition(lapis) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     // o status virou um selinho redondo no canto inferior direito da inicial, antes do nome
     expect(selo.className).toContain('rounded-full')
-    expect(selo.parentElement?.className).toContain('-right-1')
-    expect(selo.parentElement?.className).toContain('-bottom-1')
+    expect(selo.parentElement?.className).toContain('-right-0.5')
+    expect(selo.parentElement?.className).toContain('-bottom-0.5')
     expect(selo.parentElement?.parentElement?.textContent).toContain('AS')
     expect(selo.compareDocumentPosition(h1) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     expect(lapis.parentElement?.querySelector('[role="tooltip"]')?.textContent).toBe('Editar pessoa')

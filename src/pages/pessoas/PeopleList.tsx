@@ -118,7 +118,7 @@ export function PeopleList({
               value={sort}
               onChange={onSort}
               options={PEOPLE_SORTS.map((s) => ({ value: s, label: SORT_LABEL[s] }))}
-              className="w-36 shrink-0 sm:w-44"
+              className="w-32 shrink-0 sm:w-44"
             />
           </>
         )}

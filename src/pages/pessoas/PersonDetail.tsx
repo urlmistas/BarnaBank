@@ -85,7 +85,7 @@ export function PersonDetailView({
         </Link>
       </Button>
 
-      <Card className="p-5 sm:p-6">
+      <Card className="p-4 sm:p-6">
         <header className="flex flex-wrap items-start gap-4">
           <span className="relative shrink-0">
             <Avatar name={p.name} size="lg" />
@@ -102,7 +102,7 @@ export function PersonDetailView({
               {plural(p.debts.length, 'dívida', 'dívidas')} · desde <span className="num">{date(p.since)}</span>
             </p>
           </div>
-          <div className="text-right">
+          <div className="flex w-full items-baseline justify-between gap-3 border-t border-border pt-3 sm:block sm:w-auto sm:border-0 sm:pt-0 sm:text-right">
             <p className="text-xs text-fg-muted">{f.net > 0.005 ? 'Saldo a receber' : f.net < -0.005 ? 'Saldo que eu devo' : 'Saldo zerado'}</p>
             <SignedMoney value={f.net} className="text-2xl" />
           </div>
@@ -116,15 +116,16 @@ export function PersonDetailView({
           )}
           {phone && (
             <Button asChild size="sm" variant="outline">
-              <a href={'https://wa.me/' + phone} target="_blank" rel="noreferrer">
+              <a href={'https://wa.me/' + phone} target="_blank" rel="noreferrer" aria-label="Conversar">
                 <MessageCircle aria-hidden="true" />
-                Conversar
+                <span className="hidden sm:inline">Conversar</span>
               </a>
             </Button>
           )}
           <Button
             size="sm"
             variant="outline"
+            aria-label="Exportar ficha"
             onClick={() => {
               const c = data.contacts[p.key]
               const html = personSheetHtml({ p, facts: f, phone: formatPhone(c?.phone), tags: tagsOf(c), notes: notesOf(c) }, { ...doc, issuedAt: new Date() })
@@ -132,7 +133,7 @@ export function PersonDetailView({
             }}
           >
             <FileDown aria-hidden="true" />
-            Exportar ficha
+            <span className="hidden sm:inline">Exportar ficha</span>
           </Button>
           {p.hasReceivable && <ShareButton type="person" refKey={p.key} label={p.name} />}
           {p.hasPayable && <ShareButton type="owe" refKey={p.key} label={p.name} />}
@@ -203,7 +204,7 @@ function StatusBadge({ status }: { status: PersonFacts['status'] }) {
     settled: { text: 'Quitado', cls: 'border border-border-strong bg-surface-2 text-fg-muted', Icon: CircleCheck },
   }[status]
   return (
-    <Tooltip label={map.text} side="bottom" className="absolute -right-1 -bottom-1">
+    <Tooltip label={map.text} side="bottom" className="absolute -right-0.5 -bottom-0.5">
       <span role="img" aria-label={map.text} className={cn('grid size-5 place-items-center rounded-full ring-2 ring-surface', map.cls)}>
         <map.Icon aria-hidden="true" className="size-3" strokeWidth={2.5} />
       </span>

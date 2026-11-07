@@ -1,4 +1,4 @@
-import { useRef, type KeyboardEvent, type ReactNode } from 'react'
+import { useEffect, useRef, type KeyboardEvent, type ReactNode } from 'react'
 import { motion } from 'motion/react'
 import { cn } from '@/lib/utils'
 
@@ -27,6 +27,11 @@ export function Tabs<T extends string>({
   const refs = useRef<(HTMLButtonElement | null)[]>([])
   const idx = Math.max(0, items.findIndex((t) => t.value === value))
 
+  // celular: as abas rolam para o lado, e a escolhida sempre fica à vista
+  useEffect(() => {
+    refs.current[idx]?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' })
+  }, [idx])
+
   function onKeyDown(e: KeyboardEvent) {
     let next = -1
     if (e.key === 'ArrowRight') next = (idx + 1) % items.length
@@ -40,7 +45,7 @@ export function Tabs<T extends string>({
   }
 
   return (
-    <div role="tablist" aria-label={label} onKeyDown={onKeyDown} className={cn('flex gap-1 border-b border-border', className)}>
+    <div role="tablist" aria-label={label} onKeyDown={onKeyDown} className={cn('flex gap-1 overflow-x-auto border-b border-border [scrollbar-width:none] [&::-webkit-scrollbar]:hidden', className)}>
       {items.map((t, i) => {
         const on = t.value === value
         return (
@@ -57,7 +62,7 @@ export function Tabs<T extends string>({
             tabIndex={on ? 0 : -1}
             onClick={() => onChange(t.value)}
             className={cn(
-              'relative flex h-10 cursor-pointer items-center gap-1.5 px-3 text-sm font-medium transition-colors',
+              'relative flex h-10 shrink-0 cursor-pointer items-center gap-1.5 px-2.5 text-sm font-medium whitespace-nowrap transition-colors sm:px-3',
               on ? 'text-fg' : 'text-fg-muted hover:text-fg',
             )}
           >
@@ -67,7 +72,7 @@ export function Tabs<T extends string>({
               <motion.span
                 layoutId={`${baseId}-underline`}
                 aria-hidden="true"
-                className="absolute inset-x-0 -bottom-px h-0.5 rounded-full bg-accent"
+                className="absolute inset-x-0 bottom-0 h-0.5 rounded-full bg-accent"
                 transition={{ duration: 0.22, ease: [0.2, 0, 0, 1] }}
               />
             )}
