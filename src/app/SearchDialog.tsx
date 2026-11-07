@@ -111,9 +111,7 @@ function SearchBody({ onClose }: { onClose: () => void }) {
       <div id={listId} role="listbox" aria-label="Resultados" className="mt-3 max-h-[min(60dvh,420px)] overflow-y-auto">
         {!q ? (
           <p className="px-1 py-6 text-center text-sm text-fg-muted">
-            Busque por pessoa, grupo, carteira, categoria, conta fixa, compra no cartão ou meta.
-            <br />
-            Dá para buscar por valor também: <b className="num text-fg">45,00</b>
+            Busque por pessoa, valor, grupo, carteira, categoria, conta fixa, compra no cartão ou meta.
           </p>
         ) : !sections.length ? (
           <p role="status" className="px-1 py-6 text-center text-sm text-fg-muted">

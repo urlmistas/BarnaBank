@@ -59,7 +59,7 @@ export function EditPersonButton({ personKey, name }: { personKey: string; name:
   if (!canEdit) return null
   return (
     <>
-      <Tooltip label="Editar pessoa">
+      <Tooltip label="Editar pessoa" side="bottom">
         <Button size="icon" variant="ghost" aria-label="Editar pessoa" className="size-8" onClick={() => setEditing(true)}>
           <Pencil aria-hidden="true" />
         </Button>

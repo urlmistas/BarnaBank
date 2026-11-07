@@ -5,6 +5,7 @@ import { ArrowLeft, ArrowLeftRight, ChevronLeft, ChevronRight, Inbox, Pencil, Pl
 import { useAppData } from '@/app/data-context'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Tooltip } from '@/components/ui/tooltip'
 import { Segmented } from '@/components/ui/segmented'
 import { Skeleton } from '@/components/ui/skeleton'
 import { TabPanel, Tabs } from '@/components/ui/tabs'
@@ -95,11 +96,13 @@ export function WalletDetailView({
           </p>
         </div>
         {!fullPage && (
-          <Button asChild variant="ghost" size="icon" className="-mt-1 -mr-2">
-            <Link to={backHref} aria-label="Fechar carteira" title="Fechar">
+          <Tooltip label="Fechar" side="bottom" align="end" className="-mt-1 -mr-2">
+          <Button asChild variant="ghost" size="icon">
+            <Link to={backHref} aria-label="Fechar carteira">
               <X aria-hidden="true" />
             </Link>
           </Button>
+          </Tooltip>
         )}
       </header>
 
@@ -110,12 +113,16 @@ export function WalletDetailView({
             Lançamento
           </Button>
           <span className="ml-auto flex gap-0.5">
-            <Button size="icon" variant="ghost" className="size-8" aria-label={`Editar carteira ${wallet.name}`} title="Editar" onClick={() => setDlg('edit')}>
-              <Pencil />
-            </Button>
-            <Button size="icon" variant="ghost" className="size-8" aria-label={`Excluir carteira ${wallet.name}`} title="Excluir" onClick={() => setDlg('delete')}>
-              <Trash2 />
-            </Button>
+            <Tooltip label="Editar" side="bottom">
+              <Button size="icon" variant="ghost" className="size-8" aria-label={`Editar carteira ${wallet.name}`} onClick={() => setDlg('edit')}>
+                <Pencil />
+              </Button>
+            </Tooltip>
+            <Tooltip label="Excluir" side="bottom" align="end">
+              <Button size="icon" variant="ghost" className="size-8" aria-label={`Excluir carteira ${wallet.name}`} onClick={() => setDlg('delete')}>
+                <Trash2 />
+              </Button>
+            </Tooltip>
           </span>
           <TxFormDialog open={dlg === 'tx'} onClose={() => setDlg(null)} walletId={wallet.id} />
           <WalletFormDialog open={dlg === 'edit'} onClose={() => setDlg(null)} wallet={wallet} />
@@ -403,12 +410,16 @@ function MovementRow({ e }: { e: WalletEvent }) {
       <SignedMoney value={e.kind === 'entrada' ? e.amount : -e.amount} muted={e.isTransfer} className="text-sm" />
       {txId && exists && (
         <span className="-mr-2 flex">
-          <Button size="icon" variant="ghost" className="size-8" aria-label="Editar lançamento" title="Editar" onClick={() => setDlg('edit')}>
-            <Pencil />
-          </Button>
-          <Button size="icon" variant="ghost" className="size-8" aria-label="Excluir lançamento" title="Excluir" onClick={() => setDlg('delete')}>
-            <Trash2 />
-          </Button>
+          <Tooltip label="Editar" side="bottom">
+            <Button size="icon" variant="ghost" className="size-8" aria-label="Editar lançamento" onClick={() => setDlg('edit')}>
+              <Pencil />
+            </Button>
+          </Tooltip>
+          <Tooltip label="Excluir" side="bottom" align="end">
+            <Button size="icon" variant="ghost" className="size-8" aria-label="Excluir lançamento" onClick={() => setDlg('delete')}>
+              <Trash2 />
+            </Button>
+          </Tooltip>
           <TxFormDialog open={dlg === 'edit'} onClose={() => setDlg(null)} txId={txId} />
           <ConfirmDialog open={dlg === 'delete'} onClose={() => setDlg(null)} title="Excluir lançamento" okLabel="Excluir" onOk={() => deleteTx(txId, money(e.amount))}>
             Excluir <b className="text-fg">{e.label}</b> de <b className="num text-fg">{money(e.amount)}</b> em <span className="num">{date(e.date)}</span>? Dá para

@@ -92,7 +92,7 @@ describe('busca', () => {
     mount()
     fireEvent.click(await screen.findByRole('button', { name: 'Buscar' }))
     const d = dlg()!
-    expect(within(d).getByText(/Busque por pessoa/)).toBeTruthy()
+    expect(within(d).getByText('Busque por pessoa, valor, grupo, carteira, categoria, conta fixa, compra no cartão ou meta.')).toBeTruthy()
     fireEvent.change(within(d).getByRole('combobox'), { target: { value: 'ana' } })
     expect(await within(d).findByRole('option', { name: /Ana Souza/ })).toBeTruthy()
     fireEvent.keyDown(within(d).getByRole('combobox'), { key: 'Enter' })
@@ -164,5 +164,21 @@ describe('simulador de empréstimo', () => {
     fireEvent.change(within(d).getByLabelText('Valor a emprestar (R$)'), { target: { value: 'abc' } })
     fireEvent.change(within(d).getByLabelText('Número de parcelas'), { target: { value: '' } })
     await waitFor(() => expect(within(d).getByText('Total').nextElementSibling?.textContent).toMatch(/0,00/))
+  })
+
+  it('cabeçalho: busca em barra com o atalho, sem botão de tema, configurações redondo e com dica', async () => {
+    mount()
+    const busca = await screen.findByRole('button', { name: 'Buscar' })
+    expect(busca.textContent).toContain('Buscar…')
+    expect(within(busca).getByText('Ctrl K').tagName).toBe('KBD')
+    expect(busca.getAttribute('aria-keyshortcuts')).toBe('Control+K')
+    expect(screen.queryByRole('button', { name: /tema/i })).toBeNull()
+    const config = screen.getByRole('link', { name: 'Configurações' })
+    expect(config.className).toContain('rounded-full')
+    expect(config.parentElement?.querySelector('[role="tooltip"]')?.textContent).toBe('Configurações')
+    // a dica é do balão único: não sobra o title nativo
+    expect(config.getAttribute('title')).toBeNull()
+    fireEvent.click(busca)
+    await waitFor(() => expect(dlg()).toBeTruthy())
   })
 })

@@ -1,9 +1,11 @@
 import { useCallback, useState } from 'react'
 import { NavLink, useLocation, useNavigate, useOutlet } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
-import { Calculator, ChartColumn, Eye, EyeOff, House, Moon, Receipt, Search, Settings, Sun, Users, Wallet, type LucideIcon } from 'lucide-react'
+import { Calculator, ChartColumn, Eye, EyeOff, House, Receipt, Search, Settings, Users, Wallet, type LucideIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Kbd } from '@/components/ui/kbd'
+import { Tooltip } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 import { useTheme } from './theme'
 import { useAppData } from './data-context'
@@ -37,7 +39,7 @@ function Underline({ id }: { id: string }) {
 export function AppShell() {
   const location = useLocation()
   const outlet = useOutlet()
-  const { theme, toggle } = useTheme()
+  const { toggle } = useTheme()
   const { result, cloud, bot, conflict, hideValues, toggleHideValues } = useAppData()
   const [searchOpen, setSearchOpen] = useState(false)
   const [simOpen, setSimOpen] = useState(false)
@@ -110,45 +112,54 @@ export function AppShell() {
                 Demonstração
               </Badge>
             )}
-            <Button variant="ghost" size="icon" onClick={() => setSearchOpen(true)} aria-label="Buscar" title="Buscar (Ctrl+K ou /)">
-              <Search />
-            </Button>
-            <Button variant="ghost" size="icon" onClick={() => setSimOpen(true)} aria-label="Simulador de empréstimo" title="Simulador de empréstimo">
-              <Calculator />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={toggleHideValues}
-              aria-pressed={hideValues}
-              aria-label={hideValues ? 'Mostrar valores' : 'Esconder valores'}
-              title={hideValues ? 'Mostrar valores' : 'Esconder valores'}
-            >
-              {hideValues ? <EyeOff /> : <Eye />}
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={toggle}
-              aria-label={theme === 'dark' ? 'Usar tema claro' : 'Usar tema escuro'}
-              title={theme === 'dark' ? 'Tema claro' : 'Tema escuro'}
-            >
-              {theme === 'dark' ? <Sun /> : <Moon />}
-            </Button>
-            <NavLink
-              to="/configuracoes"
-              aria-label="Configurações"
-              title="Configurações"
-              className={({ isActive }) =>
-                cn(
-                  'relative inline-flex size-9 items-center justify-center rounded-sm transition-colors hover:bg-surface-2 hover:text-fg [&_svg]:size-4',
-                  isActive ? 'text-fg' : 'text-fg-muted',
-                )
-              }
-            >
-              <Settings aria-hidden="true" />
-              {cloudError && <span aria-hidden="true" className="absolute top-2 right-2 size-1.5 rounded-full bg-neg" />}
-            </NavLink>
+            <Tooltip label="Buscar (Ctrl+K ou /)" side="bottom" bubbleClassName="md:hidden">
+              <button
+                type="button"
+                onClick={() => setSearchOpen(true)}
+                aria-label="Buscar"
+                aria-keyshortcuts="Control+K"
+                className="inline-flex size-9 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-full text-sm text-fg-muted transition-colors hover:bg-surface-2 hover:text-fg md:w-64 md:justify-start md:border md:border-border md:bg-surface-2/40 md:pr-1.5 md:pl-3 md:backdrop-blur-md md:hover:border-border-strong [&_svg]:size-4 [&_svg]:shrink-0"
+              >
+                <Search aria-hidden="true" />
+                <span aria-hidden="true" className="hidden flex-1 text-left md:block">
+                  Buscar…
+                </span>
+                <Kbd aria-hidden="true" className="hidden md:inline-flex">
+                  Ctrl K
+                </Kbd>
+              </button>
+            </Tooltip>
+            <Tooltip label="Simulador de empréstimo" side="bottom">
+              <Button variant="ghost" size="icon" onClick={() => setSimOpen(true)} aria-label="Simulador de empréstimo">
+                <Calculator />
+              </Button>
+            </Tooltip>
+            <Tooltip label={hideValues ? 'Mostrar valores' : 'Esconder valores'} side="bottom">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={toggleHideValues}
+                aria-pressed={hideValues}
+                aria-label={hideValues ? 'Mostrar valores' : 'Esconder valores'}
+              >
+                {hideValues ? <EyeOff /> : <Eye />}
+              </Button>
+            </Tooltip>
+            <Tooltip label="Configurações" side="bottom" align="end">
+              <NavLink
+                to="/configuracoes"
+                aria-label="Configurações"
+                className={({ isActive }) =>
+                  cn(
+                    'relative inline-flex size-9 items-center justify-center rounded-full transition-colors hover:bg-surface-2 hover:text-fg [&_svg]:size-4',
+                    isActive ? 'text-fg' : 'text-fg-muted',
+                  )
+                }
+              >
+                <Settings aria-hidden="true" />
+                {cloudError && <span aria-hidden="true" className="absolute top-2 right-2 size-1.5 rounded-full bg-neg" />}
+              </NavLink>
+            </Tooltip>
           </div>
         </div>
       </header>

@@ -156,14 +156,19 @@ describe('Pessoas: escrita', () => {
     expect(cor('Em atraso').icone).toContain('text-neg')
   })
 
-  it('lápis com dica ao lado do nome, antes da etiqueta de status; sem o telefone na página', async () => {
+  it('lápis com dica ao lado do nome; status em selinho na inicial; sem o telefone na página', async () => {
     seed({ contacts: { 'ana souza': { phone: '11999998888' } } })
     mount()
     const h1 = await screen.findByRole('heading', { level: 1, name: 'Ana Souza' })
     const lapis = screen.getByRole('button', { name: 'Editar pessoa' })
-    const etiqueta = screen.getByText('Em atraso', { selector: 'span.rounded-full' })
+    const selo = screen.getByRole('img', { name: 'Em atraso' })
     expect(h1.compareDocumentPosition(lapis) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
-    expect(lapis.compareDocumentPosition(etiqueta) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    // o status virou um selinho redondo no canto inferior direito da inicial, antes do nome
+    expect(selo.className).toContain('rounded-full')
+    expect(selo.parentElement?.className).toContain('-right-1')
+    expect(selo.parentElement?.className).toContain('-bottom-1')
+    expect(selo.parentElement?.parentElement?.textContent).toContain('AS')
+    expect(selo.compareDocumentPosition(h1) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     expect(lapis.parentElement?.querySelector('[role="tooltip"]')?.textContent).toBe('Editar pessoa')
     expect(screen.queryByText('(11) 99999-8888')).toBeNull()
   })

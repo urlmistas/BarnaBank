@@ -3,6 +3,7 @@ import { useParams, useSearchParams } from 'react-router-dom'
 import { Medal, Plus, Trophy } from 'lucide-react'
 import { useAppData } from '@/app/data-context'
 import { Button } from '@/components/ui/button'
+import { Tooltip } from '@/components/ui/tooltip'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useToast } from '@/components/ui/toast'
 import { rankingHtml, rankingRows } from '@/lib/print/documents'
@@ -94,11 +95,11 @@ function PessoasReady({ data, today }: { data: AppData; today: string }) {
           </div>
           <div className="flex items-center gap-2">
             {data.debts.some((d) => d.kind === 'receivable') && (
+              <Tooltip label="Ranking dos pagadores" side="bottom">
               <Button
                 size="icon"
                 variant="ghost"
                 aria-label="Ranking"
-                title="Ranking dos pagadores"
                 onClick={() => {
                   const html = rankingHtml(rankingRows(data.debts, today), { ...doc, issuedAt: new Date() })
                   if (!openPrintWindow(html)) toast.show('Seu navegador bloqueou a nova janela. Permita pop-ups para este site e tente de novo.')
@@ -106,11 +107,14 @@ function PessoasReady({ data, today }: { data: AppData; today: string }) {
               >
                 <Trophy aria-hidden="true" />
               </Button>
+              </Tooltip>
             )}
             {data.debts.some((d) => d.kind === 'receivable') && (
-              <Button size="icon" variant="ghost" aria-label="Placar" title="Placar" onClick={() => setBoard(true)}>
-                <Medal aria-hidden="true" />
-              </Button>
+              <Tooltip label="Placar" side="bottom">
+                <Button size="icon" variant="ghost" aria-label="Placar" onClick={() => setBoard(true)}>
+                  <Medal aria-hidden="true" />
+                </Button>
+              </Tooltip>
             )}
             {canCreate && (
               <Button size="sm" onClick={() => setCreating(true)}>

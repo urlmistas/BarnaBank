@@ -13,6 +13,7 @@ import { personSheetHtml } from '@/lib/print/documents'
 import { openPrintWindow } from '@/lib/print/html'
 import { useDocCtx } from '@/lib/print/use-doc-ctx'
 import { useToast } from '@/components/ui/toast'
+import { Tooltip } from '@/components/ui/tooltip'
 import { whatsPhone } from '@/lib/finance/groups'
 import { personDetail, type DebtView, type HistoryItem, type InstView, type PersonDetail } from '@/lib/finance/people'
 import type { DebtCalc } from '@/lib/finance/debts'
@@ -86,14 +87,16 @@ export function PersonDetailView({
 
       <Card className="p-5 sm:p-6">
         <header className="flex flex-wrap items-start gap-4">
-          <Avatar name={p.name} size="lg" />
+          <span className="relative shrink-0">
+            <Avatar name={p.name} size="lg" />
+            <StatusBadge status={f.status} />
+          </span>
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
               <h1 id="pessoa-nome" ref={headingRef} tabIndex={-1} className="truncate text-2xl font-semibold tracking-tight outline-none">
                 {p.name}
               </h1>
               <EditPersonButton personKey={p.key} name={p.name} />
-              <StatusChip status={f.status} />
             </div>
             <p className="mt-1 text-sm text-fg-muted">
               {plural(p.debts.length, 'dívida', 'dívidas')} · desde <span className="num">{date(p.since)}</span>
@@ -192,13 +195,20 @@ export function PersonDetailView({
   )
 }
 
-function StatusChip({ status }: { status: PersonFacts['status'] }) {
+/** selinho redondo no canto inferior direito da inicial: atraso (vermelho), em dia (verde) ou quitado (neutro) */
+function StatusBadge({ status }: { status: PersonFacts['status'] }) {
   const map = {
-    late: { text: 'Em atraso', cls: 'border-neg/40 bg-neg/10 text-neg' },
-    open: { text: 'Em dia', cls: 'border-pos/40 bg-pos/10 text-pos' },
-    settled: { text: 'Quitado', cls: 'border-border bg-surface-2 text-fg-muted' },
+    late: { text: 'Em atraso', cls: 'bg-neg text-white', Icon: ClockAlert },
+    open: { text: 'Em dia', cls: 'bg-pos text-bg', Icon: Check },
+    settled: { text: 'Quitado', cls: 'border border-border-strong bg-surface-2 text-fg-muted', Icon: CircleCheck },
   }[status]
-  return <span className={cn('inline-flex h-6 items-center rounded-full border px-2.5 text-xs font-medium', map.cls)}>{map.text}</span>
+  return (
+    <Tooltip label={map.text} side="bottom" className="absolute -right-1 -bottom-1">
+      <span role="img" aria-label={map.text} className={cn('grid size-5 place-items-center rounded-full ring-2 ring-surface', map.cls)}>
+        <map.Icon aria-hidden="true" className="size-3" strokeWidth={2.5} />
+      </span>
+    </Tooltip>
+  )
 }
 
 function Fact({ label, value, tone }: { label: string; value: string; tone?: string }) {
