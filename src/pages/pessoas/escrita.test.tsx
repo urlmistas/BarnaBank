@@ -128,6 +128,48 @@ describe('Pessoas: escrita', () => {
     expect(screen.getByRole('link', { name: /Pessoas/ })).toBeTruthy()
   })
 
+  it('as abas ficam no topo e a aba Gráfico mostra pagamentos e pontualidade', async () => {
+    seed({ debts: [debt({ payments: [{ date: '2026-10-05', amount: 40 }] })] })
+    mount()
+    const tablist = await screen.findByRole('tablist', { name: /Informações de Ana Souza/ })
+    const resumo = screen.getByRole('complementary', { name: /Informações de Ana Souza/ })
+    // as abas vêm antes da barra lateral (Resumo), na ordem do documento
+    expect(tablist.compareDocumentPosition(resumo) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(within(resumo).getByText('Quitação prevista')).toBeTruthy()
+    fireEvent.click(within(tablist).getByRole('tab', { name: 'Gráfico' }))
+    expect(await screen.findByRole('region', { name: 'Pagamentos por mês' })).toBeTruthy()
+    expect(screen.getByRole('region', { name: 'Pontualidade' })).toBeTruthy()
+  })
+
+  it('a aba da pessoa diz "Me deve", tem Linha do tempo e o gráfico traz a evolução do saldo', async () => {
+    seed({ debts: [debt({ payments: [{ date: '2026-10-05', amount: 40 }] })] })
+    mount()
+    const tablist = await screen.findByRole('tablist', { name: /Informações de Ana Souza/ })
+    expect(within(tablist).getByRole('tab', { name: /^Me deve/ })).toBeTruthy()
+    expect(within(tablist).queryByRole('tab', { name: /Me devem/ })).toBeNull()
+    // Linha do tempo fica ao lado de Calendário
+    const names = within(tablist).getAllByRole('tab').map((t) => t.textContent)
+    expect(names.indexOf('Linha do tempo')).toBe(names.indexOf('Calendário') + 1)
+    fireEvent.click(within(tablist).getByRole('tab', { name: 'Linha do tempo' }))
+    const lista = await screen.findByRole('list', { name: /Linha do tempo de Ana Souza/ })
+    expect(within(lista).getByText('Pagamento recebido')).toBeTruthy()
+    expect(within(lista).getByText(/Empréstimo criado/)).toBeTruthy()
+    fireEvent.click(within(tablist).getByRole('tab', { name: 'Gráfico' }))
+    expect(await screen.findByRole('region', { name: 'Evolução do saldo' })).toBeTruthy()
+  })
+
+  it('"Exportar ficha" abre o documento da pessoa', async () => {
+    seed({ contacts: { 'ana souza': { phone: '11999998888', notes: 'Paga dia 5' } } })
+    const win = { document: { open: vi.fn(), write: vi.fn(), close: vi.fn() } }
+    vi.stubGlobal('open', vi.fn(() => win))
+    mount()
+    fireEvent.click(await screen.findByRole('button', { name: /Exportar ficha/ }))
+    const html = win.document.write.mock.calls[0][0] as string
+    expect(html).toContain('Ficha da pessoa')
+    expect(html).toContain('Ana Souza')
+    expect(html).toContain('Paga dia 5')
+  })
+
   it('excluir dívida pede confirmação', async () => {
     seed()
     mount()

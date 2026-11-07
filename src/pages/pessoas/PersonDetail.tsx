@@ -1,13 +1,18 @@
-import { lazy, Suspense, useEffect, useId, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
-import { ArrowLeft, Check, ChevronDown, Circle, CircleAlert, CircleDashed, Image, Inbox, MessageCircle, Paperclip, Pencil, Plus, Trash2, UserRound } from 'lucide-react'
+import { ArrowLeft, Check, ChevronDown, Circle, CircleAlert, CircleDashed, FileDown, Image, Inbox, MessageCircle, Paperclip, Pencil, Plus, Trash2, UserRound } from 'lucide-react'
 import { useAppData } from '@/app/data-context'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { TabPanel, Tabs } from '@/components/ui/tabs'
 import { personFacts, type PersonFacts } from '@/lib/finance/person-facts'
+import { formatPhone, notesOf, tagsOf } from '@/lib/finance/person-extra'
+import { personSheetHtml } from '@/lib/print/documents'
+import { openPrintWindow } from '@/lib/print/html'
+import { useDocCtx } from '@/lib/print/use-doc-ctx'
+import { useToast } from '@/components/ui/toast'
 import { whatsPhone } from '@/lib/finance/groups'
 import { personDetail, type DebtView, type HistoryItem, type InstView, type PersonDetail } from '@/lib/finance/people'
 import type { DebtCalc } from '@/lib/finance/debts'
@@ -24,10 +29,12 @@ import { ReceiptDialog } from './receipt-ui'
 import { useReceiptActions } from './use-receipts'
 import { receiptIdOf } from '@/lib/receipts/store'
 
+const PersonChart = lazy(() => import('./PersonChart').then((m) => ({ default: m.PersonChart })))
+const PersonTimeline = lazy(() => import('./PersonTimeline').then((m) => ({ default: m.PersonTimeline })))
 const PersonCalendar = lazy(() => import('./PersonCalendar').then((m) => ({ default: m.PersonCalendar })))
 
 const ease = [0.2, 0, 0, 1] as const
-type Tab = 'receber' | 'pagar' | 'historico' | 'calendario'
+type Tab = 'receber' | 'pagar' | 'historico' | 'grafico' | 'calendario' | 'linha'
 
 export function PersonDetailView({
   personKey,
@@ -44,6 +51,8 @@ export function PersonDetailView({
   const p = useMemo(() => personDetail(data, personKey, today, date, calc), [data, personKey, today, date, calc])
   const headingRef = useRef<HTMLHeadingElement>(null)
   const [newDebt, setNewDebt] = useState(false)
+  const doc = useDocCtx()
+  const toast = useToast()
 
   // página própria da pessoa: o foco vai para o nome, como numa navegação nova
   useEffect(() => {
@@ -109,44 +118,65 @@ export function PersonDetailView({
               </a>
             </Button>
           )}
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => {
+              const c = data.contacts[p.key]
+              const html = personSheetHtml({ p, facts: f, phone: formatPhone(c?.phone), tags: tagsOf(c), notes: notesOf(c) }, { ...doc, issuedAt: new Date() })
+              if (!openPrintWindow(html)) toast.show('Seu navegador bloqueou a nova janela. Permita pop-ups para este site e tente de novo.')
+            }}
+          >
+            <FileDown aria-hidden="true" />
+            Exportar ficha
+          </Button>
           {p.hasReceivable && <ShareButton type="person" refKey={p.key} label={p.name} />}
           {p.hasPayable && <ShareButton type="owe" refKey={p.key} label={p.name} />}
         </div>
+        {tiles.length > 0 && (
+          <dl
+            className={cn(
+              'mt-5 grid grid-cols-2 gap-px overflow-hidden rounded-md border border-border bg-border',
+              tiles.length >= 6 ? 'sm:grid-cols-3' : tiles.length >= 4 ? 'sm:grid-cols-4' : 'sm:grid-cols-2',
+            )}
+          >
+            {tiles.map((it) => (
+              <div key={it.label} className="min-w-0 bg-surface px-4 py-3">
+                <dt className="text-xs text-fg-muted">{it.label}</dt>
+                <dd className={cn('num mt-1 truncate text-lg font-semibold tracking-tight', it.tone)} title={money(it.value)}>
+                  {money(it.value)}
+                </dd>
+              </div>
+            ))}
+          </dl>
+        )}
       </Card>
 
-      {tiles.length > 0 && (
-        <dl className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          {tiles.map((it) => (
-            <div key={it.label} className="min-w-0 rounded-lg border border-border bg-surface px-4 py-3">
-              <dt className="text-xs text-fg-muted">{it.label}</dt>
-              <dd className={cn('num mt-1 truncate text-lg font-semibold tracking-tight', it.tone)} title={money(it.value)}>
-                {money(it.value)}
-              </dd>
-            </div>
-          ))}
-        </dl>
-      )}
-
-      <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start">
-        <PersonTabs p={p} />
-        <aside aria-label={`Informações de ${p.name}`} className="flex flex-col gap-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Resumo</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <dl className="divide-y divide-border text-sm">
-                <Fact label="Dívidas em aberto" value={String(f.openCount)} />
-                <Fact label="Dívidas quitadas" value={String(f.paidCount)} />
-                <Fact label="Próximo vencimento" value={f.nextDue ? date(f.nextDue) : '—'} />
-                <Fact label="Último pagamento" value={f.lastPayment ? date(f.lastPayment) : '—'} />
-                <Fact label="Pagamentos registrados" value={String(f.paymentsCount)} />
-                <Fact label="Cliente desde" value={date(p.since)} />
-              </dl>
-            </CardContent>
-          </Card>
-          <PersonExtra personKey={p.key} name={p.name} />
-        </aside>
+      <div className="mt-4">
+        <PersonTabs
+          p={p}
+          side={
+            <aside aria-label={`Informações de ${p.name}`} className="flex flex-col gap-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Resumo</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <dl className="divide-y divide-border text-sm">
+                    <Fact label="Dívidas em aberto" value={String(f.openCount)} />
+                    <Fact label="Dívidas quitadas" value={String(f.paidCount)} />
+                    <Fact label="Próximo vencimento" value={f.nextDue ? date(f.nextDue) : '—'} />
+                    <Fact label="Quitação prevista" value={f.payoffDate ? date(f.payoffDate) : '—'} />
+                    <Fact label="Último pagamento" value={f.lastPayment ? date(f.lastPayment) : '—'} />
+                    <Fact label="Pagamentos registrados" value={String(f.paymentsCount)} />
+                    <Fact label="Cliente desde" value={date(p.since)} />
+                  </dl>
+                </CardContent>
+              </Card>
+              <PersonExtra personKey={p.key} name={p.name} />
+            </aside>
+          }
+        />
       </div>
 
       <DebtFormDialog open={newDebt} onClose={() => setNewDebt(false)} initialName={p.name} kind={p.hasReceivable || !p.hasPayable ? 'receivable' : 'payable'} />
@@ -172,52 +202,60 @@ function Fact({ label, value }: { label: string; value: string }) {
   )
 }
 
-function PersonTabs({ p }: { p: PersonDetail }) {
+function PersonTabs({ p, side }: { p: PersonDetail; side: ReactNode }) {
   const toReceive = p.debts.filter((v) => v.kind === 'receivable')
   const toPay = p.debts.filter((v) => v.kind === 'payable')
   const [tab, setTab] = useState<Tab>(toReceive.length || !toPay.length ? 'receber' : 'pagar')
   const baseId = useId()
   const items: { value: Tab; label: string; count?: number }[] = []
-  if (toReceive.length || !toPay.length) items.push({ value: 'receber', label: 'Me devem', count: toReceive.length })
+  if (toReceive.length || !toPay.length) items.push({ value: 'receber', label: 'Me deve', count: toReceive.length })
   if (toPay.length) items.push({ value: 'pagar', label: 'Eu devo', count: toPay.length })
-  items.push({ value: 'historico', label: 'Histórico', count: p.history.length }, { value: 'calendario', label: 'Calendário' })
+  items.push({ value: 'historico', label: 'Histórico', count: p.history.length }, { value: 'grafico', label: 'Gráfico' }, { value: 'calendario', label: 'Calendário' }, { value: 'linha', label: 'Linha do tempo' })
   const list = tab === 'pagar' ? toPay : toReceive
   // só a primeira dívida em aberto (ou a primeira, se tudo está quitado) vem aberta; as outras abrem ao clicar
   const firstOpenId = (list.find((v) => !v.paid) ?? list[0])?.debt.id
   return (
     <div className="min-w-0">
-      <Tabs
-        baseId={baseId}
-        label={`Informações de ${p.name}`}
-        value={tab}
-        onChange={setTab}
-        items={items}
-      />
-      <AnimatePresence mode="wait" initial={false}>
-        <motion.div
-          key={tab}
-          initial={{ opacity: 0, y: 4 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.15, ease }}
-        >
-          <TabPanel baseId={baseId} value={tab} className="pt-4 pb-2">
-            {(tab === 'receber' || tab === 'pagar') && (
-              <div className="flex flex-col gap-3">
-                {list.map((v) => (
-                  <DebtCard key={v.debt.id} v={v} defaultOpen={v.debt.id === firstOpenId} />
-                ))}
-              </div>
-            )}
-            {tab === 'historico' && <History items={p.history} debts={p.debts.map((v) => v.debt)} />}
-            {tab === 'calendario' && (
-              <Suspense fallback={<div className="h-80" />}>
-                <PersonCalendar p={p} />
-              </Suspense>
-            )}
-          </TabPanel>
-        </motion.div>
-      </AnimatePresence>
+      <Tabs baseId={baseId} label={`Informações de ${p.name}`} value={tab} onChange={setTab} items={items} />
+      <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start">
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.div
+            key={tab}
+            className="min-w-0"
+            initial={{ opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.15, ease }}
+          >
+            <TabPanel baseId={baseId} value={tab}>
+              {(tab === 'receber' || tab === 'pagar') && (
+                <div className="flex flex-col gap-3">
+                  {list.map((v) => (
+                    <DebtCard key={v.debt.id} v={v} defaultOpen={v.debt.id === firstOpenId} />
+                  ))}
+                </div>
+              )}
+              {tab === 'historico' && <History items={p.history} debts={p.debts.map((v) => v.debt)} />}
+              {tab === 'grafico' && (
+                <Suspense fallback={<div className="h-80" />}>
+                  <PersonChart p={p} />
+                </Suspense>
+              )}
+              {tab === 'linha' && (
+                <Suspense fallback={<div className="h-80" />}>
+                  <PersonTimeline p={p} />
+                </Suspense>
+              )}
+              {tab === 'calendario' && (
+                <Suspense fallback={<div className="h-80" />}>
+                  <PersonCalendar p={p} />
+                </Suspense>
+              )}
+            </TabPanel>
+          </motion.div>
+        </AnimatePresence>
+        {side}
+      </div>
     </div>
   )
 }

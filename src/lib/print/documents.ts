@@ -1,7 +1,8 @@
 import type { Debt, ISODate, Wallet } from '@/lib/types'
 import { EPS, round2 } from '@/lib/finance/dates'
 import { finalValue, installments, makeDebtCalc, paidAmount } from '@/lib/finance/debts'
-import { initials, nameKey } from '@/lib/finance/people'
+import { initials, nameKey, type PersonDetail } from '@/lib/finance/people'
+import type { PersonFacts } from '@/lib/finance/person-facts'
 import { dataCompleta, dataExtenso, extenso } from './extenso'
 import { esc, renderDoc } from './html'
 
@@ -200,6 +201,67 @@ export function receiptHtml(d: Debt, ctx: DocCtx, groupTitle?: string): string {
     `<div class="r-sign">${owner ? `<b>${esc(owner)}</b>` : '<span style="color:var(--p-subtle)">Assinatura de quem recebeu</span>'}</div></div>` +
     `<p class="r-foot">Gerado pelo BarnaBank em ${esc(dataCompleta(ctx.today))} · código ${esc(code)}. Valores conforme os pagamentos registrados.</p></div>`
   return renderDoc({ title: `Recibo de quitação — ${d.name} — BarnaBank`, css: SHEET_CSS + RECEIPT_CSS, body, theme: ctx.theme })
+}
+
+// ---------------------------------------------------------------- ficha da pessoa
+
+export interface PersonSheet {
+  p: PersonDetail
+  facts: PersonFacts
+  phone: string
+  tags: string[]
+  notes: string
+}
+
+/** ficha com tudo da pessoa: valores, resumo, dívidas e últimos pagamentos */
+export function personSheetHtml(s: PersonSheet, ctx: DocCtx): string {
+  const { p, facts: f } = s
+  const t = p.totals
+  const status = f.status === 'late' ? 'Em atraso' : f.status === 'open' ? 'Em dia' : 'Quitado'
+  const big: [string, number, boolean?][] = []
+  if (p.hasReceivable) big.push(['Falta receber', t.toReceive], ['Em atraso', t.overdue], ['Já recebi', t.received])
+  if (p.hasPayable) big.push(['Eu devo', t.owe], ['Já paguei', t.paidOut])
+  const grid = big
+    .slice(0, 3)
+    .map(([l, v]) => `<div><div class="s-label">${esc(l)}</div><div class="s-val">${esc(ctx.money(v))}</div></div>`)
+    .join('')
+  const extra = big.length > 3 ? big.slice(3).map(([l, v]) => `<div class="row"><span>${esc(l)}</span><b>${esc(ctx.money(v))}</b></div>`).join('') : ''
+  const row = (l: string, v: string) => `<div class="row"><span>${esc(l)}</span><b>${esc(v)}</b></div>`
+  const summary =
+    row('Situação', status) +
+    row('Total emprestado', ctx.money(t.lent)) +
+    row('Dívidas em aberto', String(f.openCount)) +
+    row('Dívidas quitadas', String(f.paidCount)) +
+    row('Próximo vencimento', f.nextDue ? ctx.date(f.nextDue) : '—') +
+    row('Quitação prevista', f.payoffDate ? ctx.date(f.payoffDate) : '—') +
+    row('Último pagamento', f.lastPayment ? ctx.date(f.lastPayment) : '—') +
+    row('Cliente desde', ctx.date(p.since)) +
+    extra
+  const debts = p.debts
+    .map((v) => {
+      const sit = v.paid ? 'Quitada' : v.status === 'atrasado' ? 'Atrasada' : 'Em aberto'
+      return (
+        `<tr><td>${esc(v.label)}${v.kind === 'payable' ? ' <span style="color:var(--p-subtle)">(eu devo)</span>' : ''}</td><td>${esc(ctx.date(v.debt.date))}</td>` +
+        `<td class="num">${esc(ctx.money(v.total))}</td><td class="num">${esc(ctx.money(v.paidAmount))}</td><td class="num">${esc(ctx.money(v.paid ? 0 : v.remaining))}</td>` +
+        `<td><span class="pill ${v.paid ? 'pill-paid' : 'pill-pending'}">${sit}</span></td></tr>`
+      )
+    })
+    .join('')
+  const pays = [...p.history]
+    .sort((a, b) => (a.date < b.date ? 1 : -1))
+    .slice(0, 12)
+    .map((h) => `<tr><td>${esc(ctx.date(h.date))}</td><td>${esc(h.debtLabel)}${h.note ? ' · ' + esc(h.note) : ''}</td><td class="num">${h.dir === 'in' ? '+' : '−'} ${esc(ctx.money(h.amount))}</td></tr>`)
+    .join('')
+  const contact = [s.phone, ...s.tags].filter(Boolean).join(' · ')
+  const body =
+    `<div class="sheet">${top('Ficha da pessoa')}<h1 class="s-title">${esc(p.name)}</h1>` +
+    `<div class="s-sub">${esc(status)} · ${p.debts.length} ${p.debts.length === 1 ? 'dívida' : 'dívidas'}${contact ? ' · ' + esc(contact) : ''}</div>` +
+    `<div class="s-grid">${grid}</div><div class="s-summary">${summary}</div>` +
+    (s.notes ? `<div class="s-notes"><div class="s-label">Anotações</div><p>${esc(s.notes)}</p></div>` : '') +
+    (debts ? `<table><thead><tr><th>Dívida</th><th>Data</th><th class="num">Total</th><th class="num">Pago</th><th class="num">Falta</th><th>Situação</th></tr></thead><tbody>${debts}</tbody></table>` : '') +
+    (pays ? `<div class="s-label">Últimos pagamentos</div><table><thead><tr><th>Data</th><th>Referente a</th><th class="num">Valor</th></tr></thead><tbody>${pays}</tbody></table>` : '') +
+    `${footer(ctx)}</div>`
+  return renderDoc({ title: `Ficha — ${p.name} — BarnaBank`, css: SHEET_CSS, body, theme: ctx.theme })
 }
 
 // ---------------------------------------------------------------- ranking dos pagadores
