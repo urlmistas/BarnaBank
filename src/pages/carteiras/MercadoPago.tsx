@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useId, useState, type FormEvent } from 'react'
-import { Loader2, RefreshCw, Settings2 } from 'lucide-react'
+import { Loader2, RefreshCw, Settings2, X } from 'lucide-react'
 import { useAppData } from '@/app/data-context'
 import { Button } from '@/components/ui/button'
 import { MercadoPagoLogo } from '@/components/mercado-pago-logo'
@@ -187,7 +187,9 @@ function SetupForm({ current, onClose, onSaved }: { current: MpView | null; onCl
         const { pots } = await mpFind((u, i) => fetch(u, i), await botToken())
         if (!live) return
         const known = new Map<string, MpPot>((current?.pots ?? []).map((p) => [p.id, p]))
-        const ids = new Set([...pots.map((p) => p.id), ...known.keys()])
+        // caixinha antiga, parada e que você não usa mais não precisa aparecer (dá para tirar qualquer uma no X)
+        const recente = Date.now() - 60 * 86400000
+        const ids = new Set([...pots.filter((p) => p.porGasto > 0 || Date.parse(p.ultimo) > recente).map((p) => p.id), ...known.keys()])
         const found = new Map<string, MpFound>(pots.map((p) => [p.id, p]))
         setRows(
           [...ids].map((id) => {
@@ -249,11 +251,14 @@ function SetupForm({ current, onClose, onSaved }: { current: MpView | null; onCl
       )}
       {rows && rows.length === 0 && <p className="mt-2 text-sm text-fg-muted">Nenhuma caixinha apareceu nas suas movimentações.</p>}
       {rows?.map((r) => (
-        <div key={r.id} className="mt-3 grid grid-cols-[1fr_1fr_72px] gap-2">
-          <div className="col-span-3 text-xs text-fg-subtle">{r.porGasto > 0 ? 'Recebe ' + formatMoneyInput(r.porGasto) + ' a cada gasto' : 'Caixinha ' + r.id.slice(0, 4)}</div>
+        <div key={r.id} className="mt-3 grid grid-cols-[1fr_1fr_72px_auto] gap-2">
+          <div className="col-span-4 text-xs text-fg-subtle">{r.porGasto > 0 ? 'Recebe ' + formatMoneyInput(r.porGasto) + ' a cada gasto' : 'Caixinha ' + r.id.slice(0, 4)}</div>
           <Input aria-label={'Nome da caixinha ' + r.id.slice(0, 4)} placeholder="Nome" value={r.name} onChange={(e) => set(r.id, { name: e.target.value })} />
           <Input aria-label={'Valor da caixinha ' + (r.name || r.id.slice(0, 4))} inputMode="decimal" placeholder="Valor" value={r.valor} onChange={(e) => set(r.id, { valor: e.target.value })} />
           <Input aria-label={'% do CDI da caixinha ' + (r.name || r.id.slice(0, 4))} inputMode="decimal" value={r.pct} onChange={(e) => set(r.id, { pct: e.target.value })} />
+          <Button type="button" variant="ghost" size="icon" aria-label={'Tirar a caixinha ' + (r.name || r.id.slice(0, 4))} onClick={() => setRows((rs) => rs && rs.filter((x) => x.id !== r.id))}>
+            <X />
+          </Button>
         </div>
       ))}
       <p role="alert" aria-live="assertive" className="mt-3 min-h-5 text-xs text-neg">
