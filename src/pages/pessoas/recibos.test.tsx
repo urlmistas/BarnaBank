@@ -121,6 +121,10 @@ describe('Pessoas: documentos', () => {
     localStorage.clear()
     seed(debt(PAID))
     mount()
+    // a dívida quitada vem dobrada: abre o card para chegar ao recibo
+    expect(screen.queryByRole('button', { name: /Recibo de quitação/ })).toBeNull()
+    const cabecalho = (await screen.findAllByRole('button', { expanded: false })).find((b) => b.getAttribute('aria-controls'))!
+    fireEvent.click(cabecalho)
     fireEvent.click(await screen.findByRole('button', { name: /Recibo de quitação/ }))
     const html = win.document.write.mock.calls[0][0] as string
     expect(html).toContain('RECIBO DE QUITAÇÃO')

@@ -1,11 +1,11 @@
 import { lazy, Suspense, useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
-import { ArrowLeft, BanknoteArrowUp, CalendarClock, Check, ChevronDown, Circle, CircleAlert, CircleDashed, ClockAlert, FileDown, HandCoins, Image, Inbox, MessageCircle, Paperclip, Pencil, PiggyBank, Plus, ReceiptText, Trash2, UserRound, type LucideIcon } from 'lucide-react'
+import { ArrowLeft, BanknoteArrowUp, CalendarClock, Check, ChevronDown, Circle, CircleAlert, CircleCheck, CircleDashed, ClockAlert, FileDown, HandCoins, Image, Inbox, MessageCircle, Paperclip, Pencil, PiggyBank, Plus, ReceiptText, Trash2, UserRound, type LucideIcon } from 'lucide-react'
 import { useAppData } from '@/app/data-context'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { TabPanel, Tabs } from '@/components/ui/tabs'
 import { personFacts, type PersonFacts } from '@/lib/finance/person-facts'
 import { formatPhone, notesOf, tagsOf } from '@/lib/finance/person-extra'
@@ -22,7 +22,7 @@ import type { AppData, Debt } from '@/lib/types'
 import { Avatar, SignedMoney } from './parts'
 import { DebtActions } from './DebtActions'
 import { ShareButton } from './share-dialog'
-import { PersonExtra } from './PersonExtra'
+import { EditPersonButton, TagsNotes, TrustSummary } from './PersonExtra'
 import { ConfirmDialog, DebtFormDialog, EditPaymentDialog } from './dialogs'
 import { useDebtActions } from './use-debt-actions'
 import { ReceiptDialog } from './receipt-ui'
@@ -92,6 +92,7 @@ export function PersonDetailView({
               <h1 id="pessoa-nome" ref={headingRef} tabIndex={-1} className="truncate text-2xl font-semibold tracking-tight outline-none">
                 {p.name}
               </h1>
+              <EditPersonButton personKey={p.key} name={p.name} />
               <StatusChip status={f.status} />
             </div>
             <p className="mt-1 text-sm text-fg-muted">
@@ -161,12 +162,16 @@ export function PersonDetailView({
           side={
             <aside aria-label={`Informações de ${p.name}`} className="flex flex-col gap-4">
               <Card>
-                <CardHeader>
-                  <CardTitle>Resumo</CardTitle>
-                </CardHeader>
-                <CardContent>
+                <CardContent className="pt-5">
+                  <TrustSummary personKey={p.key} />
+                  <h2 className="mt-5 border-t border-border pt-4 pb-2 text-sm font-medium">Resumo</h2>
                   <dl className="divide-y divide-border text-sm">
                     <Fact label="Dívidas em aberto" value={String(f.openCount)} />
+                    <Fact
+                      label="Dívidas em atraso"
+                      value={f.lateCount ? `${f.lateCount} · ${plural(f.lateInstallments, 'parcela', 'parcelas')}` : '0'}
+                      tone={f.lateCount ? 'text-neg' : undefined}
+                    />
                     <Fact label="Dívidas quitadas" value={String(f.paidCount)} />
                     <Fact label="Próximo vencimento" value={f.nextDue ? date(f.nextDue) : '—'} />
                     <Fact label="Quitação prevista" value={f.payoffDate ? date(f.payoffDate) : '—'} />
@@ -174,9 +179,9 @@ export function PersonDetailView({
                     <Fact label="Pagamentos registrados" value={String(f.paymentsCount)} />
                     <Fact label="Cliente desde" value={date(p.since)} />
                   </dl>
+                  <TagsNotes personKey={p.key} className="mt-4 border-t border-border pt-4" />
                 </CardContent>
               </Card>
-              <PersonExtra personKey={p.key} name={p.name} />
             </aside>
           }
         />
@@ -196,11 +201,11 @@ function StatusChip({ status }: { status: PersonFacts['status'] }) {
   return <span className={cn('inline-flex h-6 items-center rounded-full border px-2.5 text-xs font-medium', map.cls)}>{map.text}</span>
 }
 
-function Fact({ label, value }: { label: string; value: string }) {
+function Fact({ label, value, tone }: { label: string; value: string; tone?: string }) {
   return (
     <div className="flex items-center justify-between gap-3 py-2 first:pt-0 last:pb-0">
       <dt className="text-fg-muted">{label}</dt>
-      <dd className="num font-medium">{value}</dd>
+      <dd className={cn('num font-medium', tone)}>{value}</dd>
     </div>
   )
 }
@@ -215,8 +220,8 @@ function PersonTabs({ p, side }: { p: PersonDetail; side: ReactNode }) {
   if (toPay.length) items.push({ value: 'pagar', label: 'Eu devo', count: toPay.length })
   items.push({ value: 'historico', label: 'Histórico', count: p.history.length }, { value: 'grafico', label: 'Gráfico' }, { value: 'calendario', label: 'Calendário' }, { value: 'linha', label: 'Linha do tempo' })
   const list = tab === 'pagar' ? toPay : toReceive
-  // só a primeira dívida em aberto (ou a primeira, se tudo está quitado) vem aberta; as outras abrem ao clicar
-  const firstOpenId = (list.find((v) => !v.paid) ?? list[0])?.debt.id
+  // só a primeira dívida em aberto vem aberta; as quitadas e as outras abrem ao clicar
+  const firstOpenId = list.find((v) => !v.paid)?.debt.id
   return (
     <div className="min-w-0">
       <Tabs baseId={baseId} label={`Informações de ${p.name}`} value={tab} onChange={setTab} items={items} />
@@ -319,18 +324,18 @@ function DebtCard({ v, defaultOpen }: { v: DebtView; defaultOpen: boolean }) {
   if (v.credit > 0.005) extras.push({ label: pay ? 'Paguei a mais' : 'Recebido a mais', value: money(v.credit) })
 
   return (
-    <Card aria-label={v.label} className="overflow-hidden">
+    <Card aria-label={v.label} className={cn('relative overflow-hidden transition duration-200', v.paid && 'opacity-60 saturate-50 hover:opacity-100 hover:saturate-100 focus-within:opacity-100 focus-within:saturate-100')}>
       <button
         type="button"
         aria-expanded={open}
         aria-controls={bodyId}
         onClick={() => setOpen((o) => !o)}
-        className="block w-full cursor-pointer px-4 pt-3.5 pb-3 text-left transition-colors hover:bg-surface-2"
+        className={cn('block w-full cursor-pointer px-4 pt-3.5 pb-3 text-left transition-colors hover:bg-surface-2', v.paid && 'pl-11')}
       >
         <span className="flex items-start justify-between gap-3">
           <span className="min-w-0">
             <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
-              <span className="truncate text-sm font-medium">{v.label}</span>
+              <span className={cn('truncate text-sm font-medium', v.paid && 'text-fg-muted line-through decoration-fg-subtle/60')}>{v.label}</span>
               {d.groupId && <Badge>grupo</Badge>}
             </span>
             <span className={cn('mt-0.5 block text-xs', st.late ? 'text-neg' : 'text-fg-subtle')}>{st.text}</span>
@@ -345,17 +350,25 @@ function DebtCard({ v, defaultOpen }: { v: DebtView; defaultOpen: boolean }) {
             <ChevronDown aria-hidden="true" className={cn('mt-1 size-4 shrink-0 text-fg-subtle transition-transform', open && 'rotate-180')} />
           </span>
         </span>
-        <span
-          role="progressbar"
-          aria-label={pay ? 'Quanto já paguei' : 'Quanto já recebi'}
-          aria-valuemin={0}
-          aria-valuemax={100}
-          aria-valuenow={Math.round(v.progress)}
-          className="mt-3 block h-1 overflow-hidden rounded-full bg-surface-2"
-        >
-          <span className="block h-full rounded-full bg-accent" style={{ width: `${v.progress}%` }} />
+        <span className="mt-3 flex items-center gap-2">
+          <span
+            role="progressbar"
+            aria-label={pay ? 'Quanto já paguei' : 'Quanto já recebi'}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={Math.round(v.progress)}
+            className="block h-1 flex-1 overflow-hidden rounded-full bg-surface-2"
+          >
+            <span className={cn('block h-full rounded-full', v.paid ? 'bg-pos' : 'bg-accent')} style={{ width: `${v.paid ? 100 : v.progress}%` }} />
+          </span>
+          {v.paid && <CircleCheck aria-hidden="true" className="size-3.5 shrink-0 text-pos" />}
         </span>
       </button>
+      {v.paid && (
+        <span className="pointer-events-none absolute top-[11px] -left-[27px] w-[96px] -rotate-45 bg-pos/20 py-0.5 text-center text-[9px] font-semibold tracking-wider text-pos uppercase">
+          Quitada
+        </span>
+      )}
 
       <AnimatePresence initial={false}>
         {open && (

@@ -12,6 +12,9 @@ export interface PersonFacts {
   /** data do pagamento mais recente (entrada ou saída) */
   lastPayment: ISODate | null
   paymentsCount: number
+  /** quantas dívidas estão em atraso e quantas parcelas vencidas sem pagar elas somam */
+  lateCount: number
+  lateInstallments: number
   /** vencimento da última parcela em aberto: quando a pessoa termina de pagar, se pagar em dia */
   payoffDate: ISODate | null
   /** a receber menos o que eu devo; positivo = a pessoa me deve */
@@ -31,6 +34,8 @@ export function personFacts(p: PersonDetail, today: ISODate): PersonFacts {
     nextDue: dues[0] ?? null,
     lastPayment,
     payoffDate: lastDue,
+    lateCount: open.filter((v) => v.status === 'atrasado').length,
+    lateInstallments: open.reduce((n, v) => n + (v.status === 'atrasado' ? v.overdueCount : 0), 0),
     paymentsCount: p.history.length,
     net: p.totals.toReceive - p.totals.owe,
     status: late ? 'late' : open.length ? 'open' : 'settled',

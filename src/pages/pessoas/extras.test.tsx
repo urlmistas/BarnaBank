@@ -149,10 +149,10 @@ describe('Pessoas: etiquetas, notas e confiança', () => {
     expect(await screen.findByText('recebe dia 5')).toBeTruthy()
   })
 
-  it('edita o telefone da pessoa, mostra formatado e permite apagar', async () => {
+  it('edita o telefone da pessoa, atualiza o botão Conversar e permite apagar', async () => {
     seed({ contacts: { 'ana souza': { phone: '11999998888', tags: ['Amigo'] } } })
     mount()
-    expect(await screen.findByText('(11) 99999-8888')).toBeTruthy()
+    expect((await screen.findByRole('link', { name: /Conversar/ })).getAttribute('href')).toBe('https://wa.me/5511999998888')
     fireEvent.click(screen.getByRole('button', { name: /Editar pessoa/ }))
     let dlg = openDialog()
     const campo = within(dlg).getByLabelText('Telefone') as HTMLInputElement
@@ -161,7 +161,7 @@ describe('Pessoas: etiquetas, notas e confiança', () => {
     fireEvent.click(within(dlg).getByRole('button', { name: 'Salvar' }))
     await waitFor(() => expect(stored().contacts['ana souza'].phone).toBe('43988887777'))
     expect(stored().contacts['ana souza'].tags).toEqual(['Amigo'])
-    expect(await screen.findByText('(43) 98888-7777')).toBeTruthy()
+    await waitFor(() => expect(screen.getByRole('link', { name: /Conversar/ }).getAttribute('href')).toBe('https://wa.me/5543988887777'))
 
     fireEvent.click(screen.getByRole('button', { name: /Editar pessoa/ }))
     dlg = openDialog()

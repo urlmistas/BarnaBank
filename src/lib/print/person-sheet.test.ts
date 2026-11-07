@@ -15,7 +15,7 @@ describe('personSheetHtml', () => {
     debts: [{ label: 'Moto', kind: 'receivable', paid: false, status: 'atrasado', total: 300, paidAmount: 100, remaining: 200, debt: { date: '2026-02-01' } }],
     history: [{ date: '2026-03-01', amount: 100, dir: 'in', debtLabel: 'Moto', note: 'pix' }],
   } as unknown as PersonDetail
-  const facts: PersonFacts = { openCount: 1, paidCount: 0, nextDue: '2026-12-01', lastPayment: '2026-03-01', payoffDate: '2027-03-01', paymentsCount: 1, net: 200, status: 'late' }
+  const facts: PersonFacts = { openCount: 1, paidCount: 0, nextDue: '2026-12-01', lastPayment: '2026-03-01', payoffDate: '2027-03-01', paymentsCount: 1, lateCount: 1, lateInstallments: 1, net: 200, status: 'late' }
 
   it('traz valores, resumo, dívidas e pagamentos, e escapa o nome', () => {
     const html = personSheetHtml({ p, facts, phone: '(11) 99999-8888', tags: ['Família'], notes: 'Paga dia 5' }, ctx)

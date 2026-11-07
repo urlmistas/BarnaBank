@@ -156,6 +156,49 @@ describe('Pessoas: escrita', () => {
     expect(cor('Em atraso').icone).toContain('text-neg')
   })
 
+  it('lápis com dica ao lado do nome, antes da etiqueta de status; sem o telefone na página', async () => {
+    seed({ contacts: { 'ana souza': { phone: '11999998888' } } })
+    mount()
+    const h1 = await screen.findByRole('heading', { level: 1, name: 'Ana Souza' })
+    const lapis = screen.getByRole('button', { name: 'Editar pessoa' })
+    const etiqueta = screen.getByText('Em atraso', { selector: 'span.rounded-full' })
+    expect(h1.compareDocumentPosition(lapis) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(lapis.compareDocumentPosition(etiqueta) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(lapis.parentElement?.querySelector('[role="tooltip"]')?.textContent).toBe('Editar pessoa')
+    expect(screen.queryByText('(11) 99999-8888')).toBeNull()
+  })
+
+  it('confiança e resumo ficam no mesmo card, confiança primeiro, e o resumo conta dívidas em atraso', async () => {
+    seed({ debts: [debt(), debt({ id: 'd2', principal: 50 })] })
+    mount()
+    const lateral = await screen.findByRole('complementary', { name: /Informações de Ana Souza/ })
+    const nota = await within(lateral).findByText(/Confiança|Confiança: sem histórico/)
+    const resumo = within(lateral).getByRole('heading', { name: 'Resumo' })
+    expect(nota.compareDocumentPosition(resumo) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    // um único card: nota e resumo têm o mesmo ancestral <section>
+    expect(nota.closest('section')).toBe(resumo.closest('section'))
+    const linha = within(lateral).getByText('Dívidas em atraso').closest('div')!
+    expect(linha.textContent).toMatch(/2 · 2 parcelas|2 · /)
+  })
+
+  it('dívida quitada fica opaca e com selo "Quitada"; a em aberto não', async () => {
+    seed({ debts: [debt({ id: 'q1', payments: [{ date: '2020-01-05', amount: 100 }] }), debt({ id: 'a1', principal: 70 })] })
+    mount()
+    await screen.findByRole('heading', { level: 1, name: 'Ana Souza' })
+    const selo = await screen.findByText('Quitada', { selector: 'span' })
+    const quitada = selo.closest('section')!
+    expect(quitada.className).toContain('opacity-60')
+    // título riscado, barra cheia e verde, fita no canto e já dobrada
+    expect(quitada.querySelector('.line-through')).toBeTruthy()
+    expect(quitada.querySelector('[role="progressbar"] > span')?.className).toContain('bg-pos')
+    expect(quitada.querySelector('[role="progressbar"] > span')?.getAttribute('style')).toContain('width: 100%')
+    expect(selo.className).toContain('-rotate-45')
+    expect(quitada.querySelector('button[aria-expanded]')?.getAttribute('aria-expanded')).toBe('false')
+    // a dívida em aberto (a1, R$ 70) não ganha o efeito
+    const aberta = screen.getAllByRole('region').find((r) => r !== selo.closest('section') && r.getAttribute('data-slot') === 'card' && /R\$\s?70/.test(r.textContent ?? ''))
+    expect(aberta?.className ?? '').not.toContain('opacity-60')
+  })
+
   it('a aba da pessoa diz "Me deve", tem Linha do tempo e o gráfico traz a evolução do saldo', async () => {
     seed({ debts: [debt({ payments: [{ date: '2026-10-05', amount: 40 }] })] })
     mount()

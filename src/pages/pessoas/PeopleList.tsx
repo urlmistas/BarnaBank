@@ -210,6 +210,7 @@ function PersonRowLink({ row, filter, selected, href }: { row: PersonRow; filter
       className={cn(
         'relative flex items-center gap-3 px-4 py-3 transition-colors hover:bg-surface-2 focus-visible:bg-surface-2 focus-visible:outline-offset-[-2px]',
         selected && 'bg-surface-2',
+        row.openCount === 0 && 'opacity-60 saturate-50 hover:opacity-100 hover:saturate-100 focus-visible:opacity-100',
       )}
     >
       {selected && <span aria-hidden="true" className="absolute inset-y-0 left-0 w-0.5 bg-accent" />}

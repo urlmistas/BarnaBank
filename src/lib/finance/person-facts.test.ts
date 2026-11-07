@@ -45,6 +45,14 @@ describe('personFacts', () => {
     expect(f).toMatchObject({ lastPayment: '2026-10-05', paymentsCount: 3, net: -40, status: 'settled' })
   })
 
+  it('conta dívidas em atraso e as parcelas vencidas delas', () => {
+    const late = (n: number) => ({ paid: false, status: 'atrasado', overdueCount: n, insts: [] }) as unknown as PersonDetail['debts'][number]
+    const ok = { paid: false, status: 'em dia', overdueCount: 0, insts: [] } as unknown as PersonDetail['debts'][number]
+    const quitada = { paid: true, status: 'pago', overdueCount: 0, insts: [] } as unknown as PersonDetail['debts'][number]
+    const f = personFacts(person({ debts: [late(2), late(1), ok, quitada] }), '2026-11-07')
+    expect(f).toMatchObject({ lateCount: 2, lateInstallments: 3 })
+  })
+
   it('sem dívidas nem pagamentos', () => {
     expect(personFacts(person({}), '2026-11-07')).toMatchObject({ openCount: 0, nextDue: null, lastPayment: null, status: 'settled', net: 0 })
   })
