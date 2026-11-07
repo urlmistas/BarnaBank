@@ -1,12 +1,14 @@
 import { lazy, Suspense, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
-import { ArrowLeft, Check, ChevronDown, Circle, CircleAlert, CircleDashed, Image, Inbox, Paperclip, Pencil, Plus, Trash2, UserRound, X } from 'lucide-react'
+import { ArrowLeft, Check, ChevronDown, Circle, CircleAlert, CircleDashed, Image, Inbox, MessageCircle, Paperclip, Pencil, Plus, Trash2, UserRound } from 'lucide-react'
 import { useAppData } from '@/app/data-context'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Card } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { TabPanel, Tabs } from '@/components/ui/tabs'
+import { personFacts, type PersonFacts } from '@/lib/finance/person-facts'
+import { whatsPhone } from '@/lib/finance/groups'
 import { personDetail, type DebtView, type HistoryItem, type InstView, type PersonDetail } from '@/lib/finance/people'
 import type { DebtCalc } from '@/lib/finance/debts'
 import { plural } from '@/lib/format'
@@ -32,110 +34,145 @@ export function PersonDetailView({
   data,
   calc,
   backHref,
-  fullPage = false,
 }: {
   personKey: string
   data: AppData
   calc: DebtCalc
   backHref: string
-  fullPage?: boolean
 }) {
-  const { today, date, canCreate } = useAppData()
+  const { today, date, money, canCreate } = useAppData()
   const p = useMemo(() => personDetail(data, personKey, today, date, calc), [data, personKey, today, date, calc])
   const headingRef = useRef<HTMLHeadingElement>(null)
   const [newDebt, setNewDebt] = useState(false)
 
-  // página inteira (celular): o foco vai para o nome, como numa navegação nova
+  // página própria da pessoa: o foco vai para o nome, como numa navegação nova
   useEffect(() => {
-    if (fullPage) headingRef.current?.focus()
-  }, [fullPage])
+    headingRef.current?.focus()
+  }, [])
 
-  if (!p) return <NotFound backHref={backHref} fullPage={fullPage} />
+  if (!p) return <NotFound backHref={backHref} />
 
-  const H = fullPage ? 'h1' : 'h2'
+  const f = personFacts(p, today)
+  const phone = whatsPhone(data.contacts[p.key]?.phone)
+  const t = p.totals
+  const tiles: { label: string; value: number; tone?: string }[] = []
+  if (p.hasReceivable) {
+    tiles.push({ label: 'Falta receber', value: t.toReceive })
+    tiles.push({ label: 'Em atraso', value: t.overdue, tone: t.overdue > 0.005 ? 'text-neg' : undefined })
+    tiles.push({ label: 'Já recebi', value: t.received })
+    tiles.push({ label: 'Total emprestado', value: t.lent })
+  }
+  if (p.hasPayable) {
+    tiles.push({ label: 'Eu devo', value: t.owe })
+    tiles.push({ label: 'Já paguei', value: t.paidOut })
+  }
+
   return (
-    <motion.article
-      aria-labelledby="pessoa-nome"
-      initial={fullPage ? { opacity: 0, x: 12 } : false}
-      animate={{ opacity: 1, x: 0 }}
-      transition={{ duration: 0.2, ease }}
-      className={cn(!fullPage && 'rounded-lg border border-border bg-surface')}
-    >
-      {fullPage && (
-        <Button asChild variant="ghost" size="sm" className="-ml-2.5 mb-4">
-          <Link to={backHref}>
-            <ArrowLeft aria-hidden="true" /> Pessoas
-          </Link>
-        </Button>
-      )}
-      <header className={cn('flex items-start gap-3', !fullPage && 'px-5 pt-5')}>
-        <Avatar name={p.name} size="lg" />
-        <div className="min-w-0 flex-1 pt-0.5">
-          <H id="pessoa-nome" ref={headingRef} tabIndex={-1} className="truncate text-lg font-semibold tracking-tight outline-none">
-            {p.name}
-          </H>
-          <p className="text-sm text-fg-muted">
-            {plural(p.debts.length, 'dívida', 'dívidas')} · desde <span className="num">{date(p.since)}</span>
-          </p>
+    <motion.article aria-labelledby="pessoa-nome" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2, ease }}>
+      <Button asChild variant="ghost" size="sm" className="-ml-2.5 mb-4">
+        <Link to={backHref}>
+          <ArrowLeft aria-hidden="true" /> Pessoas
+        </Link>
+      </Button>
+
+      <Card className="p-5 sm:p-6">
+        <header className="flex flex-wrap items-start gap-4">
+          <Avatar name={p.name} size="lg" />
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <h1 id="pessoa-nome" ref={headingRef} tabIndex={-1} className="truncate text-2xl font-semibold tracking-tight outline-none">
+                {p.name}
+              </h1>
+              <StatusChip status={f.status} />
+            </div>
+            <p className="mt-1 text-sm text-fg-muted">
+              {plural(p.debts.length, 'dívida', 'dívidas')} · desde <span className="num">{date(p.since)}</span>
+            </p>
+          </div>
+          <div className="text-right">
+            <p className="text-xs text-fg-muted">{f.net > 0.005 ? 'Saldo a receber' : f.net < -0.005 ? 'Saldo que eu devo' : 'Saldo zerado'}</p>
+            <SignedMoney value={f.net} className="text-2xl" />
+          </div>
+        </header>
+        <div className="mt-5 flex flex-wrap items-center gap-2 border-t border-border pt-4">
+          {canCreate && (
+            <Button size="sm" onClick={() => setNewDebt(true)}>
+              <Plus aria-hidden="true" />
+              Nova dívida
+            </Button>
+          )}
+          {phone && (
+            <Button asChild size="sm" variant="outline">
+              <a href={'https://wa.me/' + phone} target="_blank" rel="noreferrer">
+                <MessageCircle aria-hidden="true" />
+                Conversar
+              </a>
+            </Button>
+          )}
+          {p.hasReceivable && <ShareButton type="person" refKey={p.key} label={p.name} />}
+          {p.hasPayable && <ShareButton type="owe" refKey={p.key} label={p.name} />}
         </div>
-        {!fullPage && (
-          <Button asChild variant="ghost" size="icon" className="-mt-1 -mr-2">
-            <Link to={backHref} aria-label="Fechar pessoa" title="Fechar">
-              <X aria-hidden="true" />
-            </Link>
-          </Button>
-        )}
-      </header>
+      </Card>
 
-      <div className={cn('mt-4 flex flex-wrap items-center gap-2', !fullPage && 'mx-5')}>
-        {canCreate && (
-          <Button size="sm" onClick={() => setNewDebt(true)}>
-            <Plus aria-hidden="true" />
-            Nova dívida
-          </Button>
-        )}
-        {p.hasReceivable && <ShareButton type="person" refKey={p.key} label={p.name} />}
-        {p.hasPayable && <ShareButton type="owe" refKey={p.key} label={p.name} />}
+      {tiles.length > 0 && (
+        <dl className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {tiles.map((it) => (
+            <div key={it.label} className="min-w-0 rounded-lg border border-border bg-surface px-4 py-3">
+              <dt className="text-xs text-fg-muted">{it.label}</dt>
+              <dd className={cn('num mt-1 truncate text-lg font-semibold tracking-tight', it.tone)} title={money(it.value)}>
+                {money(it.value)}
+              </dd>
+            </div>
+          ))}
+        </dl>
+      )}
+
+      <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start">
+        <PersonTabs p={p} />
+        <aside aria-label={`Informações de ${p.name}`} className="flex flex-col gap-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Resumo</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <dl className="divide-y divide-border text-sm">
+                <Fact label="Dívidas em aberto" value={String(f.openCount)} />
+                <Fact label="Dívidas quitadas" value={String(f.paidCount)} />
+                <Fact label="Próximo vencimento" value={f.nextDue ? date(f.nextDue) : '—'} />
+                <Fact label="Último pagamento" value={f.lastPayment ? date(f.lastPayment) : '—'} />
+                <Fact label="Pagamentos registrados" value={String(f.paymentsCount)} />
+                <Fact label="Cliente desde" value={date(p.since)} />
+              </dl>
+            </CardContent>
+          </Card>
+          <PersonExtra personKey={p.key} name={p.name} />
+        </aside>
       </div>
+
       <DebtFormDialog open={newDebt} onClose={() => setNewDebt(false)} initialName={p.name} kind={p.hasReceivable || !p.hasPayable ? 'receivable' : 'payable'} />
-
-      <PersonFigures p={p} className={cn('mt-5', !fullPage && 'mx-5')} />
-      <div className={cn(!fullPage && 'mx-5')}>
-        <PersonExtra personKey={p.key} name={p.name} />
-      </div>
-      <PersonTabs p={p} padded={!fullPage} />
     </motion.article>
   )
 }
 
-function PersonFigures({ p, className }: { p: PersonDetail; className?: string }) {
-  const { money } = useAppData()
-  const t = p.totals
-  const items: { label: string; value: number; tone?: string }[] = []
-  if (p.hasReceivable) {
-    items.push({ label: 'Falta receber', value: t.toReceive })
-    items.push({ label: 'Em atraso', value: t.overdue, tone: t.overdue > 0.005 ? 'text-neg' : undefined })
-    items.push({ label: 'Já recebi', value: t.received })
-  }
-  if (p.hasPayable) {
-    items.push({ label: 'Eu devo', value: t.owe })
-    items.push({ label: 'Já paguei', value: t.paidOut })
-  }
+function StatusChip({ status }: { status: PersonFacts['status'] }) {
+  const map = {
+    late: { text: 'Em atraso', cls: 'border-neg/40 bg-neg/10 text-neg' },
+    open: { text: 'Em dia', cls: 'border-pos/40 bg-pos/10 text-pos' },
+    settled: { text: 'Quitado', cls: 'border-border bg-surface-2 text-fg-muted' },
+  }[status]
+  return <span className={cn('inline-flex h-6 items-center rounded-full border px-2.5 text-xs font-medium', map.cls)}>{map.text}</span>
+}
+
+function Fact({ label, value }: { label: string; value: string }) {
   return (
-    <dl className={cn('grid grid-cols-3 gap-x-4 gap-y-3 rounded-md border border-border px-4 py-3', className)}>
-      {items.map((it) => (
-        <div key={it.label} className="min-w-0">
-          <dt className="text-xs text-fg-muted">{it.label}</dt>
-          <dd className={cn('num mt-0.5 truncate text-sm font-medium', it.tone)} title={money(it.value)}>
-            {money(it.value)}
-          </dd>
-        </div>
-      ))}
-    </dl>
+    <div className="flex items-center justify-between gap-3 py-2 first:pt-0 last:pb-0">
+      <dt className="text-fg-muted">{label}</dt>
+      <dd className="num font-medium">{value}</dd>
+    </div>
   )
 }
 
-function PersonTabs({ p, padded }: { p: PersonDetail; padded: boolean }) {
+function PersonTabs({ p }: { p: PersonDetail }) {
   const toReceive = p.debts.filter((v) => v.kind === 'receivable')
   const toPay = p.debts.filter((v) => v.kind === 'payable')
   const [tab, setTab] = useState<Tab>(toReceive.length || !toPay.length ? 'receber' : 'pagar')
@@ -148,13 +185,12 @@ function PersonTabs({ p, padded }: { p: PersonDetail; padded: boolean }) {
   // só a primeira dívida em aberto (ou a primeira, se tudo está quitado) vem aberta; as outras abrem ao clicar
   const firstOpenId = (list.find((v) => !v.paid) ?? list[0])?.debt.id
   return (
-    <div className="mt-5">
+    <div className="min-w-0">
       <Tabs
         baseId={baseId}
         label={`Informações de ${p.name}`}
         value={tab}
         onChange={setTab}
-        className={cn(padded && 'px-3')}
         items={items}
       />
       <AnimatePresence mode="wait" initial={false}>
@@ -165,7 +201,7 @@ function PersonTabs({ p, padded }: { p: PersonDetail; padded: boolean }) {
           exit={{ opacity: 0 }}
           transition={{ duration: 0.15, ease }}
         >
-          <TabPanel baseId={baseId} value={tab} className={cn('pt-4', padded ? 'px-5 pb-5' : 'pb-2')}>
+          <TabPanel baseId={baseId} value={tab} className="pt-4 pb-2">
             {(tab === 'receber' || tab === 'pagar') && (
               <div className="flex flex-col gap-3">
                 {list.map((v) => (
@@ -485,11 +521,11 @@ function RemovePayment({ debt, index, onClose }: { debt: Debt; index: number; on
   )
 }
 
-function NotFound({ backHref, fullPage }: { backHref: string; fullPage: boolean }) {
+function NotFound({ backHref }: { backHref: string }) {
   return (
     <div className="flex flex-col items-center rounded-lg border border-dashed border-border px-6 py-12 text-center">
       <UserRound aria-hidden="true" className="size-5 text-fg-subtle" />
-      {fullPage ? <h1 className="mt-3 text-base font-medium">Pessoa não encontrada</h1> : <h2 className="mt-3 text-base font-medium">Pessoa não encontrada</h2>}
+      <h1 className="mt-3 text-base font-medium">Pessoa não encontrada</h1>
       <p className="mt-1 max-w-xs text-sm text-fg-muted">Não há dívidas com esse nome. Ela pode ter sido renomeada ou excluída no BarnaBank.</p>
       <Button asChild variant="outline" size="sm" className="mt-4">
         <Link to={backHref}>Voltar para Pessoas</Link>

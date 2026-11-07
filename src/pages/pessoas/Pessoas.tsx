@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
-import { AnimatePresence, motion } from 'motion/react'
-import { Medal, Plus, Trophy, UserRound } from 'lucide-react'
+import { Medal, Plus, Trophy } from 'lucide-react'
 import { useAppData } from '@/app/data-context'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -12,7 +11,6 @@ import { useDocCtx } from '@/lib/print/use-doc-ctx'
 import { buildPersonRows, peopleTotals, PEOPLE_FILTERS, type PeopleFilter, type PeopleTotals } from '@/lib/finance/people'
 import { makeDebtCalc } from '@/lib/finance/debts'
 import { plural } from '@/lib/format'
-import { useMediaQuery } from '@/lib/use-media-query'
 import { cn } from '@/lib/utils'
 import type { AppData } from '@/lib/types'
 import { PeopleList } from './PeopleList'
@@ -28,8 +26,6 @@ import { PEOPLE_SORTS, type PeopleSort } from '@/lib/finance/person-extra'
 // no celular /pessoas/:id é uma página inteira. Filtro e busca ficam na URL (?f=&q=),
 // então voltar do detalhe mantém a lista como estava.
 
-const ease = [0.2, 0, 0, 1] as const
-
 export function Pessoas() {
   const { status, result, today } = useAppData()
   if (status === 'loading' || !result) return <PessoasSkeleton />
@@ -38,7 +34,6 @@ export function Pessoas() {
 
 function PessoasReady({ data, today }: { data: AppData; today: string }) {
   const { id } = useParams()
-  const wide = useMediaQuery('(min-width: 1024px)')
   const [params, setParams] = useSearchParams()
   const { canCreate } = useAppData()
   const [creating, setCreating] = useState(false)
@@ -77,9 +72,9 @@ function PessoasReady({ data, today }: { data: AppData; today: string }) {
   const qs = params.toString()
   const listHref = '/pessoas' + (qs ? '?' + qs : '')
 
-  // celular com pessoa aberta: só o detalhe
-  if (id && !wide) {
-    return <PersonDetailView key={id} personKey={id} data={data} calc={view.calc} backHref={listHref} fullPage />
+  // cada pessoa tem a sua própria página
+  if (id) {
+    return <PersonDetailView key={id} personKey={id} data={data} calc={view.calc} backHref={listHref} />
   }
 
   const hasPeople = view.rows.length > 0
@@ -133,7 +128,7 @@ function PessoasReady({ data, today }: { data: AppData; today: string }) {
         <GroupsSection filter={filter} query={query} />
       </div>
 
-      <div className={cn('mt-6', hasPeople && 'lg:grid lg:grid-cols-[minmax(0,400px)_minmax(0,1fr)] lg:items-start lg:gap-8')}>
+      <div className="mt-6">
         <PeopleList
           rows={view.rows}
           side={side}
@@ -144,28 +139,8 @@ function PessoasReady({ data, today }: { data: AppData; today: string }) {
           onQuery={(q) => update({ q })}
           sort={sort}
           onSort={(o) => update({ o })}
-          selectedKey={wide ? id : undefined}
           search={qs}
         />
-        {hasPeople && wide && (
-          <aside aria-label="Pessoa selecionada" className="lg:sticky lg:top-20">
-            <AnimatePresence mode="wait" initial={false}>
-              <motion.div
-                key={id ?? 'none'}
-                initial={{ opacity: 0, x: 8 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -4 }}
-                transition={{ duration: 0.18, ease }}
-              >
-                {id ? (
-                  <PersonDetailView personKey={id} data={data} calc={view.calc} backHref={listHref} />
-                ) : (
-                  <PickHint />
-                )}
-              </motion.div>
-            </AnimatePresence>
-          </aside>
-        )}
       </div>
       <DebtFormDialog open={creating} onClose={() => setCreating(false)} />
       <BoardDialog open={board} onClose={() => setBoard(false)} />
@@ -205,23 +180,13 @@ function Metrics({ totals }: { totals: PeopleTotals }) {
   )
 }
 
-function PickHint() {
-  return (
-    <div className="flex min-h-64 flex-col items-center justify-center rounded-lg border border-dashed border-border px-6 py-12 text-center">
-      <UserRound aria-hidden="true" className="size-5 text-fg-subtle" />
-      <p className="mt-3 text-sm font-medium">Escolha alguém na lista</p>
-      <p className="mt-1 max-w-xs text-sm text-fg-muted">A pessoa abre aqui, com as dívidas, as parcelas, o histórico e o calendário.</p>
-    </div>
-  )
-}
-
 function PessoasSkeleton() {
   return (
     <div aria-busy="true" aria-live="polite">
       <span className="sr-only">Carregando…</span>
       <Skeleton className="h-8 w-32" />
       <Skeleton className="mt-4 h-[74px] w-full rounded-lg" />
-      <div className="mt-6 lg:grid lg:grid-cols-[minmax(0,400px)_minmax(0,1fr)] lg:gap-8">
+      <div className="mt-6">
         <div>
           <Skeleton className="h-9 w-full" />
           <Skeleton className="mt-3 h-9 w-full" />
@@ -238,7 +203,6 @@ function PessoasSkeleton() {
             ))}
           </div>
         </div>
-        <Skeleton className="hidden h-96 rounded-lg lg:block" />
       </div>
     </div>
   )

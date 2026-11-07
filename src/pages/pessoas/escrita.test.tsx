@@ -103,14 +103,29 @@ describe('Pessoas: escrita', () => {
   it('"Nova dívida" no perfil da pessoa já vem com o nome dela e grava para ela', async () => {
     seed()
     mount()
-    const painel = await screen.findByRole('complementary', { name: 'Pessoa selecionada' })
-    fireEvent.click(within(painel).getByRole('button', { name: /Nova dívida/ }))
+    fireEvent.click(await screen.findByRole('button', { name: /Nova dívida/ }))
     const dlg = document.querySelector<HTMLElement>('dialog[open]')!
     expect((within(dlg).getByLabelText('Nome do amigo') as HTMLInputElement).value).toBe('Ana Souza')
     fireEvent.change(within(dlg).getByLabelText('Valor (R$)'), { target: { value: '80' } })
     fireEvent.click(within(dlg).getByRole('button', { name: 'Adicionar' }))
     await waitFor(() => expect(stored().debts).toHaveLength(2))
     expect(stored().debts[1]).toMatchObject({ name: 'Ana Souza', principal: 80, kind: 'receivable' })
+  })
+
+  it('a pessoa tem página própria com saldo, números e resumo', async () => {
+    seed({ contacts: { 'ana souza': { phone: '11999998888', tags: ['Família'], notes: 'Paga no dia 5' } } })
+    mount()
+    expect((await screen.findByRole('heading', { level: 1, name: 'Ana Souza' })).textContent).toBe('Ana Souza')
+    expect(screen.getByText('Total emprestado')).toBeTruthy()
+    const resumo = screen.getByRole('complementary', { name: /Informações de Ana Souza/ })
+    expect(within(resumo).getByText('Dívidas em aberto')).toBeTruthy()
+    expect(within(resumo).getByText('Próximo vencimento')).toBeTruthy()
+    expect(within(resumo).getByText('Família')).toBeTruthy()
+    expect(within(resumo).getByText('Paga no dia 5')).toBeTruthy()
+    expect(screen.getByRole('link', { name: /Conversar/ }).getAttribute('href')).toBe('https://wa.me/5511999998888')
+    // a lista de pessoas não aparece ao lado: é uma página inteira, com volta para a lista
+    expect(screen.queryByRole('list', { name: 'Pessoas' })).toBeNull()
+    expect(screen.getByRole('link', { name: /Pessoas/ })).toBeTruthy()
   })
 
   it('excluir dívida pede confirmação', async () => {
