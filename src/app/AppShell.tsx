@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge'
 import { Kbd } from '@/components/ui/kbd'
 import { Tooltip } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
+import logoUrl from '@/assets/logo.png'
 import { useTheme } from './theme'
 import { useAppData } from './data-context'
 import { SyncConflictDialog } from './SyncConflictDialog'
@@ -74,9 +75,7 @@ export function AppShell() {
       <header className="sticky top-0 z-30 border-b border-border bg-bg/95 backdrop-blur-sm supports-[backdrop-filter]:bg-bg/80">
         <div className="mx-auto flex h-14 max-w-[1120px] items-center gap-6 px-4 md:px-6">
           <NavLink to="/" className="flex items-center gap-2 rounded-sm" aria-label="BarnaBank, ir para o Início">
-            <span aria-hidden="true" className="grid size-6 place-items-center rounded-sm bg-accent text-xs font-semibold text-accent-fg">
-              B
-            </span>
+            <img src={logoUrl} alt="" aria-hidden="true" className="h-6 w-auto" />
             <span className="text-sm font-semibold tracking-tight">BarnaBank</span>
           </NavLink>
 
