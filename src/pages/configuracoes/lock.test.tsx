@@ -21,7 +21,11 @@ beforeEach(() => {
     this.removeAttribute('open')
   }
 })
-afterEach(cleanup)
+afterEach(() => {
+  cleanup()
+  Reflect.deleteProperty(window, 'PublicKeyCredential')
+  Reflect.deleteProperty(navigator, 'credentials')
+})
 configure({ asyncUtilTimeout: 5000 })
 
 describe('Configurações: bloqueio do app', () => {
@@ -57,5 +61,33 @@ describe('Configurações: bloqueio do app', () => {
     expect(readLock()!.after).toBe(0)
     fireEvent.click(screen.getByRole('switch', { name: 'Bloquear com PIN' }))
     await waitFor(() => expect(readLock()).toBeNull())
+  })
+
+  it('com biometria disponível: o PIN já oferece cadastrar a biometria e a tela de bloqueio passa a usá-la', async () => {
+    Object.defineProperty(window, 'PublicKeyCredential', { value: { isUserVerifyingPlatformAuthenticatorAvailable: async () => true }, configurable: true })
+    Object.defineProperty(navigator, 'credentials', { value: { create: async () => ({ rawId: new Uint8Array([1, 2, 3]).buffer }) }, configurable: true })
+    mount()
+    fireEvent.click(await screen.findByRole('switch', { name: 'Bloquear com PIN' }))
+    const dlg = document.querySelector<HTMLElement>('dialog[open]')!
+    const box = (await screen.findByRole('checkbox', { name: /Abrir com a biometria/ })) as HTMLInputElement
+    expect(box.checked).toBe(true)
+    for (const i of dlg.querySelectorAll<HTMLInputElement>('input[type=password]')) fireEvent.change(i, { target: { value: '9090' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar PIN' }))
+    await waitFor(() => expect(readLock()?.cred).toBeTruthy())
+    expect(await screen.findByText(/abre com a biometria/)).toBeTruthy()
+  })
+
+  it('se a biometria falhar ao cadastrar, fica só o PIN e avisa', async () => {
+    Object.defineProperty(window, 'PublicKeyCredential', { value: { isUserVerifyingPlatformAuthenticatorAvailable: async () => true }, configurable: true })
+    Object.defineProperty(navigator, 'credentials', { value: { create: async () => { throw new Error('cancelado') } }, configurable: true })
+    mount()
+    fireEvent.click(await screen.findByRole('switch', { name: 'Bloquear com PIN' }))
+    const dlg = document.querySelector<HTMLElement>('dialog[open]')!
+    await screen.findByRole('checkbox', { name: /Abrir com a biometria/ })
+    for (const i of dlg.querySelectorAll<HTMLInputElement>('input[type=password]')) fireEvent.change(i, { target: { value: '9090' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar PIN' }))
+    await waitFor(() => expect(readLock()).not.toBeNull())
+    expect(readLock()?.cred).toBeUndefined()
+    expect(await screen.findByText(/só com PIN/)).toBeTruthy()
   })
 })

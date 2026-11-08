@@ -40,7 +40,7 @@ export function LockSection() {
       title="Bloqueio do app"
       hint="Pede um PIN para abrir o BarnaBank neste aparelho. Protege contra quem pegar o seu celular; não criptografa os dados guardados nele."
     >
-      <Row label="Bloquear com PIN" hint={cfg ? 'O app abre trancado e tranca de novo depois do tempo escolhido.' : 'Escolha um PIN de 4 a 8 números.'}>
+      <Row label="Bloquear com PIN" hint={cfg ? 'O app abre trancado e tranca de novo depois do tempo escolhido.' : 'Escolha um PIN de 4 a 8 números. Ele fica de reserva se você usar a biometria.'}>
         <Switch
           label="Bloquear com PIN"
           checked={!!cfg}
@@ -79,10 +79,28 @@ export function LockSection() {
       <Modal open={pinDlg} onClose={() => setPinDlg(false)} title={cfg ? 'Trocar o PIN' : 'Criar o PIN'}>
         <PinForm
           onCancel={() => setPinDlg(false)}
-          onSave={async (pin) => {
-            writeLock(await makeLock(pin, cfg?.after ?? 0, cfg?.cred))
+          askBio={bio && !cfg?.cred}
+          onSave={async (pin, wantBio) => {
+            let cred = cfg?.cred
+            let bioFailed = false
+            if (wantBio) {
+              try {
+                cred = await registerBio()
+              } catch {
+                bioFailed = true
+              }
+            }
+            writeLock(await makeLock(pin, cfg?.after ?? 0, cred))
             setPinDlg(false)
-            toast.show(cfg ? 'PIN trocado.' : 'Bloqueio ligado. O app pede o PIN da próxima vez que você abrir.')
+            toast.show(
+              bioFailed
+                ? 'Bloqueio ligado só com PIN: não consegui cadastrar a biometria. Tente em "Usar biometria".'
+                : cfg
+                  ? 'PIN trocado.'
+                  : cred
+                    ? 'Bloqueio ligado. O app abre com a biometria, e o PIN fica de reserva.'
+                    : 'Bloqueio ligado. O app pede o PIN da próxima vez que você abrir.',
+            )
           }}
         />
       </Modal>
@@ -90,13 +108,14 @@ export function LockSection() {
   )
 }
 
-function PinForm({ onSave, onCancel }: { onSave: (pin: string) => Promise<void>; onCancel: () => void }) {
+function PinForm({ onSave, onCancel, askBio }: { onSave: (pin: string, wantBio: boolean) => Promise<void>; onCancel: () => void; askBio: boolean }) {
   const a = useId()
   const b = useId()
   const [pin, setPin] = useState('')
   const [again, setAgain] = useState('')
   const [err, setErr] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [wantBio, setWantBio] = useState(true)
   const digits = (v: string) => v.replace(/\D/g, '').slice(0, 8)
 
   async function submit(e: FormEvent) {
@@ -105,7 +124,7 @@ function PinForm({ onSave, onCancel }: { onSave: (pin: string) => Promise<void>;
     if (pin !== again) return setErr('Os dois PINs não são iguais.')
     setBusy(true)
     try {
-      await onSave(pin)
+      await onSave(pin, askBio && wantBio)
     } catch {
       setErr('Não consegui salvar o PIN.')
       setBusy(false)
@@ -120,6 +139,15 @@ function PinForm({ onSave, onCancel }: { onSave: (pin: string) => Promise<void>;
       <Field label="Repita o PIN" htmlFor={b} className="mt-3">
         <Input id={b} type="password" inputMode="numeric" autoComplete="off" value={again} onChange={(e) => setAgain(digits(e.target.value))} />
       </Field>
+      {askBio && (
+        <label className="mt-4 flex cursor-pointer items-start gap-2 text-sm">
+          <input type="checkbox" checked={wantBio} onChange={(e) => setWantBio(e.target.checked)} className="mt-0.5 size-4" />
+          <span>
+            Abrir com a biometria do aparelho
+            <span className="block text-xs text-fg-muted">Digital ou rosto, no lugar do PIN. O PIN fica de reserva.</span>
+          </span>
+        </label>
+      )}
       <p role="alert" className={err ? 'mt-3 text-sm text-neg' : 'hidden'}>
         {err}
       </p>

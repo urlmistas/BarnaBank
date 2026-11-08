@@ -72,19 +72,23 @@ function LockScreen({ cfg, onUnlock }: { cfg: LockCfg; onUnlock: () => void }) {
     return () => window.clearInterval(t)
   }, [until])
 
-  const bio = useCallback(async () => {
-    if (!cfg.cred) return
-    setBusy(true)
-    if (await verifyBio(cfg.cred)) onUnlock()
-    else setMsg('Não deu para usar a biometria. Digite o PIN.')
-    setBusy(false)
-  }, [cfg.cred, onUnlock])
+  // auto = pedido ao abrir a tela: o Safari do iPhone só aceita o Face ID depois de um toque, então ali a falha é silenciosa
+  const bio = useCallback(
+    async (auto = false) => {
+      if (!cfg.cred) return
+      setBusy(true)
+      if (await verifyBio(cfg.cred)) onUnlock()
+      else if (!auto) setMsg('Não deu para usar a biometria. Digite o PIN.')
+      setBusy(false)
+    },
+    [cfg.cred, onUnlock],
+  )
 
   // com biometria cadastrada, já pede ao abrir (se o navegador recusar sem toque, o botão fica na tela)
   useEffect(() => {
     if (tried.current || !cfg.cred) return
     tried.current = true
-    void bio()
+    void bio(true)
   }, [cfg.cred, bio])
 
   async function submit(e: FormEvent) {
@@ -142,7 +146,7 @@ function LockScreen({ cfg, onUnlock }: { cfg: LockCfg; onUnlock: () => void }) {
           Abrir
         </Button>
         {cfg.cred && (
-          <Button type="button" variant="outline" className="mt-2 w-full" disabled={busy} onClick={() => void bio()}>
+          <Button type="button" variant="outline" className="mt-2 w-full" disabled={busy} onClick={() => void bio(false)}>
             <Fingerprint aria-hidden="true" />
             Usar biometria
           </Button>

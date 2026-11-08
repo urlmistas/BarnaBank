@@ -33,7 +33,10 @@ beforeEach(() => {
   localStorage.clear()
   setVisibility('visible')
 })
-afterEach(cleanup)
+afterEach(() => {
+  cleanup()
+  Reflect.deleteProperty(navigator, 'credentials')
+})
 configure({ asyncUtilTimeout: 5000 })
 
 describe('trava do app', () => {
@@ -101,5 +104,23 @@ describe('trava do app', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Sair e tirar o bloqueio' }))
     expect(await screen.findByText('conteúdo do app')).toBeTruthy()
     expect(localStorage.getItem(LOCK_KEY)).toBeNull()
+  })
+
+  it('com biometria: o pedido automático ao abrir que falha (Safari exige toque) não mostra erro; o botão tenta de novo e abre', async () => {
+    let allowed = false
+    Object.defineProperty(navigator, 'credentials', {
+      value: { get: async () => { if (!allowed) throw new DOMException('precisa de gesto', 'NotAllowedError'); return {} } },
+      configurable: true,
+    })
+    writeLock(await makeLock('4821', 0, 'AQID'))
+    mount()
+    const btn = await screen.findByRole('button', { name: 'Usar biometria' })
+    await waitFor(() => expect((btn as HTMLButtonElement).disabled).toBe(false))
+    expect(screen.queryByText(/Não deu para usar a biometria/)).toBeNull()
+    fireEvent.click(btn)
+    expect(await screen.findByText(/Não deu para usar a biometria/)).toBeTruthy()
+    allowed = true
+    fireEvent.click(screen.getByRole('button', { name: 'Usar biometria' }))
+    expect(await screen.findByText('conteúdo do app')).toBeTruthy()
   })
 })
