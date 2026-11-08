@@ -327,30 +327,32 @@ export function MercadoPago() {
         )}
       </CardContent>
       <Modal open={ask && !!configured && dlg === null} onClose={dismissAsk} title="O saldo está batendo?">
-        <p className="text-sm text-fg-muted">
-          Veja no app do Mercado Pago: a conta está com <span className="num text-fg">{money(configured?.saldo ?? 0)}</span> e o total (com os porquinhos) em{' '}
-          <span className="num text-fg">{money(configured?.total ?? 0)}</span>?
-        </p>
-        <div className="mt-4 flex flex-wrap justify-end gap-2">
-          <Button type="button" variant="ghost" className="rounded-[7px]" onClick={dismissAsk} disabled={asking}>
-            Agora não
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            className="rounded-[7px]"
-            disabled={asking}
-            onClick={() => {
-              setRespondida(true)
-              setDlg('tudo')
-            }}
-          >
-            Não, ajustar valores
-          </Button>
-          <Button type="button" className="rounded-[7px]" onClick={() => void confirmAsk()} disabled={asking}>
-            {asking ? <Loader2 className="animate-spin" /> : null}
-            Sim, está batendo
-          </Button>
+        <div className="p-5">
+          <p className="text-sm text-fg-muted">
+            Veja no app do Mercado Pago: a conta está com <span className="num text-fg">{money(configured?.saldo ?? 0)}</span> e o total (com os porquinhos) em{' '}
+            <span className="num text-fg">{money(configured?.total ?? 0)}</span>?
+          </p>
+          <div className="mt-4 flex flex-wrap justify-end gap-2">
+            <Button type="button" variant="ghost" className="rounded-[7px]" onClick={dismissAsk} disabled={asking}>
+              Agora não
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              className="rounded-[7px]"
+              disabled={asking}
+              onClick={() => {
+                setRespondida(true)
+                setDlg('tudo')
+              }}
+            >
+              Não, ajustar valores
+            </Button>
+            <Button type="button" className="rounded-[7px]" onClick={() => void confirmAsk()} disabled={asking}>
+              {asking ? <Loader2 className="animate-spin" /> : null}
+              Sim, está batendo
+            </Button>
+          </div>
         </div>
       </Modal>
       <Modal open={dlg !== null} onClose={() => setDlg(null)} title={dlg === 'porquinhos' ? 'Porquinhos do Mercado Pago' : dlg === 'conta' ? 'Carteira Mercado Pago' : 'Configurar o Mercado Pago'}>
