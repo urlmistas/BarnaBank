@@ -118,7 +118,7 @@ export function AppShell() {
                 onClick={() => setSearchOpen(true)}
                 aria-label="Buscar"
                 aria-keyshortcuts="Control+K"
-                className="inline-flex size-9 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-full text-sm text-fg-muted transition-colors hover:bg-surface-2 hover:text-fg md:w-64 md:rounded-[5px] md:justify-start md:border md:border-border md:bg-surface-2/40 md:pr-1.5 md:pl-3 md:backdrop-blur-md md:hover:border-border-strong [&_svg]:size-4 [&_svg]:shrink-0"
+                className="inline-flex size-9 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-full text-sm text-fg-muted transition-colors hover:bg-fg/12 hover:text-fg md:w-64 md:rounded-[5px] md:justify-start md:border md:border-border md:bg-surface-2/40 md:pr-1.5 md:pl-3 md:backdrop-blur-md md:hover:border-border-strong [&_svg]:size-4 [&_svg]:shrink-0"
               >
                 <Search aria-hidden="true" />
                 <span aria-hidden="true" className="hidden flex-1 text-left md:block">
@@ -130,7 +130,7 @@ export function AppShell() {
               </button>
             </Tooltip>
             <Tooltip label="Simulador de empréstimo" side="bottom">
-              <Button variant="ghost" size="icon" onClick={() => setSimOpen(true)} aria-label="Simulador de empréstimo">
+              <Button variant="ghost" size="icon" className="hover:bg-fg/12" onClick={() => setSimOpen(true)} aria-label="Simulador de empréstimo">
                 <Calculator />
               </Button>
             </Tooltip>
@@ -138,6 +138,7 @@ export function AppShell() {
               <Button
                 variant="ghost"
                 size="icon"
+                className="hover:bg-fg/12"
                 onClick={toggleHideValues}
                 aria-pressed={hideValues}
                 aria-label={hideValues ? 'Mostrar valores' : 'Esconder valores'}
@@ -151,7 +152,7 @@ export function AppShell() {
                 aria-label="Configurações"
                 className={({ isActive }) =>
                   cn(
-                    'relative inline-flex size-9 items-center justify-center rounded-full transition-colors hover:bg-surface-2 hover:text-fg [&_svg]:size-4',
+                    'relative inline-flex size-9 items-center justify-center rounded-full transition-colors hover:bg-fg/12 hover:text-fg [&_svg]:size-4',
                     isActive ? 'text-fg' : 'text-fg-muted',
                   )
                 }

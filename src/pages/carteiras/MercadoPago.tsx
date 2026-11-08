@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useId, useState, type FormEvent } from 'react'
-import { BanknoteCheck, ChartNoAxesCombined, Info, Loader2, Receipt, RefreshCw, Settings2, X } from 'lucide-react'
+import { BanknoteCheck, ChartNoAxesCombined, Info, PiggyBank, Loader2, Receipt, RefreshCw, Settings2, X } from 'lucide-react'
 import { useAppData } from '@/app/data-context'
 import { Button } from '@/components/ui/button'
 import { MercadoPagoLogo } from '@/components/mercado-pago-logo'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { Tooltip } from '@/components/ui/tooltip'
 import { Field, Modal } from '@/components/ui/modal'
 import { isMpWallet, MP_WALLET, mpAdjustment, mpNewTransactions, mpToday } from '@/lib/finance/mercadopago'
 import { walletBalance } from '@/lib/finance/wallets'
@@ -47,6 +48,10 @@ const whenRel = (iso: string) => {
   return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) + ' às ' + hm
 }
 
+// o que a janela de valores mostra: só a conta, só os porquinhos, ou tudo (primeira configuração)
+type Modo = 'conta' | 'porquinhos' | 'tudo'
+const HOVER = 'hover:bg-fg/12'
+
 const when = (iso: string) => {
   const d = new Date(iso)
   return isNaN(d.getTime()) ? '' : d.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
@@ -58,7 +63,7 @@ export function MercadoPago() {
   const [view, setView] = useState<MpView | { configured: false } | null | undefined>(undefined)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
-  const [dlg, setDlg] = useState(false)
+  const [dlg, setDlg] = useState<Modo | null>(null)
   const [all, setAll] = useState(false)
 
   const fetcher = useCallback((url: string, init?: RequestInit) => fetch(url, init), [])
@@ -124,19 +129,30 @@ export function MercadoPago() {
           Mercado Pago
         </CardTitle>
         <div className="flex items-center gap-1">
-          <Button variant="ghost" size="icon" aria-label="Atualizar" disabled={busy} onClick={() => void load()}>
-            {busy ? <Loader2 className="animate-spin" /> : <RefreshCw />}
-          </Button>
-          <Button variant="ghost" size="icon" aria-label={configured ? 'Informar valores de hoje' : 'Configurar'} onClick={() => setDlg(true)}>
-            <Settings2 />
-          </Button>
+          <Tooltip label="Atualizar" side="bottom">
+            <Button variant="ghost" size="icon" className={HOVER} aria-label="Atualizar" disabled={busy} onClick={() => void load()}>
+              {busy ? <Loader2 className="animate-spin" /> : <RefreshCw />}
+            </Button>
+          </Tooltip>
+          {configured && (
+            <Tooltip label="Editar porquinhos" side="bottom">
+              <Button variant="ghost" size="icon" className={HOVER} aria-label="Editar porquinhos" onClick={() => setDlg('porquinhos')}>
+                <PiggyBank />
+              </Button>
+            </Tooltip>
+          )}
+          <Tooltip label={configured ? 'Configurar a carteira' : 'Configurar'} side="bottom" align="end">
+            <Button variant="ghost" size="icon" className={HOVER} aria-label={configured ? 'Configurar a carteira' : 'Configurar'} onClick={() => setDlg(configured ? 'conta' : 'tudo')}>
+              <Settings2 />
+            </Button>
+          </Tooltip>
         </div>
       </CardHeader>
       <CardContent>
         {!configured ? (
           <div>
             <p className="text-sm text-fg-muted">Acompanhe o saldo e os porquinhos da sua conta Mercado Pago. Você informa os valores de hoje e o bot confere as movimentações novas.</p>
-            <Button className="mt-3" size="sm" onClick={() => setDlg(true)}>
+            <Button className="mt-3" size="sm" onClick={() => setDlg('tudo')}>
               Configurar
             </Button>
           </div>
@@ -240,13 +256,14 @@ export function MercadoPago() {
           </p>
         )}
       </CardContent>
-      <Modal open={dlg} onClose={() => setDlg(false)} title="Valores de hoje do Mercado Pago">
+      <Modal open={dlg !== null} onClose={() => setDlg(null)} title={dlg === 'porquinhos' ? 'Porquinhos do Mercado Pago' : dlg === 'conta' ? 'Carteira Mercado Pago' : 'Configurar o Mercado Pago'}>
         <SetupForm
+          mode={dlg ?? 'tudo'}
           current={configured}
-          onClose={() => setDlg(false)}
+          onClose={() => setDlg(null)}
           onSaved={(v) => {
             setView(v)
-            setDlg(false)
+            setDlg(null)
           }}
         />
       </Modal>
@@ -320,7 +337,10 @@ interface Row {
   porGasto: number
 }
 
-function SetupForm({ current, onClose, onSaved }: { current: MpView | null; onClose: () => void; onSaved: (v: MpView) => void }) {
+function SetupForm({ mode, current, onClose, onSaved }: { mode: Modo; current: MpView | null; onClose: () => void; onSaved: (v: MpView) => void }) {
+  // sem configuração ainda, tem que informar tudo
+  const showConta = mode !== 'porquinhos' || !current
+  const showPots = mode !== 'conta' || !current
   const { botToken, result, canCreate } = useAppData()
   // lança as entradas e saídas na carteira Mercado Pago do app (ligado na primeira vez)
   const [lancar, setLancar] = useState(current ? current.carteira !== 'nao' : true)
@@ -335,6 +355,7 @@ function SetupForm({ current, onClose, onSaved }: { current: MpView | null; onCl
 
   // os porquinhos vêm do histórico do Mercado Pago; os que já têm nome mantêm o nome e o rendimento
   useEffect(() => {
+    if (!showPots) return
     let live = true
     void (async () => {
       try {
@@ -358,17 +379,19 @@ function SetupForm({ current, onClose, onSaved }: { current: MpView | null; onCl
     return () => {
       live = false
     }
-  }, [botToken, current])
+  }, [botToken, current, showPots])
 
   async function submit(e: FormEvent) {
     e.preventDefault()
-    if (!rows) return
-    const s = parseMoney(saldo)
+    if (showPots && !rows) return
+    // o que esta janela não mostra segue como está (a estimativa atual)
+    const s = showConta || !current ? parseMoney(saldo) : current.saldo
     if (isNaN(s)) return setErr('Informe o saldo da conta.')
-    const sp = Number(saldoPct.replace(',', '.'))
+    const sp = showConta || !current ? Number(saldoPct.replace(',', '.')) : current.saldoPct
     if (!isFinite(sp) || sp < 0 || sp > 300) return setErr('Rendimento da conta: de 0 a 300% do CDI.')
     const pots: Record<string, { name: string; valor: number; pct: number; meta: number }> = {}
-    for (const r of rows) {
+    if (!showPots && current) for (const p of current.pots) pots[p.id] = { name: p.name, valor: p.valor, pct: p.pct, meta: p.meta }
+    for (const r of showPots ? (rows ?? []) : []) {
       const v = parseMoney(r.valor)
       const pct = Number(r.pct.replace(',', '.'))
       if (isNaN(v)) return setErr('Informe o valor de cada porquinho (ou 0).')
@@ -392,7 +415,9 @@ function SetupForm({ current, onClose, onSaved }: { current: MpView | null; onCl
   const set = (id: string, patch: Partial<Row>) => setRows((rs) => rs && rs.map((r) => (r.id === id ? { ...r, ...patch } : r)))
   return (
     <form onSubmit={(e) => void submit(e)} className="p-5">
-      <p className="text-xs text-fg-muted">Digite o que o app do Mercado Pago mostra agora. A partir daqui o bot soma o que entrar e tirar o que sair.</p>
+      <p className="text-xs text-fg-muted">{mode === 'porquinhos' ? 'Nome, valor, rendimento e meta de cada porquinho. Digite o que o app do Mercado Pago mostra agora.' : 'Digite o que o app do Mercado Pago mostra agora. A partir daqui o bot soma o que entrar e tirar o que sair.'}</p>
+      {showConta && (
+        <>
       <div className="mt-4 grid grid-cols-[1fr_88px] gap-3">
         <Field label="Saldo da conta (R$)" htmlFor={saldoId}>
           <Input id={saldoId} inputMode="decimal" value={saldo} onChange={(e) => setSaldo(e.target.value)} placeholder="0,00" />
@@ -401,6 +426,24 @@ function SetupForm({ current, onClose, onSaved }: { current: MpView | null; onCl
           <Input id={pctId} inputMode="decimal" value={saldoPct} onChange={(e) => setSaldoPct(e.target.value)} />
         </Field>
       </div>
+      <p className="mt-5 text-xs font-medium tracking-wide text-fg-subtle uppercase">Integração</p>
+      {canCreate && (
+        <div className="mt-2">
+          <div className="flex items-center justify-between gap-4">
+            <span className="text-sm">Lançar entradas e saídas na carteira Mercado Pago do app</span>
+            <Switch checked={lancar} onChange={setLancar} label="Lançar na carteira Mercado Pago" />
+          </div>
+          <p className="mt-1 text-xs text-fg-subtle">A carteira é criada sozinha e o saldo dela passa a ser o total do Mercado Pago (conta + porquinhos). O guardado nos porquinhos não vira gasto.</p>
+        </div>
+      )}
+      <div className="mt-3 flex items-center justify-between gap-4">
+        <span className="text-sm">Avisar no Telegram quando entrar, sair ou for guardado</span>
+        <Switch checked={avisos} onChange={setAvisos} label="Avisar no Telegram" />
+      </div>
+        </>
+      )}
+      {showPots && (
+        <>
       <p className="mt-5 text-xs font-medium tracking-wide text-fg-subtle uppercase">Porquinhos</p>
       {!rows && !err && (
         <p className="mt-3 flex items-center gap-2 text-sm text-fg-muted">
@@ -424,20 +467,8 @@ function SetupForm({ current, onClose, onSaved }: { current: MpView | null; onCl
           </div>
         </div>
       ))}
-      <p className="mt-5 text-xs font-medium tracking-wide text-fg-subtle uppercase">Integração</p>
-      {canCreate && (
-        <div className="mt-2">
-          <div className="flex items-center justify-between gap-4">
-            <span className="text-sm">Lançar entradas e saídas na carteira Mercado Pago do app</span>
-            <Switch checked={lancar} onChange={setLancar} label="Lançar na carteira Mercado Pago" />
-          </div>
-          <p className="mt-1 text-xs text-fg-subtle">A carteira é criada sozinha e o saldo dela passa a ser o total do Mercado Pago (conta + porquinhos). O guardado nos porquinhos não vira gasto.</p>
-        </div>
+        </>
       )}
-      <div className="mt-3 flex items-center justify-between gap-4">
-        <span className="text-sm">Avisar no Telegram quando entrar, sair ou for guardado</span>
-        <Switch checked={avisos} onChange={setAvisos} label="Avisar no Telegram" />
-      </div>
       <p role="alert" aria-live="assertive" className="mt-3 min-h-5 text-xs text-neg">
         {err}
       </p>
@@ -445,7 +476,7 @@ function SetupForm({ current, onClose, onSaved }: { current: MpView | null; onCl
         <Button type="button" variant="ghost" onClick={onClose}>
           Cancelar
         </Button>
-        <Button type="submit" disabled={!rows || busy}>
+        <Button type="submit" disabled={(showPots && !rows) || busy}>
           {busy ? 'Salvando…' : 'Salvar'}
         </Button>
       </div>
