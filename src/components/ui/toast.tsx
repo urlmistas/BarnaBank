@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
-import { Button } from '@/components/ui/button'
+import { CircleCheck } from 'lucide-react'
 
 // Aviso curto no rodapé, com "Desfazer" opcional. Um de cada vez.
 interface ToastItem {
@@ -48,21 +48,28 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 8, scale: 0.98 }}
               transition={{ duration: 0.2, ease: [0.2, 0, 0, 1] }}
-              className="pointer-events-auto flex max-w-md items-center gap-3 rounded-lg border border-border-strong bg-surface py-2 pr-2 pl-4 text-sm"
+              className="pointer-events-auto relative flex max-w-md items-center gap-3 overflow-hidden rounded-lg border border-border-strong bg-surface-2 py-3 pr-4 pl-5 text-sm shadow-[0_10px_32px_-8px_rgba(0,0,0,0.55)]"
             >
-              {item.icon && <span className="shrink-0 text-pos [&_svg]:size-4">{item.icon}</span>}
+              {/* faixa da cor da marca na borda esquerda */}
+              <span aria-hidden="true" className="absolute inset-y-0 left-0 w-[3px] bg-accent" />
+              {(item.icon || item.undo) && (
+                <span className="shrink-0 text-pos [&_svg]:size-5">{item.icon ?? <CircleCheck aria-hidden="true" />}</span>
+              )}
               <span className="min-w-0">{item.message}</span>
               {item.undo && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    item.undo?.()
-                    setItem(null)
-                  }}
-                >
-                  Desfazer
-                </Button>
+                <>
+                  <span aria-hidden="true" className="h-5 w-px shrink-0 bg-border-strong" />
+                  <button
+                    type="button"
+                    className="shrink-0 cursor-pointer rounded-sm px-1 py-0.5 text-sm font-semibold text-accent-text transition-colors hover:underline focus-visible:underline"
+                    onClick={() => {
+                      item.undo?.()
+                      setItem(null)
+                    }}
+                  >
+                    Desfazer
+                  </button>
+                </>
               )}
             </motion.div>
           )}

@@ -256,6 +256,8 @@ function TagsForm({ personKey, name, onClose, onRenamed }: { personKey: string; 
   const [photo, setPhoto] = useState(() => photoOf(c))
   const [photoErr, setPhotoErr] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
+  // o botão quica ao ser clicado, para mostrar que o clique valeu antes de abrir o seletor de arquivos
+  const [bounce, setBounce] = useState(false)
   async function pickPhoto(file: File | undefined) {
     if (!file) return
     try {
@@ -277,7 +279,7 @@ function TagsForm({ personKey, name, onClose, onRenamed }: { personKey: string; 
     if (taken && !merge) return setErro('Já existe uma pessoa com esse nome. Marque a opção para juntar as duas.')
     const final = other.trim() && !tags.includes(other.trim()) ? [...tags, other.trim()] : tags
     let newKey = personKey
-    const ok = write('Salvo', (api) => {
+    const ok = write('Alterações salvas', (api) => {
       newKey = renamePerson(api, personKey, nome)
       api.contacts[newKey] = withPhoto(withTagsNotes(api.contacts[newKey], final, notes, phone), photo) as Record<string, unknown>
     })
@@ -293,7 +295,17 @@ function TagsForm({ personKey, name, onClose, onRenamed }: { personKey: string; 
         <Avatar name={nome || name} size="lg" photo={photo} />
         <div className="min-w-0">
           <div className="flex flex-wrap gap-2">
-            <Button type="button" size="sm" variant="outline" onClick={() => fileRef.current?.click()}>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className={bounce ? 'motion-safe:animate-[bb-bounce_0.35s_ease-out]' : undefined}
+              onAnimationEnd={() => setBounce(false)}
+              onClick={() => {
+                setBounce(true)
+                fileRef.current?.click()
+              }}
+            >
               <Camera aria-hidden="true" />
               {photo ? 'Trocar foto' : 'Escolher foto'}
             </Button>

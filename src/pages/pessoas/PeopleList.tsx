@@ -126,6 +126,7 @@ export function PeopleList({
         {onSide && (
           <Segmented
             id="pessoas-lado"
+            variant="tabs"
             label="Quem deve a quem"
             value={side}
             onChange={onSide}
@@ -134,6 +135,7 @@ export function PeopleList({
         )}
         <Segmented
           id="pessoas-filtro"
+          variant="pills"
           label="Filtrar pessoas"
           value={filter}
           onChange={onFilter}
@@ -185,6 +187,7 @@ function PersonRowLink({ row, filter, selected, href }: { row: PersonRow; filter
 
   let sub: string
   let late = false
+  let lateTag: { n: string; days: string } | null = null
   if (filter === 'quitados') {
     sub =
       plural(row.paidDebts, 'quitada', 'quitadas') +
@@ -193,6 +196,7 @@ function PersonRowLink({ row, filter, selected, href }: { row: PersonRow; filter
   } else if (st.kind === 'late') {
     late = true
     sub = `${st.installments} em atraso · há ${plural(st.days, 'dia', 'dias')}`
+    lateTag = { n: `${st.installments} em atraso`, days: `há ${plural(st.days, 'dia', 'dias')}` }
   } else if (st.kind === 'open') {
     const when =
       st.dueInDays === 0 ? 'vence hoje' : st.dueInDays === 1 ? 'vence amanhã' : st.nextDueISO ? `vence ${date(st.nextDueISO)}` : ''
@@ -220,9 +224,17 @@ function PersonRowLink({ row, filter, selected, href }: { row: PersonRow; filter
       </span>
       <span className="min-w-0 flex-1">
         <span className="block truncate text-sm font-medium">{row.name}</span>
-        <span className={cn('block truncate text-xs', late ? 'text-neg' : 'text-fg-subtle')}>{sub}</span>
+        {lateTag ? (
+          <span className="mt-0.5 flex items-center gap-1.5 truncate text-xs">
+            <span className="rounded-full bg-neg/15 px-2 py-0.5 font-semibold text-neg">{lateTag.n}</span>
+            <span className="truncate text-fg-subtle">{lateTag.days}</span>
+          </span>
+        ) : (
+          <span className={cn('block truncate text-xs', late ? 'text-neg' : 'text-fg-subtle')}>{sub}</span>
+        )}
       </span>
-      <SignedMoney value={amount} muted={settledView} className="text-sm" />
+      {/* verde vivo só para o que já foi recebido; o que ainda está a receber fica em verde discreto */}
+      <SignedMoney value={amount} className={cn('text-sm', !settledView && amount > 0 && 'text-pos/70')} />
     </Link>
   )
 }

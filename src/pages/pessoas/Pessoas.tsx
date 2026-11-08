@@ -11,7 +11,6 @@ import { openPrintWindow } from '@/lib/print/html'
 import { useDocCtx } from '@/lib/print/use-doc-ctx'
 import { buildPersonRows, peopleTotals, PEOPLE_FILTERS, type PeopleFilter, type PeopleTotals } from '@/lib/finance/people'
 import { makeDebtCalc } from '@/lib/finance/debts'
-import { plural } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import type { AppData } from '@/lib/types'
 import { PeopleList } from './PeopleList'
@@ -85,13 +84,10 @@ function PessoasReady({ data, today }: { data: AppData; today: string }) {
       <header className="flex flex-col gap-4">
         <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
           <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
-            <h1 className="text-2xl font-semibold tracking-tight">Pessoas</h1>
-            {hasPeople && (
-              <p className="num text-sm text-fg-muted">
-                {plural(view.rows.length, 'pessoa', 'pessoas')}
-                {view.totals.toPay > 0.005 && <MoneyNote label="eu devo" value={view.totals.toPay} />}
-              </p>
-            )}
+            <h1 className="text-2xl font-semibold tracking-tight">
+              Pessoas
+              {hasPeople && <span aria-hidden="true" className="num ml-2 font-normal text-fg-subtle">({view.rows.length})</span>}
+            </h1>
           </div>
           <div className="flex items-center gap-2">
             {data.debts.some((d) => d.kind === 'receivable') && (
@@ -152,28 +148,19 @@ function PessoasReady({ data, today }: { data: AppData; today: string }) {
   )
 }
 
-function MoneyNote({ label, value }: { label: string; value: number }) {
-  const { money } = useAppData()
-  return (
-    <>
-      <span className="text-fg-subtle"> · </span>
-      {label} <span className="font-medium text-fg">{money(value)}</span>
-    </>
-  )
-}
-
 /** As três medidas da tela. Mesmos números do Início (A receber / atrasado). */
 function Metrics({ totals }: { totals: PeopleTotals }) {
   const { money } = useAppData()
   const items = [
     { label: 'A receber', value: totals.toReceive, tone: undefined, Icon: HandCoins },
+    ...(totals.toPay > 0.005 ? [{ label: 'A pagar', value: totals.toPay, tone: undefined as string | undefined, Icon: HandCoins }] : []),
     { label: 'Em atraso', value: totals.late, tone: totals.late > 0.005 ? 'text-neg' : undefined, Icon: ClockAlert },
     { label: 'Recebido', value: totals.received, tone: 'text-pos' as string | undefined, Icon: CircleCheck },
   ] satisfies { label: string; value: number; tone: string | undefined; Icon: LucideIcon }[]
   return (
-    <dl className="grid grid-cols-3 divide-x divide-border rounded-lg border border-border bg-surface">
+    <dl className={cn('grid gap-px overflow-hidden rounded-lg border border-border bg-border', items.length > 3 ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-3')}>
       {items.map((it) => (
-        <div key={it.label} className="min-w-0 px-3 py-3 sm:px-5 sm:py-4">
+        <div key={it.label} className="min-w-0 bg-surface px-3 py-3 sm:px-5 sm:py-4">
           <dt className="flex items-center gap-1.5 text-xs text-fg-muted">
             <it.Icon aria-hidden="true" className="size-3.5 shrink-0" />
             {it.label}

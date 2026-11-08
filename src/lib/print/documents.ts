@@ -45,16 +45,20 @@ const SHEET_CSS = `
 .s-val{font-family:"Geist","Inter",sans-serif;font-variant-numeric:tabular-nums;font-size:18px;font-weight:600;letter-spacing:-.02em;color:var(--p-fg)}
 .s-val.accent{color:var(--p-accent-text)}
 .s-summary{background:var(--p-surface2);border:1px solid var(--p-border);border-radius:10px;padding:16px 20px;margin-bottom:28px;display:grid;grid-template-columns:1fr 1fr;gap:4px 28px}
-.s-summary .row{display:flex;justify-content:space-between;gap:12px;font-size:13px;padding:7px 0;border-bottom:1px solid var(--p-border);color:var(--p-muted)}
+.s-summary .row{display:flex;justify-content:flex-start;gap:12px;font-size:13px;padding:7px 0;border-bottom:1px solid var(--p-border);color:var(--p-muted)}
+.s-summary .row span{flex:0 0 150px}
 .s-summary .row b{font-family:"Geist","Inter",sans-serif;font-variant-numeric:tabular-nums;color:var(--p-fg);font-weight:600}
 table{width:100%;border-collapse:collapse;margin-bottom:24px}
 thead th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--p-subtle);font-weight:600;padding:0 0 8px;border-bottom:1px solid var(--p-border-strong)}
 tbody td{padding:10px 0;border-bottom:1px solid var(--p-border);font-size:13px}
 tbody tr:last-child td{border-bottom:0}
 td+td,th+th{padding-left:14px}
-td.num,th.num{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+td.num,th.num{text-align:left;white-space:nowrap;font-variant-numeric:tabular-nums}
 td.num{font-family:"Geist","Inter",sans-serif;font-weight:500}
-.pill{font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px}
+.pill{display:inline-block;white-space:nowrap;font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px}
+th:last-child,td:last-child{padding-left:22px}
+.s-ico{display:flex;align-items:center;gap:6px}
+.s-ico svg{width:14px;height:14px;flex:none}
 .pill-paid{background:var(--p-pos-bg);color:var(--p-pos)}
 .pill-pending{background:var(--p-warn-bg);color:var(--p-accent-text)}
 .s-notes{margin-bottom:24px}
@@ -215,6 +219,10 @@ export interface PersonSheet {
   notes: string
 }
 
+// lucide rotate-ccw-clock
+const CLOCK_ICON =
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></svg>'
+
 /** ficha com tudo da pessoa: valores, resumo, dívidas e últimos pagamentos */
 export function personSheetHtml(s: PersonSheet, ctx: DocCtx): string {
   const { p, facts: f } = s
@@ -261,9 +269,9 @@ export function personSheetHtml(s: PersonSheet, ctx: DocCtx): string {
     `<div class="s-grid">${grid}</div><div class="s-summary">${summary}</div>` +
     (s.notes ? `<div class="s-notes"><div class="s-label">Anotações</div><p>${esc(s.notes)}</p></div>` : '') +
     (debts ? `<table><thead><tr><th>Dívida</th><th>Data</th><th class="num">Total</th><th class="num">Pago</th><th class="num">Falta</th><th>Situação</th></tr></thead><tbody>${debts}</tbody></table>` : '') +
-    (pays ? `<div class="s-label">Últimos pagamentos</div><table><thead><tr><th>Data</th><th>Referente a</th><th class="num">Valor</th></tr></thead><tbody>${pays}</tbody></table>` : '') +
+    (pays ? `<div class="s-label s-ico">${CLOCK_ICON}Últimos pagamentos</div><table><thead><tr><th>Data</th><th>Dívida</th><th class="num">Valor</th></tr></thead><tbody>${pays}</tbody></table>` : '') +
     `${footer(ctx)}</div>`
-  return renderDoc({ title: `Ficha — ${p.name} — BarnaBank`, css: SHEET_CSS, body, theme: ctx.theme })
+  return renderDoc({ title: `${p.name} — BarnaBank`, css: SHEET_CSS, body, theme: ctx.theme })
 }
 
 // ---------------------------------------------------------------- ranking dos pagadores

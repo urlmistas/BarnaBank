@@ -320,3 +320,19 @@ dialog[open]::backdrop {
     animation: none;
   }
 }
+
+/* botão que "quica" ao ser clicado (confirma o clique antes de abrir o seletor de arquivos) */
+@keyframes bb-bounce {
+  0% {
+    transform: scale(1);
+  }
+  35% {
+    transform: scale(0.9);
+  }
+  70% {
+    transform: scale(1.07);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
