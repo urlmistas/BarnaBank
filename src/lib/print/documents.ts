@@ -256,7 +256,7 @@ export function personSheetHtml(s: PersonSheet, ctx: DocCtx): string {
     .join('')
   const contact = [s.phone, ...s.tags].filter(Boolean).join(' · ')
   const body =
-    `<div class="sheet">${top('Ficha da pessoa')}<h1 class="s-title">${esc(p.name)}</h1>` +
+    `<div class="sheet">${top('Ficha individual')}<h1 class="s-title">${esc(p.name)}</h1>` +
     `<div class="s-sub">${esc(status)} · ${p.debts.length} ${p.debts.length === 1 ? 'dívida' : 'dívidas'}${contact ? ' · ' + esc(contact) : ''}</div>` +
     `<div class="s-grid">${grid}</div><div class="s-summary">${summary}</div>` +
     (s.notes ? `<div class="s-notes"><div class="s-label">Anotações</div><p>${esc(s.notes)}</p></div>` : '') +

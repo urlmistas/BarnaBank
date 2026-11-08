@@ -228,7 +228,7 @@ describe('Pessoas: escrita', () => {
     mount()
     fireEvent.click(await screen.findByRole('button', { name: /Exportar ficha/ }))
     const html = win.document.write.mock.calls[0][0] as string
-    expect(html).toContain('Ficha da pessoa')
+    expect(html).toContain('Ficha individual')
     expect(html).toContain('Ana Souza')
     expect(html).toContain('Paga dia 5')
   })

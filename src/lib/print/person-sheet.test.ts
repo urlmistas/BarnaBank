@@ -19,7 +19,7 @@ describe('personSheetHtml', () => {
 
   it('traz valores, resumo, dívidas e pagamentos, e escapa o nome', () => {
     const html = personSheetHtml({ p, facts, phone: '(11) 99999-8888', tags: ['Família'], notes: 'Paga dia 5' }, ctx)
-    expect(html).toContain('Ficha da pessoa')
+    expect(html).toContain('Ficha individual')
     expect(html).toContain('Ana &lt;Souza&gt;')
     expect(html).not.toContain('Ana <Souza>')
     expect(html).toContain('Falta receber')
