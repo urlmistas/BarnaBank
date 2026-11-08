@@ -120,9 +120,9 @@ function AlertRow({ alert }: { alert: DashboardAlert }) {
           <span className="text-fg-subtle"> · {names}</span>
         </span>
       </p>
-      <Button asChild variant="ghost" size="sm" className="shrink-0">
+      <Button asChild variant="ghost" size="sm" className="group shrink-0">
         <Link to={late ? '/pessoas?f=atrasados' : '/pessoas'}>
-          Ver <ArrowRight aria-hidden="true" />
+          Ver <ArrowRight aria-hidden="true" className="transition-transform duration-200 ease-out group-hover:translate-x-1 group-focus-visible:translate-x-1 motion-reduce:transition-none" />
         </Link>
       </Button>
     </div>
