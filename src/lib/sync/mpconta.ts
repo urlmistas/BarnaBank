@@ -11,6 +11,8 @@ export interface MpPot {
   valor: number
   /** % do CDI que o porquinho rende */
   pct: number
+  /** meta em R$ (0 = sem meta) */
+  meta: number
 }
 
 export interface MpMov {
@@ -24,6 +26,17 @@ export interface MpMov {
   pot: string
 }
 
+/** o que o app estimava e o que o dono informou na última conferência */
+export interface MpConferencia {
+  at: string
+  saldo: { est: number; real: number }
+  pots: { id: string; name: string; est: number; real: number }[]
+  /** real − estimado, na conta */
+  diff: number
+  /** soma das diferenças (sem sinal): conta e porquinhos */
+  total: number
+}
+
 export interface MpView {
   configured: true
   saldo: number
@@ -34,7 +47,14 @@ export interface MpView {
   yieldDate: string
   pots: MpPot[]
   total: number
+  /** carteira do app onde as entradas e saídas são lançadas ('' = não lança) */
+  carteira: string
+  /** avisos no Telegram ligados */
+  avisos: boolean
+  conferencia: MpConferencia | null
   movs: MpMov[]
+  /** entradas e saídas que dá para lançar nas carteiras */
+  lancar: MpMov[]
   ignoradas: { id: string; at: string; valor: number; motivo: string }[]
 }
 
@@ -49,7 +69,9 @@ export interface MpFound {
 export interface MpSave {
   saldo: number
   saldoPct: number
-  pots: Record<string, { name: string; valor: number; pct: number }>
+  pots: Record<string, { name: string; valor: number; pct: number; meta: number }>
+  carteira: string
+  avisos: boolean
 }
 
 async function call<T>(fetcher: Fetch, token: string, method: 'GET' | 'POST' | 'DELETE', body?: unknown, base = BOT_URL): Promise<T> {

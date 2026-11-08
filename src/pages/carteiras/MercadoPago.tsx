@@ -6,10 +6,15 @@ import { MercadoPagoLogo } from '@/components/mercado-pago-logo'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Field, Modal } from '@/components/ui/modal'
+import { Select } from '@/components/ui/select'
+import { mpNewTransactions } from '@/lib/finance/mercadopago'
 import { formatMoneyInput, parseMoney } from '@/lib/money-input'
-import { mpFind, mpSave, mpView, type MpFound, type MpPot, type MpView } from '@/lib/sync/mpconta'
+import { commit } from '@/lib/store'
+import { Switch } from '@/pages/configuracoes/layout'
+import { mpFind, mpSave, mpView, type MpConferencia, type MpFound, type MpPot, type MpView } from '@/lib/sync/mpconta'
 import { BOT_URL } from '@/lib/sync/telegram-link'
 import { botErrorText } from '@/lib/sync/worker'
+import type { Wallet } from '@/lib/types'
 import { cn } from '@/lib/utils'
 import viagem from '@/assets/porquinhos/viagem.webp'
 import emergencia from '@/assets/porquinhos/emergencia.webp'
@@ -31,7 +36,7 @@ const when = (iso: string) => {
 }
 
 export function MercadoPago() {
-  const { cloud, botToken, money } = useAppData()
+  const { cloud, botToken, money, result, canCreate } = useAppData()
   const loggedIn = cloud.status !== 'off'
   const [view, setView] = useState<MpView | { configured: false } | null | undefined>(undefined)
   const [busy, setBusy] = useState(false)
@@ -72,9 +77,19 @@ export function MercadoPago() {
     }
   }, [botToken, fetcher, loggedIn])
 
+  const configured = view && view.configured ? view : null
+  const data = result?.data
+
+  // entradas e saídas do Mercado Pago viram lançamentos na carteira escolhida (sem repetir os que já estão lá)
+  useEffect(() => {
+    if (!configured?.carteira || !data || !canCreate) return
+    if (!data.wallets.some((w) => w.id === configured.carteira)) return
+    const novas = mpNewTransactions(configured.lancar, configured.carteira, data.transactions)
+    if (novas.length) commit((api) => api.transactions.push(...novas))
+  }, [configured, data, canCreate])
+
   if (!BOT_URL || !loggedIn || !view) return null
 
-  const configured = view.configured ? view : null
   // última movimentação que mexeu na conta (o Guardar ao pagar já aparece nos porquinhos)
   const last = configured?.movs.find((m) => m.tipo !== 'guardar')
   return (
@@ -142,12 +157,20 @@ export function MercadoPago() {
                 {configured.pots.length > 0 && (
                   <ul className="mt-3 divide-y divide-border text-sm">
                     {configured.pots.map((p) => (
-                      <Line key={p.id} icon={potIcon(p.name)} label={p.name} value={money(p.valor)} hint={p.pct > 0 ? p.pct + '% do CDI' : undefined} />
+                      <Line
+                        key={p.id}
+                        icon={potIcon(p.name)}
+                        label={p.name}
+                        value={money(p.valor)}
+                        hint={p.pct > 0 ? p.pct + '% do CDI' : undefined}
+                        progress={p.meta > 0 ? { pct: Math.min(100, Math.round((p.valor / p.meta) * 100)), text: 'de ' + money(p.meta) } : undefined}
+                      />
                     ))}
                   </ul>
                 )}
               </section>
             </div>
+            {configured.conferencia && <Conferencia c={configured.conferencia} money={money} />}
             {configured.movs.length > 0 && (
               <div className="mt-4">
                 <p className="text-xs font-medium tracking-wide text-fg-subtle uppercase">Últimas movimentações</p>
@@ -198,18 +221,44 @@ export function MercadoPago() {
   )
 }
 
-function Line({ label, value, hint, icon }: { label: string; value: string; hint?: string; icon?: string }) {
+function Line({ label, value, hint, icon, progress }: { label: string; value: string; hint?: string; icon?: string; progress?: { pct: number; text: string } }) {
   return (
-    <li className="flex items-center justify-between gap-3 py-1.5">
-      <span className="flex min-w-0 items-center gap-2.5">
-        {icon && <img src={icon} alt="" aria-hidden="true" className="size-7 shrink-0 object-contain" />}
-        <span className="min-w-0 truncate">
-          {label}
-          {hint && <span className="text-fg-subtle"> · {hint}</span>}
+    <li className="py-1.5">
+      <div className="flex items-center justify-between gap-3">
+        <span className="flex min-w-0 items-center gap-2.5">
+          {icon && <img src={icon} alt="" aria-hidden="true" className="size-7 shrink-0 object-contain" />}
+          <span className="min-w-0 truncate">
+            {label}
+            {hint && <span className="text-fg-subtle"> · {hint}</span>}
+          </span>
         </span>
-      </span>
-      <span className="num shrink-0 font-medium">{value}</span>
+        <span className="num shrink-0 font-medium">{value}</span>
+      </div>
+      {progress && (
+        <div className={cn('mt-1.5 flex items-center gap-2', icon && 'pl-[38px]')}>
+          <div role="progressbar" aria-label={'Meta de ' + label} aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress.pct} className="h-1.5 flex-1 overflow-hidden rounded-full bg-surface-2">
+            <div className="h-full rounded-full bg-[#00b1ea] transition-[width]" style={{ width: progress.pct + '%' }} />
+          </div>
+          <span className="num shrink-0 text-xs text-fg-subtle">
+            {progress.pct}% {progress.text}
+          </span>
+        </div>
+      )}
     </li>
+  )
+}
+
+// o quanto a estimativa errou na última vez que o dono informou os valores reais
+function Conferencia({ c, money }: { c: MpConferencia; money: (v: number) => string }) {
+  const bateu = c.total < 1
+  const partes = [
+    c.saldo.real !== c.saldo.est ? 'conta ' + (c.diff > 0 ? '+' : '−') + money(Math.abs(c.diff)) : '',
+    ...c.pots.filter((p) => Math.abs(p.real - p.est) >= 0.01).map((p) => p.name + ' ' + (p.real > p.est ? '+' : '−') + money(Math.abs(p.real - p.est))),
+  ].filter(Boolean)
+  return (
+    <p className={cn('mt-3 rounded-md border px-3 py-2 text-xs', bateu ? 'border-border text-fg-muted' : 'border-neg/40 text-neg')}>
+      Conferido em {when(c.at)}: {bateu ? 'a estimativa bateu com o app do Mercado Pago.' : 'a estimativa estava errada em ' + money(c.total) + ' (' + partes.join(', ') + '). Rendimento e movimentos fora da API explicam a diferença.'}
+    </p>
   )
 }
 
@@ -218,13 +267,18 @@ interface Row {
   name: string
   valor: string
   pct: string
+  meta: string
   porGasto: number
 }
 
 function SetupForm({ current, onClose, onSaved }: { current: MpView | null; onClose: () => void; onSaved: (v: MpView) => void }) {
-  const { botToken } = useAppData()
+  const { botToken, result, canCreate } = useAppData()
+  const wallets: Wallet[] = result?.data.wallets ?? []
+  const [carteira, setCarteira] = useState(current?.carteira ?? '')
+  const [avisos, setAvisos] = useState(current?.avisos ?? true)
   const saldoId = useId()
   const pctId = useId()
+  const walletId = useId()
   const [rows, setRows] = useState<Row[] | null>(null)
   const [saldo, setSaldo] = useState(current ? formatMoneyInput(current.saldo) : '')
   const [saldoPct, setSaldoPct] = useState(current ? String(current.saldoPct) : '0')
@@ -246,7 +300,7 @@ function SetupForm({ current, onClose, onSaved }: { current: MpView | null; onCl
         setRows(
           [...ids].map((id) => {
             const k = known.get(id)
-            return { id, name: k?.name ?? '', valor: k ? formatMoneyInput(k.valor) : '', pct: String(k?.pct ?? 120), porGasto: found.get(id)?.porGasto ?? 0 }
+            return { id, name: k?.name ?? '', valor: k ? formatMoneyInput(k.valor) : '', pct: String(k?.pct ?? 120), meta: k?.meta ? formatMoneyInput(k.meta) : '', porGasto: found.get(id)?.porGasto ?? 0 }
           }),
         )
       } catch (e) {
@@ -265,18 +319,20 @@ function SetupForm({ current, onClose, onSaved }: { current: MpView | null; onCl
     if (isNaN(s)) return setErr('Informe o saldo da conta.')
     const sp = Number(saldoPct.replace(',', '.'))
     if (!isFinite(sp) || sp < 0 || sp > 300) return setErr('Rendimento da conta: de 0 a 300% do CDI.')
-    const pots: Record<string, { name: string; valor: number; pct: number }> = {}
+    const pots: Record<string, { name: string; valor: number; pct: number; meta: number }> = {}
     for (const r of rows) {
       const v = parseMoney(r.valor)
       const pct = Number(r.pct.replace(',', '.'))
       if (isNaN(v)) return setErr('Informe o valor de cada porquinho (ou 0).')
       if (!isFinite(pct) || pct < 0 || pct > 300) return setErr('Rendimento do porquinho: de 0 a 300% do CDI.')
-      pots[r.id] = { name: r.name.trim() || 'Porquinho ' + r.id.slice(0, 4), valor: v, pct }
+      const meta = r.meta.trim() ? parseMoney(r.meta) : 0
+      if (isNaN(meta) || meta < 0) return setErr('Meta do porquinho: um valor em R$ (ou deixe em branco).')
+      pots[r.id] = { name: r.name.trim() || 'Porquinho ' + r.id.slice(0, 4), valor: v, pct, meta }
     }
     setBusy(true)
     setErr(null)
     try {
-      onSaved(await mpSave((u, i) => fetch(u, i), await botToken(), { saldo: s, saldoPct: sp, pots }))
+      onSaved(await mpSave((u, i) => fetch(u, i), await botToken(), { saldo: s, saldoPct: sp, pots, carteira, avisos }))
     } catch (e2) {
       setErr(botErrorText(e2))
       setBusy(false)
@@ -303,16 +359,31 @@ function SetupForm({ current, onClose, onSaved }: { current: MpView | null; onCl
       )}
       {rows && rows.length === 0 && <p className="mt-2 text-sm text-fg-muted">Nenhum porquinho apareceu nas suas movimentações.</p>}
       {rows?.map((r) => (
-        <div key={r.id} className="mt-3 grid grid-cols-[1fr_1fr_72px_auto] gap-2">
-          <div className="col-span-4 text-xs text-fg-subtle">{r.porGasto > 0 ? 'Recebe ' + formatMoneyInput(r.porGasto) + ' a cada gasto' : 'Porquinho ' + r.id.slice(0, 4)}</div>
-          <Input aria-label={'Nome do porquinho ' + r.id.slice(0, 4)} placeholder="Nome" value={r.name} onChange={(e) => set(r.id, { name: e.target.value })} />
-          <Input aria-label={'Valor do porquinho ' + (r.name || r.id.slice(0, 4))} inputMode="decimal" placeholder="Valor" value={r.valor} onChange={(e) => set(r.id, { valor: e.target.value })} />
-          <Input aria-label={'% do CDI do porquinho ' + (r.name || r.id.slice(0, 4))} inputMode="decimal" value={r.pct} onChange={(e) => set(r.id, { pct: e.target.value })} />
-          <Button type="button" variant="ghost" size="icon" aria-label={'Tirar o porquinho ' + (r.name || r.id.slice(0, 4))} onClick={() => setRows((rs) => rs && rs.filter((x) => x.id !== r.id))}>
-            <X />
-          </Button>
+        <div key={r.id} className="mt-3 rounded-lg border border-border p-3">
+          <div className="text-xs text-fg-subtle">{r.porGasto > 0 ? 'Recebe ' + formatMoneyInput(r.porGasto) + ' a cada gasto' : 'Porquinho ' + r.id.slice(0, 4)}</div>
+          <div className="mt-2 grid grid-cols-2 gap-2">
+            <Input aria-label={'Nome do porquinho ' + r.id.slice(0, 4)} placeholder="Nome" value={r.name} onChange={(e) => set(r.id, { name: e.target.value })} />
+            <Input aria-label={'Valor do porquinho ' + (r.name || r.id.slice(0, 4))} inputMode="decimal" placeholder="Valor (R$)" value={r.valor} onChange={(e) => set(r.id, { valor: e.target.value })} />
+          </div>
+          <div className="mt-2 grid grid-cols-[1fr_1fr_auto] gap-2">
+            <Input aria-label={'% do CDI do porquinho ' + (r.name || r.id.slice(0, 4))} inputMode="decimal" placeholder="% do CDI" value={r.pct} onChange={(e) => set(r.id, { pct: e.target.value })} />
+            <Input aria-label={'Meta do porquinho ' + (r.name || r.id.slice(0, 4))} inputMode="decimal" placeholder="Meta (R$)" value={r.meta} onChange={(e) => set(r.id, { meta: e.target.value })} />
+            <Button type="button" variant="ghost" size="icon" aria-label={'Tirar o porquinho ' + (r.name || r.id.slice(0, 4))} onClick={() => setRows((rs) => rs && rs.filter((x) => x.id !== r.id))}>
+              <X />
+            </Button>
+          </div>
         </div>
       ))}
+      <p className="mt-5 text-xs font-medium tracking-wide text-fg-subtle uppercase">Integração</p>
+      {canCreate && (
+        <Field label="Lançar entradas e saídas na carteira" htmlFor={walletId} className="mt-2" hint="O saldo da carteira soma só o que acontecer daqui para a frente. O que vai para os porquinhos não é lançado.">
+          <Select id={walletId} value={carteira} onChange={setCarteira} options={[{ value: '', label: 'Não lançar' }, ...wallets.map((w) => ({ value: w.id, label: w.name }))]} />
+        </Field>
+      )}
+      <div className="mt-3 flex items-center justify-between gap-4">
+        <span className="text-sm">Avisar no Telegram quando entrar, sair ou for guardado</span>
+        <Switch checked={avisos} onChange={setAvisos} label="Avisar no Telegram" />
+      </div>
       <p role="alert" aria-live="assertive" className="mt-3 min-h-5 text-xs text-neg">
         {err}
       </p>

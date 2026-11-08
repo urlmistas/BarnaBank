@@ -1,7 +1,7 @@
 import {pixCode, qrSvg, qrPng} from './pix.mjs';
 import {getEngine} from './engine.js';
 import {criarPix, criarPreferenciaCartao, taxaCartao, valorCartao, buscarPagamento, assinaturaOk, montarRef, lerRef, MP_API} from './mercadopago.mjs';
-import {estadoNovo, aplicar, rendimento, visao, descobrirPorquinhos, lerCdi} from './mpconta.mjs';
+import {estadoNovo, aplicar, rendimento, visao, descobrirPorquinhos, lerCdi, conferir} from './mpconta.mjs';
 // BarnaBank: bot do Telegram + nuvem para sincronizar o app.
 // Roda como Cloudflare Worker. Precisa de:
 //   KV "BB" (os dados), segredos TELEGRAM_TOKEN e SYNC_KEY.
@@ -473,7 +473,8 @@ async function mpSync(env, {min = 60} = {}) {
   const desde = Math.max(Date.parse(st.anchor) - 86400000, (st.syncedAt ? Date.parse(st.syncedAt) : Date.parse(st.anchor)) - 8 * 86400000);
   const pagamentos = await mpPagamentos(env, (Date.now() - desde) / 86400000);
   if (!pagamentos) return st; // Mercado Pago fora do ar: tenta na próxima
-  aplicar(st, pagamentos, st.me);
+  const novos = [];
+  aplicar(st, pagamentos, st.me, novos);
   if (st.yieldDate < todayBR()) {
     const cdi = await mpCdi(st.yieldDate);
     if (cdi) rendimento(st, cdi);
@@ -481,7 +482,24 @@ async function mpSync(env, {min = 60} = {}) {
   st.syncedAt = new Date().toISOString();
   // o plano grátis do KV tem 1000 gravações por dia: sem mudança, só atualiza o carimbo de vez em quando
   if (JSON.stringify({...st, syncedAt: 0}) !== JSON.stringify({...JSON.parse(velho), syncedAt: 0}) || idade > 600000) await putJSON(kv, MP_CONTA, st);
+  // avisa no Telegram só depois de gravar: se o aviso falhar, o que entrou já está contado e não repete
+  if (novos.length && st.avisos !== false && st.uid) await mpAvisar(env, st, novos).catch(() => {});
   return st;
+}
+// Telegram: o que entrou, saiu ou foi guardado desde a última busca (uma mensagem só)
+async function mpAvisar(env, st, novos) {
+  const sc = scoped(env, st.uid);
+  const chat = await sc.BB.get('owner');
+  if (!chat) return;
+  const nome = id => (st.pots[id] && st.pots[id].name) || 'porquinho';
+  const linhas = novos.slice(-12).map(m => {
+    if (m.tipo === 'guardar' || m.tipo === 'guardado') return '🐷 +' + brl(m.valor) + ' em <b>' + esc(nome(m.pot)) + '</b>' + (m.tipo === 'guardar' ? ' (guardar ao pagar)' : '');
+    if (m.tipo === 'resgate') return '🐷 −' + brl(m.valor) + ' de <b>' + esc(nome(m.pot)) + '</b>';
+    if (m.tipo === 'saida') return '💸 ' + esc(m.label) + ' <b>−' + brl(m.valor) + '</b>';
+    return '💰 ' + esc(m.label) + ' <b>+' + brl(m.valor) + '</b>';
+  });
+  if (novos.length > 12) linhas.unshift('<i>…e mais ' + (novos.length - 12) + ' antes destas</i>');
+  await say(sc, chat, ['<b>Mercado Pago</b>', ...linhas, 'Conta (estimada): <b>' + brl(st.saldo) + '</b>'].join('\n'));
 }
 const mpNum = (v, max) => { const n = Number(v); return Number.isFinite(n) && Math.abs(n) <= max ? n : null; };
 async function apiMpConta(req, url, env) {
@@ -515,11 +533,18 @@ async function apiMpConta(req, url, env) {
   for (const [id, p] of Object.entries(body.pots && typeof body.pots === 'object' ? body.pots : {})) {
     const valor = mpNum(p && p.valor, 1e9), pct = mpNum(p && p.pct == null ? 120 : p.pct, 300);
     if (!/^[0-9a-f-]{36}$/i.test(id) || valor === null || pct === null) return json({error: 'porquinho inválido'}, 400);
-    pots[id] = {name: p.name, valor, pct};
+    const meta = mpNum(p && p.meta == null ? 0 : p.meta, 1e9);
+    if (meta === null || meta < 0) return json({error: 'meta inválida'}, 400);
+    pots[id] = {name: p.name, valor, pct, meta};
   }
   const eu = await mpGet(env, '/users/me');
   if (!eu || !eu.id) return json({error: 'Mercado Pago não respondeu'}, 502);
-  const st = estadoNovo({agora: new Date(), hoje: todayBR(), saldo, saldoPct, pots});
+  const carteira = String(body.carteira || '').slice(0, 60);
+  const avisos = body.avisos !== false;
+  // confere o que ele informou com o que o app estimava, antes de recomeçar a partir dos valores novos
+  const antes = await mpSync(env, {min: 0});
+  const conferencias = antes ? [...(antes.conferencias || []), conferir(antes, {saldo, pots})] : [];
+  const st = estadoNovo({agora: new Date(), hoje: todayBR(), saldo, saldoPct, pots, carteira, avisos, conferencias});
   st.uid = w.uid; st.me = eu.id;
   await putJSON(kv, MP_CONTA, st);
   return json(visao(await mpSync(env, {min: 0}) || st));

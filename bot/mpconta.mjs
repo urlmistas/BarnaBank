@@ -57,17 +57,18 @@ export function efeito(p, me) {
 const quando = p => Date.parse(p.date_approved || p.date_created || '') || 0;
 const iso = ms => new Date(ms).toISOString();
 
-export function estadoNovo({agora, hoje, saldo, saldoPct = 0, pots = {}}) {
+export function estadoNovo({agora, hoje, saldo, saldoPct = 0, pots = {}, carteira = '', avisos = true, conferencias = []}) {
   const ps = {};
   for (const id of Object.keys(pots)) {
     const x = pots[id] || {};
-    ps[id.toLowerCase()] = {name: String(x.name || 'Porquinho').slice(0, 40), valor: dois(x.valor), pct: Math.max(0, Math.min(300, Number(x.pct) || 0))};
+    ps[id.toLowerCase()] = {name: String(x.name || 'Porquinho').slice(0, 40), valor: dois(x.valor), pct: Math.max(0, Math.min(300, Number(x.pct) || 0)), meta: Math.max(0, dois(x.meta) || 0)};
   }
-  return {anchor: agora.toISOString(), yieldDate: hoje, saldo: dois(saldo), saldoPct: Math.max(0, Math.min(300, Number(saldoPct) || 0)), pots: ps, seen: {}, movs: [], ignoradas: [], syncedAt: null};
+  return {anchor: agora.toISOString(), yieldDate: hoje, saldo: dois(saldo), saldoPct: Math.max(0, Math.min(300, Number(saldoPct) || 0)), pots: ps, seen: {}, movs: [], ignoradas: [], syncedAt: null, carteira: String(carteira || ''), avisos: avisos !== false, conferencias: conferencias.slice(-20)};
 }
 
 // aplica os pagamentos ao estado (mexe no objeto). Cada pagamento conta uma vez; se mudar (estorno), só a diferença entra.
-export function aplicar(st, pagamentos, me) {
+// `novos` (opcional): recebe, em ordem, o que entrou agora e ainda não tinha sido contado (para avisar no Telegram)
+export function aplicar(st, pagamentos, me, novos) {
   const lista = (pagamentos || []).filter(p => p && p.id != null && quando(p) > Date.parse(st.anchor)).sort((a, b) => quando(a) - quando(b));
   for (const p of lista) {
     const id = String(p.id);
@@ -77,6 +78,7 @@ export function aplicar(st, pagamentos, me) {
       continue;
     }
     const novo = e ? {b: e.b || 0, pot: e.pot ? {id: e.pot.id, v: e.pot.v} : null} : {b: 0, pot: null};
+    const jaVisto = Object.prototype.hasOwnProperty.call(st.seen, id);
     const velho = st.seen[id] || {b: 0, pot: null};
     const db = dois(novo.b - velho.b);
     if (db) st.saldo = dois(st.saldo + db);
@@ -89,7 +91,8 @@ export function aplicar(st, pagamentos, me) {
       st.pots[pid].valor = dois(st.pots[pid].valor + dp);
     }
     st.seen[id] = novo;
-    if (e && !st.movs.some(m => m.id === id)) st.movs = [...st.movs, {id, at: iso(quando(p)), tipo: e.tipo, label: e.label, valor: dois(Math.abs(e.b || (e.pot && e.pot.v) || 0)), sinal: (e.b || 0) > 0 ? 1 : (e.b || 0) < 0 ? -1 : 0, pot: e.pot ? e.pot.id : ''}].slice(-60);
+    if (e && !jaVisto && novos) novos.push({id, at: iso(quando(p)), tipo: e.tipo, label: e.label, valor: dois(Math.abs(e.b || (e.pot && e.pot.v) || 0)), sinal: (e.b || 0) > 0 ? 1 : (e.b || 0) < 0 ? -1 : 0, pot: e.pot ? e.pot.id : ''});
+    if (e && !st.movs.some(m => m.id === id)) st.movs = [...st.movs, {id, at: iso(quando(p)), tipo: e.tipo, label: e.label, valor: dois(Math.abs(e.b || (e.pot && e.pot.v) || 0)), sinal: (e.b || 0) > 0 ? 1 : (e.b || 0) < 0 ? -1 : 0, pot: e.pot ? e.pot.id : ''}].slice(-200);
   }
   // não deixa o registro de "já contei" crescer sem fim: guarda só os pagamentos mais recentes
   const ids = Object.keys(st.seen);
@@ -111,12 +114,17 @@ export function rendimento(st, serie) {
 
 // o que o app mostra (sem o registro interno)
 export function visao(st) {
-  const pots = Object.entries(st.pots).map(([id, p]) => ({id, name: p.name, valor: dois(p.valor), pct: p.pct}));
+  const pots = Object.entries(st.pots).map(([id, p]) => ({id, name: p.name, valor: dois(p.valor), pct: p.pct, meta: p.meta || 0}));
   return {
     configured: true,
     saldo: dois(st.saldo), saldoPct: st.saldoPct, since: st.anchor, syncedAt: st.syncedAt, yieldDate: st.yieldDate,
     pots, total: dois(st.saldo + pots.reduce((s, p) => s + p.valor, 0)),
-    movs: [...st.movs].reverse().slice(0, 30), ignoradas: st.ignoradas.slice(-10)
+    carteira: st.carteira || '', avisos: st.avisos !== false,
+    conferencia: (st.conferencias || []).slice(-1)[0] || null,
+    movs: [...st.movs].reverse().slice(0, 30),
+    // tudo o que o app pode lançar nas carteiras (ele pula o que já lançou, pela chave mp:<id>)
+    lancar: st.movs.filter(m => m.tipo === 'entrada' || m.tipo === 'saida' || m.tipo === 'aporte').map(m => ({id: m.id, at: m.at, tipo: m.tipo, label: m.label, valor: m.valor, sinal: m.sinal})),
+    ignoradas: st.ignoradas.slice(-10)
   };
 }
 
@@ -145,4 +153,15 @@ export function lerCdi(json) {
     const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(String(r && r.data));
     return m ? {date: m[3] + '-' + m[2] + '-' + m[1], pct: Number(r.valor)} : null;
   }).filter(d => d && Number.isFinite(d.pct) && d.pct >= 0);
+}
+
+// confere o que o dono informou com o que o app estimava (antes de recomeçar a partir dos valores informados)
+export function conferir(st, {saldo, pots = {}}, agora = new Date()) {
+  const lista = Object.entries(pots).map(([id, p]) => {
+    const velho = st.pots[id.toLowerCase()];
+    return {id: id.toLowerCase(), name: String(p.name || (velho && velho.name) || 'Porquinho').slice(0, 40), est: velho ? dois(velho.valor) : null, real: dois(p.valor)};
+  }).filter(p => p.est !== null);
+  const sEst = dois(st.saldo), sReal = dois(saldo);
+  const total = dois(Math.abs(sReal - sEst) + lista.reduce((t, p) => t + Math.abs(p.real - p.est), 0));
+  return {at: agora.toISOString(), saldo: {est: sEst, real: sReal}, pots: lista, diff: dois(sReal - sEst), total};
 }
