@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useId, useState, type FormEvent } from 'react'
-import { BanknoteCheck, ChartNoAxesCombined, Info, PiggyBank, Loader2, Plus, Receipt, RefreshCw, Settings2, Trash, Zap } from 'lucide-react'
+import { BanknoteCheck, ChartNoAxesCombined, Info, PiggyBank, Loader2, Plus, RefreshCw, RotateCcwClock, Settings2, Trash, Zap } from 'lucide-react'
 import { useAppData } from '@/app/data-context'
 import { Button } from '@/components/ui/button'
 import mpLogo from '@/assets/mercadopago.png'
@@ -197,19 +197,21 @@ export function MercadoPago() {
                 <ul className="mt-3 divide-y divide-border text-sm">
                   <li className="flex items-center justify-between gap-3 py-1.5">
                     <span className="flex items-center gap-2 text-fg-muted">
-                      <Receipt className="size-4 shrink-0" aria-hidden="true" />
+                      <RotateCcwClock className="size-4 shrink-0" aria-hidden="true" />
                       Última movimentação
                     </span>
-                    <span className="min-w-0 truncate text-right">
-                      {last ? (
-                        <>
-                          <span className={cn('num', last.sinal > 0 && 'text-pos')}>{(last.sinal > 0 ? '+' : '−') + money(last.valor)}</span>
-                          <span className="text-fg-subtle"> · {last.label} · {when(last.at)}</span>
-                        </>
-                      ) : (
-                        <span className="text-fg-subtle">nenhuma ainda</span>
-                      )}
-                    </span>
+                    {last ? (
+                      <span className="flex shrink-0 items-center gap-1.5">
+                        <span className={cn('num', last.sinal > 0 && 'text-pos')}>{(last.sinal > 0 ? '+' : '−') + money(last.valor)}</span>
+                        <Tooltip label={last.label + ' · ' + when(last.at)} side="top" align="end">
+                          <button type="button" aria-label={'Detalhes da última movimentação: ' + last.label + ', ' + when(last.at)} className="inline-flex size-5 items-center justify-center rounded-full text-fg-subtle transition-colors hover:text-fg">
+                            <Info className="size-4" aria-hidden="true" />
+                          </button>
+                        </Tooltip>
+                      </span>
+                    ) : (
+                      <span className="text-fg-subtle">nenhuma ainda</span>
+                    )}
                   </li>
                   <li className="flex items-center justify-between gap-3 py-1.5">
                     <span className="flex items-center gap-2 text-fg-muted">
@@ -242,7 +244,10 @@ export function MercadoPago() {
             {configured.conferencia && <Conferencia c={configured.conferencia} money={money} />}
             {configured.movs.length > 0 && (
               <div className="mt-4">
-                <p className="text-xs font-medium tracking-wide text-fg-subtle uppercase">Últimas movimentações</p>
+                <p className="flex items-center gap-1.5 text-xs font-medium tracking-wide text-fg-subtle uppercase">
+                  <RotateCcwClock className="size-4 shrink-0" aria-hidden="true" />
+                  Últimas movimentações
+                </p>
                 <ul className="mt-1 divide-y divide-border text-sm">
                   {(all ? configured.movs : configured.movs.slice(0, 6)).map((m) => (
                     <li key={m.id} className="flex items-center justify-between gap-3 py-2">
