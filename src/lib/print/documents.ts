@@ -61,7 +61,7 @@ td.num{font-family:"Geist","Inter",sans-serif;font-weight:500}
 .s-notes p{font-size:14px;line-height:1.5;color:var(--p-fg);margin:4px 0 0;white-space:pre-wrap}
 .s-footer{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;margin-top:32px;padding-top:16px;border-top:1px solid var(--p-border)}
 .s-footer .issued{font-size:11px;color:var(--p-subtle)}
-.s-seal{width:44px;height:44px;flex:none;border-radius:10px;border:1px solid #434ce4;display:flex;align-items:center;justify-content:center;font-family:"Geist","Inter",sans-serif;font-size:11px;font-weight:600;letter-spacing:.06em;color:var(--p-accent-text);text-align:center;line-height:1.2}
+.s-seal{height:34px;width:auto;flex:none;display:block}
 tr,.s-summary,.s-grid{break-inside:avoid}
 @media print{.sheet{background:transparent;border:0;border-radius:0;margin:0;max-width:none;padding:6px 4px 0}}
 `
@@ -70,7 +70,7 @@ const top = (docType: string) =>
   `<div class="s-top"><div class="s-brand"><img class="s-mark" src="${abs(logoUrl)}" alt=""><div class="s-brandname">BarnaBank</div></div><div class="s-doctype">${esc(docType)}</div></div><div class="s-rule"></div>`
 
 const footer = (ctx: DocCtx, extra = '') =>
-  `<div class="s-footer"><div class="issued">Documento gerado por BarnaBank em ${esc(stamp(ctx.issuedAt))}${extra}<br>Caráter informativo, uso pessoal entre as partes.</div><div class="s-seal">BB</div></div>`
+  `<div class="s-footer"><div class="issued">Documento gerado por BarnaBank em ${esc(stamp(ctx.issuedAt))}${extra}<br>Caráter informativo, uso pessoal entre as partes.</div><img class="s-seal" src="${abs(logoUrl)}" alt=""></div>`
 
 // ---------------------------------------------------------------- extrato da dívida
 
