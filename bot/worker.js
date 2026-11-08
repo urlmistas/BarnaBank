@@ -1,7 +1,7 @@
 import {pixCode, qrSvg, qrPng} from './pix.mjs';
 import {getEngine} from './engine.js';
 import {criarPix, criarPreferenciaCartao, taxaCartao, valorCartao, buscarPagamento, assinaturaOk, montarRef, lerRef, MP_API} from './mercadopago.mjs';
-import {estadoNovo, aplicar, rendimento, visao, descobrirPorquinhos, lerCdi, conferir} from './mpconta.mjs';
+import {estadoNovo, aplicar, rendimento, visao, descobrirPorquinhos, lerCdi, conferir, registrarHistorico, resumoSemanal} from './mpconta.mjs';
 // BarnaBank: bot do Telegram + nuvem para sincronizar o app.
 // Roda como Cloudflare Worker. Precisa de:
 //   KV "BB" (os dados), segredos TELEGRAM_TOKEN e SYNC_KEY.
@@ -70,6 +70,8 @@ export default {
       }
       // lembretes: na hora que o dono escolheu (padrão 9h)
       await step('mercadopago', () => mpSync(env, {min: 0}));
+      // domingo, 9h: resumo da semana do Mercado Pago no Telegram
+      if (h === DAILY_HOUR) await step('mp-semanal', () => mpSemanal(env));
       await step('lembretes', () => remindersFor(env, h));
       await step('contas', () => accountsDaily(env, step, h));
     })();
@@ -479,6 +481,7 @@ async function mpSync(env, {min = 60} = {}) {
     const cdi = await mpCdi(st.yieldDate);
     if (cdi) rendimento(st, cdi);
   }
+  registrarHistorico(st, todayBR());
   st.syncedAt = new Date().toISOString();
   // o plano grátis do KV tem 1000 gravações por dia: sem mudança, só atualiza o carimbo de vez em quando
   if (JSON.stringify({...st, syncedAt: 0}) !== JSON.stringify({...JSON.parse(velho), syncedAt: 0}) || idade > 600000) await putJSON(kv, MP_CONTA, st);
@@ -500,6 +503,25 @@ async function mpAvisar(env, st, novos) {
   });
   if (novos.length > 12) linhas.unshift('<i>…e mais ' + (novos.length - 12) + ' antes destas</i>');
   await say(sc, chat, ['<b>Mercado Pago</b>', ...linhas, 'Conta (estimada): <b>' + brl(st.saldo) + '</b>'].join('\n'));
+}
+// Telegram: resumo da semana (domingo de manhã, uma vez só)
+async function mpSemanal(env) {
+  const hoje = todayBR();
+  if (new Date(hoje + 'T12:00:00Z').getUTCDay() !== 0) return;
+  const kv = {BB: rootOf(env)};
+  const st = await mpSync(env, {min: 0});
+  if (!st || st.avisos === false || !st.uid || st.semanalEm === hoje) return;
+  const chat = await scoped(env, st.uid).BB.get('owner');
+  if (!chat) return;
+  const r = resumoSemanal(st);
+  const linhas = ['<b>Mercado Pago · resumo da semana</b>', 'Total: <b>' + brl(r.total) + '</b>' + (r.variacao === null ? '' : ' (' + (r.variacao >= 0 ? '+' : '−') + brl(Math.abs(r.variacao)) + ' na semana)')];
+  if (r.entrou) linhas.push('💰 Entrou: ' + brl(r.entrou));
+  if (r.saiu) linhas.push('💸 Saiu: ' + brl(r.saiu));
+  if (r.guardado) linhas.push('🐷 Guardado nos porquinhos: ' + (r.guardado < 0 ? '−' : '') + brl(Math.abs(r.guardado)));
+  for (const m of r.metas) linhas.push('🎯 ' + esc(m.name) + ': ' + brl(m.valor) + ' de ' + brl(m.meta) + ' (' + m.pct + '%)');
+  st.semanalEm = hoje;
+  await putJSON(kv, MP_CONTA, st); // marca antes de enviar: se o envio falhar, não repete a cada hora
+  await say(scoped(env, st.uid), chat, linhas.join(String.fromCharCode(10)));
 }
 const mpNum = (v, max) => { const n = Number(v); return Number.isFinite(n) && Math.abs(n) <= max ? n : null; };
 async function apiMpConta(req, url, env) {
@@ -554,7 +576,8 @@ async function apiMpConta(req, url, env) {
   // confere o que ele informou com o que o app estimava, antes de recomeçar a partir dos valores novos
   const antes = await mpSync(env, {min: 0});
   const conferencias = antes ? [...(antes.conferencias || []), conferir(antes, {saldo, pots})] : [];
-  const st = estadoNovo({agora: new Date(), hoje: todayBR(), saldo, saldoPct, pots, carteira, avisos, conferencias});
+  const st = estadoNovo({agora: new Date(), hoje: todayBR(), saldo, saldoPct, pots, carteira, avisos, conferencias, hist: (antes && antes.hist) || []});
+  registrarHistorico(st, todayBR());
   st.uid = w.uid; st.me = eu.id;
   await putJSON(kv, MP_CONTA, st);
   return json(visao(await mpSync(env, {min: 0}) || st));

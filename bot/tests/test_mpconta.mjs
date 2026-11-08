@@ -1,7 +1,7 @@
 // Conta Mercado Pago: saldo e porquinhos estimados pelas movimentações. Formatos copiados de respostas reais da API.
 // Uso: node bot/tests/test_mpconta.mjs
 import assert from 'node:assert/strict';
-import {efeito, estadoNovo, aplicar, rendimento, visao, descobrirPorquinhos, lerCdi} from '../mpconta.mjs';
+import {efeito, estadoNovo, aplicar, rendimento, visao, descobrirPorquinhos, lerCdi, registrarHistorico, resumoSemanal, totalDe} from '../mpconta.mjs';
 
 const ME = 1000;
 const DG = 'b9b9156a-4fa7-495b-9d8d-7c3230cba756'; // recebe R$ 3 a cada gasto
@@ -89,5 +89,47 @@ const v = visao(st);
 assert.equal(v.configured, true);
 assert.equal(v.total, Math.round((v.saldo + v.pots.reduce((s, p) => s + p.valor, 0)) * 100) / 100);
 assert.ok(!('seen' in v));
+
+// ---- histórico diário do total (um ponto por dia, refeito no mesmo dia)
+{
+  const e = estadoNovo({agora: new Date('2026-11-01T12:00:00Z'), hoje: '2026-11-01', saldo: 100, pots: {[DG]: {name: 'Viagem', valor: 50, pct: 120, meta: 200}}});
+  registrarHistorico(e, '2026-11-01');
+  e.saldo = 110;
+  registrarHistorico(e, '2026-11-01');
+  assert.deepEqual(e.hist, [{d: '2026-11-01', total: 160}], 'no mesmo dia o ponto é refeito');
+  registrarHistorico(e, '2026-11-02');
+  assert.equal(e.hist.length, 2);
+  for (let i = 0; i < 200; i++) registrarHistorico(e, '2027-01-' + String(i).padStart(3, '0'));
+  assert.equal(e.hist.length, 120, 'guarda só os últimos 120 dias');
+  assert.equal(visao(e).historico.length, 60);
+  assert.equal(visao(e).cdi, 0);
+  rendimento(e, [{date: '2030-01-01', pct: 0.05}]);
+  assert.equal(visao(e).cdi, 0.05, 'a visão traz o CDI do último dia útil');
+  assert.equal(totalDe(e), Math.round((e.saldo + e.pots[DG].valor) * 100) / 100);
+  assert.deepEqual(estadoNovo({agora: new Date(), hoje: '2026-11-01', saldo: 1, hist: [{d: 'x', total: 1}]}).hist, [{d: 'x', total: 1}], 'regravar os valores não perde o histórico');
+}
+
+// ---- resumo da semana (Telegram)
+{
+  const agora = new Date('2026-11-08T12:00:00Z');
+  const e = estadoNovo({agora: new Date('2026-10-01T12:00:00Z'), hoje: '2026-10-01', saldo: 200, pots: {[DG]: {name: 'Viagem', valor: 100, pct: 120, meta: 400}, [EM]: {name: 'Emergência', valor: 30, pct: 120, meta: 0}}});
+  e.hist = [{d: '2026-10-30', total: 300}, {d: '2026-11-06', total: 330}];
+  e.movs = [
+    {id: 'a', at: '2026-11-07T12:00:00Z', tipo: 'entrada', valor: 100, sinal: 1, label: 'Pix recebido', pot: ''},
+    {id: 'b', at: '2026-11-07T13:00:00Z', tipo: 'saida', valor: 40, sinal: -1, label: 'Pix enviado', pot: ''},
+    {id: 'c', at: '2026-11-06T13:00:00Z', tipo: 'guardado', valor: 50, sinal: -1, label: 'Guardado', pot: DG},
+    {id: 'd', at: '2026-11-05T13:00:00Z', tipo: 'resgate', valor: 10, sinal: 1, label: 'Tirado', pot: DG},
+    {id: 'e', at: '2026-10-20T13:00:00Z', tipo: 'entrada', valor: 999, sinal: 1, label: 'antigo', pot: ''},
+  ];
+  const r = resumoSemanal(e, agora);
+  assert.equal(r.total, 330);
+  assert.equal(r.entrou, 100, 'só o que é da última semana');
+  assert.equal(r.saiu, 40);
+  assert.equal(r.guardado, 40, 'guardado menos o que foi tirado');
+  assert.equal(r.variacao, 30, 'comparado ao último ponto de 7 dias atrás ou antes');
+  assert.deepEqual(r.metas, [{name: 'Viagem', valor: 100, meta: 400, pct: 25}], 'só porquinhos com meta');
+  e.hist = [{d: '2026-11-07', total: 1}];
+  assert.equal(resumoSemanal(e, agora).variacao, null, 'sem ponto antigo, não inventa variação');
+}
 
 console.log('mpconta ok');

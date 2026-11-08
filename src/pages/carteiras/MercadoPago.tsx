@@ -10,7 +10,8 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Tooltip } from '@/components/ui/tooltip'
 import { useToast } from '@/components/ui/toast'
 import { Field, Modal } from '@/components/ui/modal'
-import { isMpWallet } from '@/lib/finance/mercadopago'
+import { formatMonths, isMpWallet, potForecast } from '@/lib/finance/mercadopago'
+import { TotalChart } from './TotalChart'
 import { removeWallet } from '@/lib/finance/wallet-mutations'
 import { formatMoneyInput, maskMoney, parseMoney } from '@/lib/money-input'
 import { commit } from '@/lib/store'
@@ -269,12 +270,14 @@ export function MercadoPago() {
                         value={money(p.valor)}
                         hint={p.pct > 0 ? p.pct + '% do CDI' : undefined}
                         progress={p.meta > 0 ? { pct: Math.min(100, Math.round((p.valor / p.meta) * 100)), text: 'de ' + money(p.meta) } : undefined}
+                        forecast={previsao(p, configured, money)}
                       />
                     ))}
                   </ul>
                 )}
               </section>
             </div>
+            <TotalChart points={configured.historico ?? []} money={money} className="mt-3" />
             {configured.conferencia && <Conferencia c={configured.conferencia} money={money} />}
             {configured.movs.length > 0 && (
               <div className="mt-4">
@@ -360,7 +363,15 @@ export function MercadoPago() {
   )
 }
 
-function Line({ label, value, hint, icon, progress }: { label: string; value: string; hint?: string; icon?: string; progress?: { pct: number; text: string } }) {
+// "Meta batida" ou quanto falta para a meta, no ritmo dos últimos 60 dias
+function previsao(p: MpPot, v: MpView, money: (n: number) => string): string | undefined {
+  const f = potForecast(p, v.movs, v.cdi)
+  if (!f) return p.meta > 0 ? 'Sem previsão: guarde algo para a meta andar.' : undefined
+  if ('done' in f) return 'Meta batida!'
+  return (f.perMonth > 0 ? 'No ritmo de ' + money(f.perMonth) + '/mês: ' : 'Só com o rendimento: ') + formatMonths(f.months) + ' para a meta.'
+}
+
+function Line({ label, value, hint, icon, progress, forecast }: { label: string; value: string; hint?: string; icon?: string; progress?: { pct: number; text: string }; forecast?: string }) {
   return (
     <li className="py-1.5">
       <div className="flex items-center justify-between gap-3">
@@ -383,6 +394,7 @@ function Line({ label, value, hint, icon, progress }: { label: string; value: st
           </span>
         </div>
       )}
+      {forecast && <p className={cn('mt-1 text-xs text-fg-subtle', icon && 'pl-[38px]')}>{forecast}</p>}
     </li>
   )
 }

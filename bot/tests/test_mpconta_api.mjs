@@ -130,6 +130,7 @@ assert.equal(okc.body.conferencia.total, 0);
 assert.equal(okc.body.conferencia.diff, 0);
 assert.ok(Date.parse(okc.body.conferencia.at) > Date.parse(antesConf.conferencia.at), 'a hora da conferência anda');
 assert.equal(okc.body.saldo, antesConf.saldo, 'confirmar não mexe nos valores');
+assert.ok(Array.isArray(okc.body.historico) && okc.body.historico.length >= 1 && okc.body.historico.at(-1).total === okc.body.total, 'o total do dia entra no histórico, mesmo regravando os valores');
 assert.equal((await call('POST', 'b.b.b', {acao: 'confirmar'})).status, 403);
 
 // Mercado Pago fora do ar: devolve o último estado, sem erro

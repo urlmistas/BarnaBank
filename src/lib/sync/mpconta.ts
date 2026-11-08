@@ -52,6 +52,10 @@ export interface MpView {
   /** avisos no Telegram ligados */
   avisos: boolean
   conferencia: MpConferencia | null
+  /** CDI do último dia útil, em % ao dia */
+  cdi: number
+  /** total (conta + porquinhos) de cada dia, do mais antigo ao mais novo */
+  historico: { d: string; total: number }[]
   movs: MpMov[]
   /** entradas e saídas que dá para lançar nas carteiras */
   lancar: MpMov[]

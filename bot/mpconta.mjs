@@ -57,13 +57,13 @@ export function efeito(p, me) {
 const quando = p => Date.parse(p.date_approved || p.date_created || '') || 0;
 const iso = ms => new Date(ms).toISOString();
 
-export function estadoNovo({agora, hoje, saldo, saldoPct = 0, pots = {}, carteira = '', avisos = true, conferencias = []}) {
+export function estadoNovo({agora, hoje, saldo, saldoPct = 0, pots = {}, carteira = '', avisos = true, conferencias = [], hist = []}) {
   const ps = {};
   for (const id of Object.keys(pots)) {
     const x = pots[id] || {};
     ps[id.toLowerCase()] = {name: String(x.name || 'Porquinho').slice(0, 40), valor: dois(x.valor), pct: Math.max(0, Math.min(300, Number(x.pct) || 0)), meta: Math.max(0, dois(x.meta) || 0)};
   }
-  return {anchor: agora.toISOString(), yieldDate: hoje, saldo: dois(saldo), saldoPct: Math.max(0, Math.min(300, Number(saldoPct) || 0)), pots: ps, seen: {}, movs: [], ignoradas: [], syncedAt: null, carteira: String(carteira || ''), avisos: avisos !== false, conferencias: conferencias.slice(-20)};
+  return {anchor: agora.toISOString(), yieldDate: hoje, saldo: dois(saldo), saldoPct: Math.max(0, Math.min(300, Number(saldoPct) || 0)), pots: ps, seen: {}, movs: [], ignoradas: [], syncedAt: null, carteira: String(carteira || ''), avisos: avisos !== false, conferencias: conferencias.slice(-20), hist: hist.slice(-120)};
 }
 
 // aplica os pagamentos ao estado (mexe no objeto). Cada pagamento conta uma vez; se mudar (estorno), só a diferença entra.
@@ -108,6 +108,7 @@ export function rendimento(st, serie) {
     for (const p of Object.values(st.pots)) if (p.pct > 0) p.valor = quatro(p.valor * (1 + p.pct / 100 * d.pct / 100));
     if (st.saldoPct > 0 && st.saldo > 0) st.saldo = quatro(st.saldo * (1 + st.saldoPct / 100 * d.pct / 100));
     st.yieldDate = d.date;
+    st.cdi = d.pct;
   }
   return st;
 }
@@ -121,6 +122,9 @@ export function visao(st) {
     pots, total: dois(st.saldo + pots.reduce((s, p) => s + p.valor, 0)),
     carteira: st.carteira || '', avisos: st.avisos !== false,
     conferencia: (st.conferencias || []).slice(-1)[0] || null,
+    // CDI do último dia útil (%) e o total de cada dia (para o gráfico e a previsão das metas)
+    cdi: Number.isFinite(st.cdi) ? st.cdi : 0,
+    historico: (st.hist || []).slice(-60),
     movs: [...st.movs].reverse().slice(0, 30),
     // tudo o que o app pode lançar nas carteiras (ele pula o que já lançou, pela chave mp:<id>)
     lancar: st.movs.filter(m => m.tipo === 'entrada' || m.tipo === 'saida' || m.tipo === 'aporte').map(m => ({id: m.id, at: m.at, tipo: m.tipo, label: m.label, valor: m.valor, sinal: m.sinal})),
@@ -164,4 +168,30 @@ export function conferir(st, {saldo, pots = {}}, agora = new Date()) {
   const sEst = dois(st.saldo), sReal = dois(saldo);
   const total = dois(Math.abs(sReal - sEst) + lista.reduce((t, p) => t + Math.abs(p.real - p.est), 0));
   return {at: agora.toISOString(), saldo: {est: sEst, real: sReal}, pots: lista, diff: dois(sReal - sEst), total};
+}
+
+export const totalDe = st => dois(st.saldo + Object.values(st.pots).reduce((s, p) => s + p.valor, 0));
+
+// guarda o total do dia (um ponto por dia; no mesmo dia o ponto é refeito). hoje = 'AAAA-MM-DD'
+export function registrarHistorico(st, hoje) {
+  const outros = (st.hist || []).filter(h => h.d !== hoje);
+  st.hist = [...outros, {d: hoje, total: totalDe(st)}].slice(-120);
+  return st;
+}
+
+const DIA = 86400000;
+// resumo da semana para o Telegram (ou null se não há o que dizer). agora: Date
+export function resumoSemanal(st, agora = new Date()) {
+  const t0 = agora.getTime() - 7 * DIA;
+  const movs = (st.movs || []).filter(m => Date.parse(m.at) > t0);
+  const soma = f => dois(movs.filter(f).reduce((s, m) => s + m.valor, 0));
+  const entrou = soma(m => m.tipo === 'entrada' || m.tipo === 'aporte');
+  const saiu = soma(m => m.tipo === 'saida');
+  const guardado = dois(soma(m => m.tipo === 'guardado' || m.tipo === 'guardar') - soma(m => m.tipo === 'resgate'));
+  const total = totalDe(st);
+  // total de uns 7 dias atrás: o último ponto do histórico até essa data
+  const dia0 = new Date(t0 - 3 * 3600000).toISOString().slice(0, 10);
+  const antes = (st.hist || []).filter(h => h.d <= dia0).slice(-1)[0];
+  const metas = Object.values(st.pots).filter(p => p.meta > 0).map(p => ({name: p.name, valor: dois(p.valor), meta: p.meta, pct: Math.min(100, Math.floor(p.valor / p.meta * 100))}));
+  return {total, variacao: antes ? dois(total - antes.total) : null, entrou, saiu, guardado, metas};
 }
