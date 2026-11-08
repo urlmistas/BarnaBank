@@ -11,7 +11,7 @@ import { Select } from '@/components/ui/select'
 import { PEOPLE_SORTS, SORT_LABEL, sortPeople, type PeopleSort } from '@/lib/finance/person-extra'
 import { plural } from '@/lib/format'
 import { cn } from '@/lib/utils'
-import { Avatar, SignedMoney } from './parts'
+import { Avatar, SignedMoney, StatusBadge } from './parts'
 import { personHref } from './links'
 import { PEOPLE_SIDES, SIDE_LABEL, rowsOfSide, type PeopleSide } from './people-sides'
 
@@ -214,7 +214,10 @@ function PersonRowLink({ row, filter, selected, href }: { row: PersonRow; filter
       )}
     >
       {selected && <span aria-hidden="true" className="absolute inset-y-0 left-0 w-0.5 bg-accent" />}
-      <Avatar name={row.name} />
+      <span className="relative shrink-0">
+        <Avatar name={row.name} />
+        <StatusBadge status={row.openCount === 0 ? 'settled' : st.kind === 'late' ? 'late' : 'open'} />
+      </span>
       <span className="min-w-0 flex-1">
         <span className="block truncate text-sm font-medium">{row.name}</span>
         <span className={cn('block truncate text-xs', late ? 'text-neg' : 'text-fg-subtle')}>{sub}</span>

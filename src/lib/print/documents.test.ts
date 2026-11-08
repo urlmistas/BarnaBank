@@ -130,6 +130,24 @@ describe('ranking', () => {
   })
 })
 
+describe('ranking com foto e marca nova', () => {
+  const JPG = 'data:image/jpeg;base64,/9j/4AAQSkZJRg=='
+  it('mostra a foto da pessoa no pódio, e só imagem válida', () => {
+    const d = [debt({ id: 'a', name: 'Ana', payments: [{ date: '2026-02-10', amount: 50, mode: 'fifo' }] }), debt({ id: 'b', name: 'Beto', payments: [{ date: '2026-02-11', amount: 20, mode: 'fifo' }] })]
+    const rows = rankingRows(d, TODAY, { ana: { phone: '', photo: JPG }, beto: { phone: '', photo: 'javascript:alert(1)' } })
+    expect(rows.find((r) => r.name === 'Ana')?.photo).toBe(JPG)
+    expect(rows.find((r) => r.name === 'Beto')?.photo).toBeUndefined()
+    const h = rankingHtml(rows, ctx)
+    expect(h).toContain('<img class="pc-avatar" src="' + JPG)
+    expect(h).not.toContain('javascript:')
+  })
+  it('o documento não usa mais o dourado antigo', async () => {
+    const { BASE_CSS } = await import('./html')
+    expect(BASE_CSS).not.toContain('d4b46a')
+    expect(rankingHtml([{ name: 'Ana', loans: 1, received: 10, late: 0 }], ctx)).not.toContain('d4b46a')
+  })
+})
+
 describe('relatório', () => {
   it('monta a tabela da aba atual', () => {
     const h = reportHtml(

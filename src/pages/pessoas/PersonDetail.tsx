@@ -7,20 +7,19 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { TabPanel, Tabs } from '@/components/ui/tabs'
-import { personFacts, type PersonFacts } from '@/lib/finance/person-facts'
+import { personFacts } from '@/lib/finance/person-facts'
 import { formatPhone, notesOf, tagsOf } from '@/lib/finance/person-extra'
 import { personSheetHtml } from '@/lib/print/documents'
 import { openPrintWindow } from '@/lib/print/html'
 import { useDocCtx } from '@/lib/print/use-doc-ctx'
 import { useToast } from '@/components/ui/toast'
-import { Tooltip } from '@/components/ui/tooltip'
 import { whatsPhone } from '@/lib/finance/groups'
 import { personDetail, type DebtView, type HistoryItem, type InstView, type PersonDetail } from '@/lib/finance/people'
 import type { DebtCalc } from '@/lib/finance/debts'
 import { plural } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import type { AppData, Debt } from '@/lib/types'
-import { Avatar, SignedMoney } from './parts'
+import { Avatar, SignedMoney, StatusBadge } from './parts'
 import { DebtActions } from './DebtActions'
 import { ShareButton } from './share-dialog'
 import { EditPersonButton, TagsNotes, TrustSummary } from './PersonExtra'
@@ -197,21 +196,6 @@ export function PersonDetailView({
 }
 
 /** selinho redondo no canto inferior direito da inicial: atraso (vermelho), em dia (verde) ou quitado (neutro) */
-function StatusBadge({ status }: { status: PersonFacts['status'] }) {
-  const map = {
-    late: { text: 'Em atraso', cls: 'bg-neg text-white', Icon: ClockAlert },
-    open: { text: 'Em dia', cls: 'bg-pos text-bg', Icon: Check },
-    settled: { text: 'Quitado', cls: 'border border-border-strong bg-surface-2 text-fg-muted', Icon: CircleCheck },
-  }[status]
-  return (
-    <Tooltip label={map.text} side="bottom" className="absolute -right-0.5 -bottom-0.5">
-      <span role="img" aria-label={map.text} className={cn('grid size-5 place-items-center rounded-full ring-2 ring-surface', map.cls)}>
-        <map.Icon aria-hidden="true" className="size-3" strokeWidth={2.5} />
-      </span>
-    </Tooltip>
-  )
-}
-
 function Fact({ label, value, tone }: { label: string; value: string; tone?: string }) {
   return (
     <div className="flex items-center justify-between gap-3 py-2 first:pt-0 last:pb-0">

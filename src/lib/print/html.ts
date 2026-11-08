@@ -11,7 +11,7 @@ import geistUrl from '@fontsource-variable/geist/files/geist-latin-wght-normal.w
 
 // A janela do documento não herda as fontes do site: Inter (texto) e Geist (títulos e números) vêm do próprio build,
 // com endereço completo, e o botão só imprime depois que elas carregaram (senão o PDF sai com a fonte do sistema).
-const abs = (u: string) => (/^(https?:|data:)/.test(u) ? u : (globalThis.location?.origin ?? '') + u)
+export const abs = (u: string) => (/^(https?:|data:)/.test(u) ? u : (globalThis.location?.origin ?? '') + u)
 
 export const fontFaces = () =>
   `@font-face{font-family:"Inter";src:url(${abs(interUrl)}) format("woff2");font-weight:100 900;font-style:normal;font-display:block}` +
@@ -22,8 +22,8 @@ export const fontFaces = () =>
  * nem rotação: o navegador transforma esses efeitos em imagem ao gerar o PDF e o texto sai serrilhado.
  */
 export const BASE_CSS = `
-:root{--p-bg:#f7f7f5;--p-surface:#fff;--p-surface2:#f1f1ee;--p-border:#e3e3df;--p-border-strong:#cfcfca;--p-fg:#16171a;--p-muted:#565961;--p-subtle:#6a6d75;--p-accent-text:#7f6420;--p-pos:#1d7f53;--p-pos-bg:#e3f1ea;--p-warn-bg:#f4ecd6;--p-print-bg:#fff}
-:root[data-theme=dark]{--p-bg:#0d0e10;--p-surface:#131417;--p-surface2:#191a1e;--p-border:#25272c;--p-border-strong:#34363c;--p-fg:#ededef;--p-muted:#a1a3aa;--p-subtle:#80838b;--p-accent-text:#d4b46a;--p-pos:#4cc38a;--p-pos-bg:#16271f;--p-warn-bg:#2a2414;--p-print-bg:#0d0e10}
+:root{--p-bg:#f7f7f5;--p-surface:#fff;--p-surface2:#f1f1ee;--p-border:#e3e3df;--p-border-strong:#cfcfca;--p-fg:#16171a;--p-muted:#565961;--p-subtle:#6a6d75;--p-accent-text:#3a42d4;--p-pos:#1d7f53;--p-pos-bg:#e3f1ea;--p-warn-bg:#e8eaff;--p-print-bg:#fff}
+:root[data-theme=dark]{--p-bg:#0d0e10;--p-surface:#131417;--p-surface2:#191a1e;--p-border:#25272c;--p-border-strong:#34363c;--p-fg:#ededef;--p-muted:#a1a3aa;--p-subtle:#80838b;--p-accent-text:#8f96ff;--p-pos:#4cc38a;--p-pos-bg:#16271f;--p-warn-bg:#1a1c3a;--p-print-bg:#0d0e10}
 *{box-sizing:border-box}
 html{-webkit-print-color-adjust:exact;print-color-adjust:exact;background:var(--p-bg)}
 body{margin:0;background:var(--p-bg);font-family:"Inter",system-ui,-apple-system,"Segoe UI",sans-serif;font-size:14px;line-height:1.45;color:var(--p-fg);padding:36px 18px;-webkit-font-smoothing:antialiased;text-rendering:geometricPrecision;font-feature-settings:"cv11","ss01"}

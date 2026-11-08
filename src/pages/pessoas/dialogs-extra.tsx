@@ -1,4 +1,5 @@
-import { useId, useMemo, useState, type FormEvent } from 'react'
+import { useId, useMemo, useRef, useState, type FormEvent } from 'react'
+import { Camera, Trash2 } from 'lucide-react'
 import { useAppData } from '@/app/data-context'
 import { useWrite } from '@/app/write'
 import { Button } from '@/components/ui/button'
@@ -17,6 +18,8 @@ import { replaceDebt } from '@/lib/store'
 import type { Debt } from '@/lib/types'
 import { cn } from '@/lib/utils'
 import { initials } from '@/lib/finance/people'
+import { fileToPhoto, photoOf, withPhoto } from '@/lib/finance/person-photo'
+import { Avatar } from './parts'
 
 // Diálogos extras de Pessoas: renegociar, dar mais prazo, etiquetas e notas, placar dos amigos.
 
@@ -230,7 +233,7 @@ export function TagsDialog({
   open, onClose, personKey, name, onRenamed,
 }: { open: boolean; onClose: () => void; personKey: string; name: string; onRenamed?: (newKey: string) => void }) {
   return (
-    <Modal open={open} onClose={onClose} title={`${firstName(name)}: editar pessoa`}>
+    <Modal open={open} onClose={onClose} title={name}>
       <TagsForm personKey={personKey} name={name} onClose={onClose} onRenamed={onRenamed} />
     </Modal>
   )
@@ -249,6 +252,19 @@ function TagsForm({ personKey, name, onClose, onRenamed }: { personKey: string; 
   const [phone, setPhone] = useState(() => formatPhone(c?.phone))
   const [other, setOther] = useState('')
   const [notes, setNotes] = useState(() => notesOf(c))
+  // foto: escolhida aqui (reduzida no navegador) e só gravada ao salvar
+  const [photo, setPhoto] = useState(() => photoOf(c))
+  const [photoErr, setPhotoErr] = useState('')
+  const fileRef = useRef<HTMLInputElement>(null)
+  async function pickPhoto(file: File | undefined) {
+    if (!file) return
+    try {
+      setPhoto(await fileToPhoto(file))
+      setPhotoErr('')
+    } catch (e) {
+      setPhotoErr(e instanceof Error ? e.message : 'Não consegui usar essa imagem.')
+    }
+  }
   const all = useMemo(() => allTags(contacts ?? {}, tagsOf(c)), [contacts, c])
   const toggle = (t: string) => setTags((cur) => (cur.includes(t) ? cur.filter((x) => x !== t) : [...cur, t]))
 
@@ -263,7 +279,7 @@ function TagsForm({ personKey, name, onClose, onRenamed }: { personKey: string; 
     let newKey = personKey
     const ok = write('Salvo', (api) => {
       newKey = renamePerson(api, personKey, nome)
-      api.contacts[newKey] = withTagsNotes(api.contacts[newKey], final, notes, phone) as Record<string, unknown>
+      api.contacts[newKey] = withPhoto(withTagsNotes(api.contacts[newKey], final, notes, phone), photo) as Record<string, unknown>
     })
     if (ok) {
       onClose()
@@ -273,7 +289,43 @@ function TagsForm({ personKey, name, onClose, onRenamed }: { personKey: string; 
 
   return (
     <form onSubmit={submit} className="px-5 py-4">
+      <div className="flex items-center gap-4">
+        <Avatar name={nome || name} size="lg" photo={photo} />
+        <div className="min-w-0">
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" size="sm" variant="outline" onClick={() => fileRef.current?.click()}>
+              <Camera aria-hidden="true" />
+              {photo ? 'Trocar foto' : 'Escolher foto'}
+            </Button>
+            {photo && (
+              <Button type="button" size="sm" variant="ghost" onClick={() => setPhoto('')}>
+                <Trash2 aria-hidden="true" />
+                Remover
+              </Button>
+            )}
+          </div>
+          <p className="mt-1 text-xs text-fg-subtle">A foto é reduzida e guardada na sua conta.</p>
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/*"
+            className="sr-only"
+            tabIndex={-1}
+            aria-label="Arquivo da foto"
+            onChange={(e) => {
+              void pickPhoto(e.target.files?.[0])
+              e.target.value = ''
+            }}
+          />
+        </div>
+      </div>
+      {photoErr && (
+        <p role="alert" className="mt-1 text-xs text-neg">
+          {photoErr}
+        </p>
+      )}
       <Field
+        className="mt-4"
         label="Nome"
         htmlFor={ids.name}
         hint="Trocar o nome muda em todas as dívidas dessa pessoa."

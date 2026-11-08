@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
-import { Medal, Plus, Trophy } from 'lucide-react'
+import { CircleCheck, ClockAlert, HandCoins, Medal, Plus, Trophy, type LucideIcon } from 'lucide-react'
 import { useAppData } from '@/app/data-context'
 import { Button } from '@/components/ui/button'
 import { Tooltip } from '@/components/ui/tooltip'
@@ -101,7 +101,7 @@ function PessoasReady({ data, today }: { data: AppData; today: string }) {
                 variant="ghost"
                 aria-label="Ranking"
                 onClick={() => {
-                  const html = rankingHtml(rankingRows(data.debts, today), { ...doc, issuedAt: new Date() })
+                  const html = rankingHtml(rankingRows(data.debts, today, data.contacts), { ...doc, issuedAt: new Date() })
                   if (!openPrintWindow(html)) toast.show('Seu navegador bloqueou a nova janela. Permita pop-ups para este site e tente de novo.')
                 }}
               >
@@ -166,15 +166,18 @@ function MoneyNote({ label, value }: { label: string; value: number }) {
 function Metrics({ totals }: { totals: PeopleTotals }) {
   const { money } = useAppData()
   const items = [
-    { label: 'A receber', value: totals.toReceive, tone: undefined },
-    { label: 'Em atraso', value: totals.late, tone: totals.late > 0.005 ? 'text-neg' : undefined },
-    { label: 'Recebido', value: totals.received, tone: undefined },
-  ]
+    { label: 'A receber', value: totals.toReceive, tone: undefined, Icon: HandCoins },
+    { label: 'Em atraso', value: totals.late, tone: totals.late > 0.005 ? 'text-neg' : undefined, Icon: ClockAlert },
+    { label: 'Recebido', value: totals.received, tone: 'text-pos' as string | undefined, Icon: CircleCheck },
+  ] satisfies { label: string; value: number; tone: string | undefined; Icon: LucideIcon }[]
   return (
     <dl className="grid grid-cols-3 divide-x divide-border rounded-lg border border-border bg-surface">
       {items.map((it) => (
         <div key={it.label} className="min-w-0 px-3 py-3 sm:px-5 sm:py-4">
-          <dt className="text-xs text-fg-muted">{it.label}</dt>
+          <dt className="flex items-center gap-1.5 text-xs text-fg-muted">
+            <it.Icon aria-hidden="true" className="size-3.5 shrink-0" />
+            {it.label}
+          </dt>
           <dd className={cn('num mt-1 truncate text-base font-semibold tracking-tight sm:text-lg', it.tone)} title={money(it.value)}>
             {money(it.value)}
           </dd>
