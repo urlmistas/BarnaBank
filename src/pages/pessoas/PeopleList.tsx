@@ -1,7 +1,7 @@
 import { useId, useMemo, useRef, type KeyboardEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
-import { Search, SearchX, Users, X } from 'lucide-react'
+import { HandCoins, Search, SearchX, Users, X } from 'lucide-react'
 import { useAppData } from '@/app/data-context'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -13,6 +13,7 @@ import { plural } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { Avatar, SignedMoney, StatusBadge } from './parts'
 import { personHref } from './links'
+import { lateChargeHref } from './charge-link'
 import { PEOPLE_SIDES, SIDE_LABEL, rowsOfSide, type PeopleSide } from './people-sides'
 
 const FILTER_LABEL: Record<PeopleFilter, string> = {
@@ -179,7 +180,7 @@ export function PeopleList({
 }
 
 function PersonRowLink({ row, filter, selected, href }: { row: PersonRow; filter: PeopleFilter; selected: boolean; href: string }) {
-  const { money, date, today } = useAppData()
+  const { money, date, today, baseSettings, result } = useAppData()
   const st = personStatus(row, today)
   // em "Quitados" (ou sem nada em aberto) o valor é o que já foi quitado, em tom neutro
   const settledView = filter === 'quitados' || row.openCount === 0
@@ -205,36 +206,58 @@ function PersonRowLink({ row, filter, selected, href }: { row: PersonRow; filter
 
   const dirLabel = settledView ? 'quitado' : amount > 0 ? 'a receber' : amount < 0 ? 'eu devo' : 'saldo zerado'
 
+  const chargeHref = filter === 'quitados' ? null : lateChargeHref(
+    row.debts,
+    result?.data.contacts[row.key],
+    { today, money, date, pixKey: typeof baseSettings.pixKey === 'string' ? baseSettings.pixKey : undefined },
+    result?.data.groups,
+  )
+
   return (
-    <Link
-      to={href}
-      data-row
-      aria-current={selected ? 'page' : undefined}
-      aria-label={`${row.name}, ${sub}, ${dirLabel} ${money(Math.abs(amount))}`}
+    <div
       className={cn(
-        'relative flex items-center gap-3 rounded-lg border border-border bg-surface px-4 py-4 transition-colors hover:border-border-strong hover:bg-surface-2 focus-visible:bg-surface-2 focus-visible:outline-offset-[-2px]',
+        'relative rounded-lg border border-border bg-surface transition-colors hover:border-border-strong hover:bg-surface-2 focus-within:bg-surface-2',
         selected && 'border-border-strong bg-surface-2',
-        row.openCount === 0 && 'opacity-60 saturate-50 hover:opacity-100 hover:saturate-100 focus-visible:opacity-100',
+        row.openCount === 0 && 'opacity-60 saturate-50 hover:opacity-100 hover:saturate-100 focus-within:opacity-100',
       )}
     >
-      <span className="relative shrink-0">
-        <Avatar name={row.name} />
-        <StatusBadge status={row.openCount === 0 ? 'settled' : st.kind === 'late' ? 'late' : 'open'} />
-      </span>
-      <span className="min-w-0 flex-1">
-        <span className="block truncate text-sm font-medium">{row.name}</span>
-        {lateTag ? (
-          <span className="mt-0.5 flex items-center gap-1.5 truncate text-xs">
-            <span className="rounded-full bg-neg/15 px-2 py-0.5 font-semibold text-neg">{lateTag.n}</span>
-            <span className="truncate text-fg-subtle">{lateTag.days}</span>
-          </span>
-        ) : (
-          <span className={cn('block truncate text-xs', late ? 'text-neg' : 'text-fg-subtle')}>{sub}</span>
-        )}
-      </span>
-      {/* verde vivo só para o que já foi recebido; o que ainda está a receber fica em verde discreto */}
-      <SignedMoney value={amount} className={cn('text-sm', !settledView && amount > 0 && 'text-pos/70')} />
-    </Link>
+      {/* o link cobre o card inteiro (after:inset-0); o selo e o botão Cobrar ficam acima dele */}
+      <Link
+        to={href}
+        data-row
+        aria-current={selected ? 'page' : undefined}
+        aria-label={`${row.name}, ${sub}, ${dirLabel} ${money(Math.abs(amount))}`}
+        className="flex items-center gap-3 rounded-lg px-4 py-4 after:absolute after:inset-0 after:rounded-lg focus-visible:outline-offset-[-2px]"
+      >
+        <span className="relative z-10 shrink-0">
+          <Avatar name={row.name} />
+          <StatusBadge status={row.openCount === 0 ? 'settled' : st.kind === 'late' ? 'late' : 'open'} />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-sm font-medium">{row.name}</span>
+          {lateTag ? (
+            <span className="mt-0.5 flex items-center gap-1.5 truncate text-xs">
+              <span className="rounded-full bg-neg/15 px-2 py-0.5 font-semibold text-neg">{lateTag.n}</span>
+              <span className="truncate text-fg-subtle">{lateTag.days}</span>
+            </span>
+          ) : (
+            <span className={cn('block truncate text-xs', late ? 'text-neg' : 'text-fg-subtle')}>{sub}</span>
+          )}
+        </span>
+        {/* verde vivo só para o que já foi recebido; o que ainda está a receber fica em verde discreto */}
+        <SignedMoney value={amount} className={cn('text-sm', !settledView && amount > 0 && 'text-pos/70')} />
+      </Link>
+      {chargeHref && (
+        <div className="relative z-10 flex justify-end px-4 pb-3 -mt-1">
+          <Button asChild size="sm" variant="outline">
+            <a href={chargeHref} target="_blank" rel="noreferrer" aria-label={`Cobrar ${row.name}`}>
+              <HandCoins aria-hidden="true" />
+              Cobrar
+            </a>
+          </Button>
+        </div>
+      )}
+    </div>
   )
 }
 

@@ -14,8 +14,7 @@ import { openPrintWindow } from '@/lib/print/html'
 import { useDocCtx } from '@/lib/print/use-doc-ctx'
 import { useToast } from '@/components/ui/toast'
 import { whatsPhone } from '@/lib/finance/groups'
-import { whatsappLink } from '@/lib/finance/whatsapp'
-import { chargeLinkFor } from './charge-link'
+import { lateChargeHref } from './charge-link'
 import { personDetail, type DebtView, type HistoryItem, type InstView, type PersonDetail } from '@/lib/finance/people'
 import type { DebtCalc } from '@/lib/finance/debts'
 import { plural } from '@/lib/format'
@@ -66,17 +65,12 @@ export function PersonDetailView({
   const f = personFacts(p, today)
   const phone = whatsPhone(data.contacts[p.key]?.phone)
   // "Cobrar": WhatsApp com a mensagem pronta da dívida atrasada que me devem (a mais antiga primeiro)
-  const lateDebt = p.debts.find((v) => v.kind !== 'payable' && !v.paid && v.status === 'atrasado')
-  const chargeHref = lateDebt
-    ? whatsappLink(lateDebt.debt, data.contacts[p.key], {
-        today,
-        money,
-        date,
-        groupTitle: lateDebt.groupTitle,
-        pixKey: typeof baseSettings.pixKey === 'string' ? baseSettings.pixKey : undefined,
-        link: chargeLinkFor(lateDebt.debt),
-      })
-    : null
+  const chargeHref = lateChargeHref(
+    p.debts.map((v) => v.debt),
+    data.contacts[p.key],
+    { today, money, date, pixKey: typeof baseSettings.pixKey === 'string' ? baseSettings.pixKey : undefined },
+    data.groups,
+  )
   const t = p.totals
   const tiles: { label: string; value: number; icon: LucideIcon; tone?: string }[] = []
   if (p.hasReceivable) {

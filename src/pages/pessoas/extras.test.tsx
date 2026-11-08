@@ -131,6 +131,13 @@ describe('Pessoas: WhatsApp', () => {
     expect(screen.queryByRole('link', { name: 'Cobrar' })).toBeNull()
   })
 
+  it('"Cobrar" aparece no card da lista de quem está em atraso e tem telefone', async () => {
+    seed({ contacts: { 'ana souza': { phone: '11999998888' } } })
+    mount('/pessoas?f=atrasados')
+    const cobrar = (await screen.findByRole('link', { name: 'Cobrar Ana Souza' })) as HTMLAnchorElement
+    expect(cobrar.href.startsWith('https://wa.me/5511999998888?text=')).toBe(true)
+  })
+
   it('sem telefone o botão avisa onde cadastrar', async () => {
     seed()
     mount()

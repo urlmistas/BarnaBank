@@ -1,13 +1,16 @@
 import { lazy, Suspense, useId, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
-import { ArrowRight, CalendarCheck, CircleAlert, Clock, Inbox, TriangleAlert, X } from 'lucide-react'
+import { ArrowRight, CalendarCheck, Check, CircleAlert, Clock, Inbox, TriangleAlert, X } from 'lucide-react'
 import { useAppData } from '@/app/data-context'
 import { useMpTotal } from '@/app/use-mp-total'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { dashboardAlert, dashboardSummary, upcomingItems, type DashboardAlert, type UpcomingItem } from '@/lib/finance/dashboard'
+import { quickPayment } from '@/lib/finance/mutations'
+import { replaceDebt } from '@/lib/store'
+import { useWrite } from '@/app/write'
 import { debtPlan } from '@/lib/finance/debt-plan'
 import { nameKey } from '@/lib/finance/people'
 import { briefHeadline, monthBrief, type MonthBrief } from '@/lib/finance/month-brief'
@@ -15,7 +18,7 @@ import { alertText, hideAlert, readHiddenAlerts, spendingAlerts, type SpendingAl
 import { balanceSeries } from '@/lib/finance/wallets'
 import { addDaysISO, parseISO, ymOf } from '@/lib/finance/dates'
 import { categoryRanking, monthSpending } from '@/lib/finance/reports'
-import { MONTHS, lateLabel, plural, relativeDay } from '@/lib/format'
+import { MONTHS, firstName, lateLabel, plural, relativeDay } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import type { AppData } from '@/lib/types'
 
@@ -23,6 +26,9 @@ import type { AppData } from '@/lib/types'
 const BalanceChart = lazy(() => import('./BalanceChart').then((m) => ({ default: m.BalanceChart })))
 
 const LIST_LIMIT = 5
+
+/** seta que desliza para a direita quando o link (ou o botão) com `group` recebe hover ou foco */
+const ARROW_SLIDE = 'transition-transform duration-200 ease-out group-hover:translate-x-1 group-focus-visible:translate-x-1 motion-reduce:transition-none'
 
 /** "R$ 12.345,67" → ["R$ 12.345", ",67"] para os centavos ficarem discretos */
 function splitCents(s: string): [string, string] {
@@ -122,7 +128,7 @@ function AlertRow({ alert }: { alert: DashboardAlert }) {
       </p>
       <Button asChild variant="ghost" size="sm" className="group shrink-0">
         <Link to={late ? '/pessoas?f=atrasados' : '/pessoas'}>
-          Ver <ArrowRight aria-hidden="true" className="transition-transform duration-200 ease-out group-hover:translate-x-1 group-focus-visible:translate-x-1 motion-reduce:transition-none" />
+          Ver <ArrowRight aria-hidden="true" className={ARROW_SLIDE} />
         </Link>
       </Button>
     </div>
@@ -181,8 +187,8 @@ function CategoryCard({ data, today }: { data: AppData; today: string }) {
     <section aria-label={`Gastos de ${MONTHS[parseISO(today).getMonth()]} por categoria`} className="rounded-md border border-border bg-surface px-4 py-3">
       <div className="flex items-baseline justify-between gap-3">
         <h2 className="text-sm font-medium">Gastos do mês por categoria</h2>
-        <Link to="/relatorios?g=categorias" className="inline-flex items-center gap-1 text-xs text-fg-muted hover:text-fg">
-          Ver tudo <ArrowRight aria-hidden="true" className="size-3" />
+        <Link to="/relatorios?g=categorias" className="group inline-flex items-center gap-1 text-xs text-fg-muted hover:text-fg">
+          Ver tudo <ArrowRight aria-hidden="true" className={cn('size-3', ARROW_SLIDE)} />
         </Link>
       </div>
       <ul className="mt-3 flex flex-col gap-2.5">
@@ -210,7 +216,9 @@ const PAY_LIMIT = 4
 
 /** dívidas que eu devo, na ordem em que vencem (atrasadas primeiro): quanto sai e quando */
 function PayNextCard({ data, today }: { data: AppData; today: string }) {
-  const { money } = useAppData()
+  const { money, canEdit, baseSettings } = useAppData()
+  const write = useWrite()
+  const defWallet = typeof baseSettings.defaultWalletId === 'string' ? baseSettings.defaultWalletId : ''
   const plan = useMemo(() => debtPlan(data, today), [data, today])
   const rows = useMemo(
     () => [...plan.debts].sort((a, b) => (a.nextDue ?? '9999') .localeCompare(b.nextDue ?? '9999') || a.name.localeCompare(b.name, 'pt-BR')),
@@ -218,7 +226,12 @@ function PayNextCard({ data, today }: { data: AppData; today: string }) {
   )
   if (!rows.length) return null
   const shown = rows.slice(0, PAY_LIMIT)
-  const next = rows.reduce((t, d) => t + d.installment, 0)
+  // o que o "Pagar" quita: o atrasado, ou a próxima parcela (igual ao pagamento rápido da pessoa)
+  const quickOf = (id: string) => {
+    const debt = data.debts.find((x) => x.id === id)
+    return debt ? { debt, pay: quickPayment(debt, today, defWallet || undefined) } : null
+  }
+  const next = rows.reduce((t, d) => t + (quickOf(d.id)?.pay?.amount ?? d.installment), 0)
   return (
     <section aria-labelledby="pagar-titulo" className="rounded-md border border-border bg-surface px-4 py-3">
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
@@ -226,19 +239,21 @@ function PayNextCard({ data, today }: { data: AppData; today: string }) {
           Próximos a pagar
         </h2>
         <p className="text-xs text-fg-muted">
-          {plural(rows.length, 'dívida', 'dívidas')} · parcelas somam <span className="num">{money(next)}</span>
+          {plural(rows.length, 'dívida', 'dívidas')} · a pagar agora: <span className="num">{money(next)}</span>
         </p>
       </div>
       <ul className="mt-2 divide-y divide-border">
         {shown.map((d) => {
           const late = d.overdue > 0.005
+          const q = quickOf(d.id)
+          const amount = q?.pay?.amount ?? d.installment
           const when = !d.nextDue ? '' : late ? lateLabel(d.nextDue, today) : relativeDay(d.nextDue, today)
           return (
-            <li key={d.id}>
+            <li key={d.id} className="flex items-center gap-2">
               <Link
                 to={'/pessoas/' + encodeURIComponent(nameKey(d.name))}
-                className="-mx-2 flex items-center gap-3 rounded-sm px-2 py-2 transition-colors hover:bg-surface-2 focus-visible:bg-surface-2"
-                aria-label={`${d.name}, ${when}, parcela ${money(d.installment)}`}
+                className="-mx-2 flex min-w-0 flex-1 items-center gap-3 rounded-sm px-2 py-2 transition-colors hover:bg-surface-2 focus-visible:bg-surface-2"
+                aria-label={`${d.name}, ${when}, ${money(amount)}`}
               >
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-sm font-medium">{d.name}</span>
@@ -247,15 +262,34 @@ function PayNextCard({ data, today }: { data: AppData; today: string }) {
                     {d.installment < d.remaining - 0.005 && <span className="text-fg-subtle"> · falta {money(d.remaining)} no total</span>}
                   </span>
                 </span>
-                <span className="num shrink-0 text-sm font-medium text-neg">{money(d.installment)}</span>
+                <span className="num shrink-0 text-sm font-medium text-neg">{money(amount)}</span>
               </Link>
+              {canEdit && q?.pay && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  aria-label={`Pagar ${money(amount)} a ${d.name}`}
+                  onClick={() => {
+                    const pay = q.pay
+                    if (!pay) return
+                    write(
+                      `Pago ${money(pay.amount)} a ${firstName(d.name)}`,
+                      (api) => replaceDebt(api, d.id, (x) => ({ ...x, payments: [...x.payments, pay] })),
+                      'Pagamento desfeito',
+                    )
+                  }}
+                >
+                  <Check aria-hidden="true" />
+                  Pagar
+                </Button>
+              )}
             </li>
           )
         })}
       </ul>
       {rows.length > PAY_LIMIT && (
-        <Link to="/pessoas?f=abertos" className="mt-2 inline-flex items-center gap-1 text-xs text-fg-muted hover:text-fg">
-          Ver as outras {rows.length - PAY_LIMIT} <ArrowRight aria-hidden="true" className="size-3" />
+        <Link to="/pessoas?f=abertos" className="group mt-2 inline-flex items-center gap-1 text-xs text-fg-muted hover:text-fg">
+          Ver as outras {rows.length - PAY_LIMIT} <ArrowRight aria-hidden="true" className={cn('size-3', ARROW_SLIDE)} />
         </Link>
       )}
     </section>
