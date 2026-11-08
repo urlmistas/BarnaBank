@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useId, useState, type FormEvent } from 'react'
+import { REFRESH_EVENT } from '@/lib/gestures'
 import { BanknoteCheck, ChartNoAxesCombined, Info, PiggyBank, Loader2, Plus, RefreshCw, RotateCcwClock, SaveCheck, Settings2, Trash, Zap } from 'lucide-react'
 import { useAppData } from '@/app/data-context'
 import { Button } from '@/components/ui/button'
@@ -74,12 +75,12 @@ export function MercadoPago() {
   const [asking, setAsking] = useState(false)
 
   const fetcher = useCallback((url: string, init?: RequestInit) => fetch(url, init), [])
-  const load = useCallback(async () => {
+  const load = useCallback(async (quiet = false) => {
     setBusy(true)
     setErr(null)
     try {
       setView(await mpView(fetcher, await botToken(), undefined, true))
-      toast.show('Dados atualizados!', undefined, <SaveCheck aria-hidden="true" />)
+      if (!quiet) toast.show('Dados atualizados!', undefined, <SaveCheck aria-hidden="true" />)
     } catch (e) {
       setErr(botErrorText(e))
       setView((v) => v ?? null)
@@ -106,6 +107,14 @@ export function MercadoPago() {
       live = false
     }
   }, [botToken, fetcher, loggedIn])
+
+  // puxar a tela para baixo (gesto do app instalado) atualiza o painel, sem o aviso (o aviso geral já aparece)
+  useEffect(() => {
+    if (!BOT_URL || !loggedIn) return
+    const onRefresh = () => void load(true)
+    window.addEventListener(REFRESH_EVENT, onRefresh)
+    return () => window.removeEventListener(REFRESH_EVENT, onRefresh)
+  }, [load, loggedIn])
 
   const configured = view && view.configured ? view : null
   const data = result?.data

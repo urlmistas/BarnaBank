@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react'
 import { NavLink, useLocation, useNavigate, useOutlet } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
-import { Calculator, ChartColumn, Eye, EyeOff, House, Receipt, Search, Settings, Users, Wallet, type LucideIcon } from 'lucide-react'
+import { ArrowDown, Calculator, ChartColumn, Eye, EyeOff, House, Loader2, Receipt, Search, Settings, Users, Wallet, type LucideIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Kbd } from '@/components/ui/kbd'
@@ -14,6 +14,10 @@ import { SyncConflictDialog } from './SyncConflictDialog'
 import { SearchDialog } from './SearchDialog'
 import { SimulatorDialog } from './SimulatorDialog'
 import { QuickAdd } from './QuickAdd'
+import { useGestures } from './use-gestures'
+import { useToast } from '@/components/ui/toast'
+import { isStandalone } from '@/lib/pwa/install'
+import { PULL_THRESHOLD, REFRESH_EVENT } from '@/lib/gestures'
 import { useShortcuts } from './use-shortcuts'
 import type { ShortcutAction } from '@/lib/shortcuts'
 
@@ -42,7 +46,8 @@ export function AppShell() {
   const location = useLocation()
   const outlet = useOutlet()
   const { toggle } = useTheme()
-  const { result, cloud, bot, conflict, hideValues, toggleHideValues } = useAppData()
+  const { result, cloud, bot, conflict, hideValues, toggleHideValues, refreshCloud } = useAppData()
+  const toast = useToast()
   const [searchOpen, setSearchOpen] = useState(false)
   const [simOpen, setSimOpen] = useState(false)
   const navigate = useNavigate()
@@ -58,6 +63,18 @@ export function AppShell() {
     [navigate, toggle, toggleHideValues],
   )
   useShortcuts(runShortcut)
+  // app instalado no celular: arrastar da borda esquerda volta; puxar para baixo no topo atualiza (no navegador, o próprio navegador faz isso)
+  const { pull, refreshing } = useGestures({
+    enabled: isStandalone(),
+    canGoBack: () => ((window.history.state as { idx?: number } | null)?.idx ?? 0) > 0,
+    onBack: () => navigate(-1),
+    onRefresh: async () => {
+      refreshCloud()
+      window.dispatchEvent(new Event(REFRESH_EVENT))
+      await new Promise((ok) => window.setTimeout(ok, 800))
+      toast.show('Atualizado')
+    },
+  })
   const isDemo = result?.source === 'demo'
   // aviso discreto no ícone quando a conta não respondeu (detalhe em Configurações)
   const cloudError = cloud.status === 'error' || bot.status === 'error' || !!conflict
@@ -185,6 +202,21 @@ export function AppShell() {
       </AnimatePresence>
 
       <QuickAdd />
+
+      {(pull > 0 || refreshing) && (
+        <div aria-hidden="true" className="pointer-events-none fixed inset-x-0 top-0 z-40 flex justify-center pt-[env(safe-area-inset-top)]">
+          <span
+            className="mt-2 grid size-9 place-items-center rounded-full border border-border bg-surface text-fg-muted shadow-md"
+            style={{ transform: `translateY(${refreshing ? 24 : pull - 8}px)`, transition: pull > 0 && !refreshing ? 'none' : 'transform 0.2s' }}
+          >
+            {refreshing ? (
+              <Loader2 className="size-4 motion-safe:animate-spin" />
+            ) : (
+              <ArrowDown className="size-4 transition-transform" style={{ transform: pull >= PULL_THRESHOLD ? 'rotate(180deg)' : undefined }} />
+            )}
+          </span>
+        </div>
+      )}
 
       <nav
         aria-label="Seções"
