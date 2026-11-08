@@ -183,6 +183,39 @@ describe('Telegram por conta', () => {
     await waitFor(() => expect(c.setAccountBot).toHaveBeenCalledWith(true), { timeout: 6000 })
   }, 10000)
 
+  it('vinculado em outro aparelho: enquanto confere não oferece "Gerar código", e liga a sincronização aqui', async () => {
+    const { TelegramSection } = await import('./telegram')
+    const c = ctx({})
+    let release: () => void = () => {}
+    const gate = new Promise<void>((ok) => (release = ok))
+    globalThis.fetch = vi.fn(async () => {
+      await gate
+      return new Response(JSON.stringify({ linked: true, bot: 'barna_bot', at: '2026-10-20T10:00:00Z' }), { status: 200 })
+    }) as unknown as typeof fetch
+    render(<TelegramSection botUrl={BOT} onOwnBot={() => {}} />)
+    expect(screen.getByText('Conferindo o Telegram…')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Gerar código' })).toBeNull()
+    release()
+    await waitFor(() => expect(c.setAccountBot).toHaveBeenCalledWith(true))
+    expect(await screen.findByText('Telegram vinculado')).toBeTruthy()
+  })
+
+  it('se a conferência falha (rede): avisa e deixa tentar de novo, sem oferecer um novo vínculo', async () => {
+    const { TelegramSection } = await import('./telegram')
+    ctx({})
+    let fail = true
+    globalThis.fetch = vi.fn(async () => {
+      if (fail) throw new TypeError('failed to fetch')
+      return new Response(JSON.stringify({ linked: true, bot: 'barna_bot', at: null }), { status: 200 })
+    }) as unknown as typeof fetch
+    render(<TelegramSection botUrl={BOT} onOwnBot={() => {}} />)
+    expect(await screen.findByText('Não deu para conferir o Telegram')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Gerar código' })).toBeNull()
+    fail = false
+    fireEvent.click(screen.getByRole('button', { name: 'Tentar de novo' }))
+    expect(await screen.findByText('Telegram vinculado')).toBeTruthy()
+  })
+
   it('vinculado: mostra o bot e desvincula', async () => {
     const { TelegramSection } = await import('./telegram')
     const c = ctx({ bot: { status: 'ok', account: true } })

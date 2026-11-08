@@ -215,10 +215,39 @@ export function TelegramSection({ botUrl, onOwnBot }: { botUrl: string; onOwnBot
     )
   }
 
+  // ainda não sabemos se esta conta já está vinculada (outro aparelho pode ter vinculado): não oferece "Vincular" antes de saber
+  if (!st) {
+    return (
+      <Section title="Telegram">
+        <Row
+          label={err ? 'Não deu para conferir o Telegram' : 'Conferindo o Telegram…'}
+          hint={err ? 'Sua conta pode já estar vinculada (o vínculo vale para todos os aparelhos). Tente de novo.' : 'Vendo se esta conta já está vinculada.'}
+        >
+          {err ? (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                setErr(null)
+                void check()
+              }}
+            >
+              Tentar de novo
+            </Button>
+          ) : (
+            <Loader2 aria-hidden="true" className="size-4 text-fg-muted motion-safe:animate-spin" />
+          )}
+        </Row>
+        {errLine}
+        <OwnBotRow onClick={onOwnBot} />
+      </Section>
+    )
+  }
+
   return (
     <Section title="Telegram">
       <Row label="Vincular o Telegram" hint="Lance gastos e dívidas conversando com o bot. Cada conta tem os dados separados.">
-        <Button size="sm" disabled={busy || !st} onClick={generate}>
+        <Button size="sm" disabled={busy} onClick={generate}>
           {busy && <Loader2 aria-hidden="true" className="motion-safe:animate-spin" />}
           Gerar código
         </Button>
