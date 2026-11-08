@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { MercadoPagoLogo } from '@/components/mercado-pago-logo'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { Skeleton } from '@/components/ui/skeleton'
 import { Tooltip } from '@/components/ui/tooltip'
 import { Field, Modal } from '@/components/ui/modal'
 import { isMpWallet, MP_WALLET, mpAdjustment, mpNewTransactions, mpToday } from '@/lib/finance/mercadopago'
@@ -117,7 +118,9 @@ export function MercadoPago() {
     if (novas.length) commit((api) => api.transactions.push(...novas))
   }, [configured, data, canCreate])
 
-  if (!BOT_URL || !loggedIn || !view) return null
+  if (!BOT_URL || !loggedIn || view === null) return null
+  // view undefined = ainda buscando no bot: mostra o esqueleto do card em vez de aparecer de repente
+  const loading = view === undefined
 
   // última movimentação que mexeu na conta (o Guardar ao pagar já aparece nos porquinhos)
   const last = configured?.movs.find((m) => m.tipo !== 'guardar')
@@ -130,7 +133,7 @@ export function MercadoPago() {
         </CardTitle>
         <div className="flex items-center gap-1">
           <Tooltip label="Atualizar" side="bottom">
-            <Button variant="ghost" size="icon" className={HOVER} aria-label="Atualizar" disabled={busy} onClick={() => void load()}>
+            <Button variant="ghost" size="icon" className={HOVER} aria-label="Atualizar" disabled={busy || loading} onClick={() => void load()}>
               {busy ? <Loader2 className="animate-spin" /> : <RefreshCw />}
             </Button>
           </Tooltip>
@@ -142,14 +145,32 @@ export function MercadoPago() {
             </Tooltip>
           )}
           <Tooltip label={configured ? 'Configurar a carteira' : 'Configurar'} side="bottom" align="end">
-            <Button variant="ghost" size="icon" className={HOVER} aria-label={configured ? 'Configurar a carteira' : 'Configurar'} onClick={() => setDlg(configured ? 'conta' : 'tudo')}>
+            <Button variant="ghost" size="icon" className={HOVER} aria-label={configured ? 'Configurar a carteira' : 'Configurar'} disabled={loading} onClick={() => setDlg(configured ? 'conta' : 'tudo')}>
               <Settings2 />
             </Button>
           </Tooltip>
         </div>
       </CardHeader>
       <CardContent>
-        {!configured ? (
+        {loading ? (
+          <div role="status" aria-label="Carregando o Mercado Pago">
+            <Skeleton className="h-4 w-40" />
+            <div className="mt-3 grid gap-3 md:grid-cols-2">
+              <div className="rounded-lg border border-border p-4">
+                <Skeleton className="h-3 w-32" />
+                <Skeleton className="mt-3 h-8 w-44" />
+                <Skeleton className="mt-4 h-4 w-full" />
+                <Skeleton className="mt-2 h-4 w-full" />
+              </div>
+              <div className="rounded-lg border border-border p-4">
+                <Skeleton className="h-3 w-32" />
+                <Skeleton className="mt-3 h-8 w-44" />
+                <Skeleton className="mt-4 h-4 w-full" />
+                <Skeleton className="mt-2 h-4 w-full" />
+              </div>
+            </div>
+          </div>
+        ) : !configured ? (
           <div>
             <p className="text-sm text-fg-muted">Acompanhe o saldo e os porquinhos da sua conta Mercado Pago. Você informa os valores de hoje e o bot confere as movimentações novas.</p>
             <Button className="mt-3" size="sm" onClick={() => setDlg('tudo')}>
