@@ -75,6 +75,8 @@ export function MercadoPago() {
   if (!BOT_URL || !loggedIn || !view) return null
 
   const configured = view.configured ? view : null
+  // última movimentação que mexeu na conta (o Guardar ao pagar já aparece nos porquinhos)
+  const last = configured?.movs.find((m) => m.tipo !== 'guardar')
   return (
     <Card className="mt-6">
       <CardHeader>
@@ -108,7 +110,25 @@ export function MercadoPago() {
               <section aria-label="Conta" className="rounded-lg border border-border p-4">
                 <p className="text-xs font-medium tracking-wide text-fg-subtle uppercase">Conta · saldo livre</p>
                 <p className="num mt-2 text-3xl font-semibold tracking-tight">{money(configured.saldo)}</p>
-                {configured.saldoPct > 0 && <p className="mt-1 text-xs text-fg-subtle">{configured.saldoPct}% do CDI</p>}
+                <ul className="mt-3 divide-y divide-border text-sm">
+                  <li className="flex items-center justify-between gap-3 py-1.5">
+                    <span className="text-fg-muted">Última movimentação</span>
+                    <span className="min-w-0 truncate text-right">
+                      {last ? (
+                        <>
+                          <span className={cn('num', last.sinal > 0 && 'text-pos')}>{(last.sinal > 0 ? '+' : '−') + money(last.valor)}</span>
+                          <span className="text-fg-subtle"> · {last.label} · {when(last.at)}</span>
+                        </>
+                      ) : (
+                        <span className="text-fg-subtle">nenhuma ainda</span>
+                      )}
+                    </span>
+                  </li>
+                  <li className="flex items-center justify-between gap-3 py-1.5">
+                    <span className="text-fg-muted">Rendimento da conta</span>
+                    <span className={configured.saldoPct > 0 ? '' : 'text-fg-subtle'}>{configured.saldoPct > 0 ? configured.saldoPct + '% do CDI' : 'não informado'}</span>
+                  </li>
+                </ul>
               </section>
               <section aria-label="Porquinhos" className="rounded-lg border border-border p-4">
                 <p className="text-xs font-medium tracking-wide text-fg-subtle uppercase">Guardado nos porquinhos</p>
