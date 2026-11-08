@@ -11,9 +11,19 @@ import { mpFind, mpSave, mpView, type MpFound, type MpPot, type MpView } from '@
 import { BOT_URL } from '@/lib/sync/telegram-link'
 import { botErrorText } from '@/lib/sync/worker'
 import { cn } from '@/lib/utils'
+import viagem from '@/assets/caixinhas/viagem.webp'
+import emergencia from '@/assets/caixinhas/emergencia.webp'
 
 // Mercado Pago: saldo e caixinhas estimados. O Mercado Pago não entrega saldo nem rendimento, então o dono
 // informa os valores de hoje e o bot acompanha as movimentações novas e o CDI. Só aparece para o dono.
+
+// ícone da caixinha pelo nome (sem acento e sem maiúscula); as outras ficam sem ícone
+const potIcon = (name: string): string | undefined => {
+  const n = name.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
+  if (/deutsch|viagem|travel|alemanha/.test(n)) return viagem
+  if (/emerg/.test(n)) return emergencia
+  return undefined
+}
 
 const when = (iso: string) => {
   const d = new Date(iso)
@@ -66,7 +76,7 @@ export function MercadoPago() {
 
   const configured = view.configured ? view : null
   return (
-    <Card className="mt-8">
+    <Card className="mt-6">
       <CardHeader>
         <CardTitle className="flex items-center gap-2.5">
           <MercadoPagoLogo className="size-7 text-[#00b1ea]" />
@@ -96,7 +106,7 @@ export function MercadoPago() {
             <ul className="mt-4 divide-y divide-border text-sm">
               <Line label="Conta" value={money(configured.saldo)} hint={configured.saldoPct > 0 ? configured.saldoPct + '% do CDI' : undefined} />
               {configured.pots.map((p) => (
-                <Line key={p.id} label={p.name} value={money(p.valor)} hint={p.pct > 0 ? p.pct + '% do CDI' : undefined} />
+                <Line key={p.id} icon={potIcon(p.name)} label={p.name} value={money(p.valor)} hint={p.pct > 0 ? p.pct + '% do CDI' : undefined} />
               ))}
             </ul>
             {configured.movs.length > 0 && (
@@ -149,12 +159,15 @@ export function MercadoPago() {
   )
 }
 
-function Line({ label, value, hint }: { label: string; value: string; hint?: string }) {
+function Line({ label, value, hint, icon }: { label: string; value: string; hint?: string; icon?: string }) {
   return (
     <li className="flex items-center justify-between gap-3 py-2">
-      <span className="min-w-0 truncate">
-        {label}
-        {hint && <span className="text-fg-subtle"> · {hint}</span>}
+      <span className="flex min-w-0 items-center gap-3">
+        {icon && <img src={icon} alt="" aria-hidden="true" className="size-10 shrink-0 object-contain" />}
+        <span className="min-w-0 truncate">
+          {label}
+          {hint && <span className="text-fg-subtle"> · {hint}</span>}
+        </span>
       </span>
       <span className="num shrink-0 font-medium">{value}</span>
     </li>

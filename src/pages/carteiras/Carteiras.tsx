@@ -115,6 +115,9 @@ function CarteirasReady({ data, today }: { data: AppData; today: string }) {
         </div>
       </header>
 
+      {/* o Mercado Pago é a carteira principal: fica no topo; as outras carteiras ficam logo abaixo */}
+      <MercadoPago />
+
       <div className={cn('mt-6', has && 'lg:grid lg:grid-cols-[minmax(0,400px)_minmax(0,1fr)] lg:items-start lg:gap-8')}>
         <WalletList rows={view.rows} selectedId={wide ? id : undefined} search={qs} onCreate={canCreate ? () => setDlg('wallet') : undefined} />
         {has && wide && (
@@ -133,7 +136,6 @@ function CarteirasReady({ data, today }: { data: AppData; today: string }) {
           </aside>
         )}
       </div>
-      <MercadoPago />
       <WalletFormDialog open={dlg === 'wallet'} onClose={() => setDlg(null)} />
       <TxFormDialog open={dlg === 'tx'} onClose={() => setDlg(null)} />
     </div>
