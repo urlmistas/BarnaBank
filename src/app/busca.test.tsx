@@ -166,7 +166,7 @@ describe('simulador de empréstimo', () => {
     await waitFor(() => expect(within(d).getByText('Total').nextElementSibling?.textContent).toMatch(/0,00/))
   })
 
-  it('cabeçalho: busca em barra com o atalho, sem botão de tema, configurações redondo e com dica', async () => {
+  it('cabeçalho: busca em barra com o atalho, sem botão de tema, configurações com 7px de raio e com dica', async () => {
     mount()
     const busca = await screen.findByRole('button', { name: 'Buscar' })
     expect(busca.textContent).toContain('Buscar…')
@@ -174,7 +174,7 @@ describe('simulador de empréstimo', () => {
     expect(busca.getAttribute('aria-keyshortcuts')).toBe('Control+K')
     expect(screen.queryByRole('button', { name: /tema/i })).toBeNull()
     const config = screen.getByRole('link', { name: 'Configurações' })
-    expect(config.className).toContain('rounded-full')
+    expect(config.className).toContain('rounded-[7px]')
     expect(config.parentElement?.querySelector('[role="tooltip"]')?.textContent).toBe('Configurações')
     // a dica é do balão único: não sobra o title nativo
     expect(config.getAttribute('title')).toBeNull()

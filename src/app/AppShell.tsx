@@ -26,12 +26,12 @@ const NAV: { to: string; label: string; icon: LucideIcon }[] = [
 
 const ease = [0.2, 0, 0, 1] as const
 
-function Underline({ id }: { id: string }) {
+function Underline({ id, className = 'inset-x-0 h-0.5' }: { id: string; className?: string }) {
   return (
     <motion.span
       layoutId={id}
       aria-hidden="true"
-      className="absolute inset-x-0 -bottom-px h-0.5 rounded-full bg-accent"
+      className={cn('absolute -bottom-px rounded-full bg-accent', className)}
       transition={{ duration: 0.22, ease }}
     />
   )
@@ -96,7 +96,7 @@ export function AppShell() {
                     {({ isActive }) => (
                       <>
                         {label}
-                        {isActive && <Underline id="nav-top" />}
+                        {isActive && <Underline id="nav-top" className="inset-x-3 h-[3px]" />}
                       </>
                     )}
                   </NavLink>
@@ -117,7 +117,7 @@ export function AppShell() {
                 onClick={() => setSearchOpen(true)}
                 aria-label="Buscar"
                 aria-keyshortcuts="Control+K"
-                className="inline-flex size-9 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-full text-sm text-fg-muted transition-colors hover:bg-fg/12 hover:text-fg md:w-64 md:rounded-[5px] md:justify-start md:border md:border-border md:bg-surface-2/40 md:pr-1.5 md:pl-3 md:backdrop-blur-md md:hover:border-border-strong [&_svg]:size-4 [&_svg]:shrink-0"
+                className="inline-flex size-9 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-[7px] text-sm text-fg-muted transition-colors hover:bg-fg/12 hover:text-fg md:w-64 md:justify-start md:border md:border-border md:bg-surface-2/40 md:pr-1.5 md:pl-3 md:backdrop-blur-md md:hover:border-border-strong [&_svg]:size-4 [&_svg]:shrink-0"
               >
                 <Search aria-hidden="true" />
                 <span aria-hidden="true" className="hidden flex-1 text-left md:block">
@@ -151,7 +151,7 @@ export function AppShell() {
                 aria-label="Configurações"
                 className={({ isActive }) =>
                   cn(
-                    'relative inline-flex size-9 items-center justify-center rounded-full transition-colors hover:bg-fg/12 hover:text-fg [&_svg]:size-4',
+                    'relative inline-flex size-9 items-center justify-center rounded-[7px] transition-colors hover:bg-fg/12 hover:text-fg [&_svg]:size-4',
                     isActive ? 'text-fg' : 'text-fg-muted',
                   )
                 }

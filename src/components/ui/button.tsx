@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils'
 
 // Base: shadcn/ui Button, adaptado aos tokens do BarnaBank (sem sombra, borda 1px).
 const buttonVariants = cva(
-  'inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-full text-sm font-medium disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 cursor-pointer',
+  'inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-[7px] text-sm font-medium disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 cursor-pointer',
   {
     variants: {
       variant: {
