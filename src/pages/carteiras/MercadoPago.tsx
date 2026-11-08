@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useId, useState, type FormEvent } from 'react'
-import { Loader2, RefreshCw, Settings2, X } from 'lucide-react'
+import { ChartNoAxesCombined, Loader2, Receipt, RefreshCw, Settings2, X } from 'lucide-react'
 import { useAppData } from '@/app/data-context'
 import { Button } from '@/components/ui/button'
 import { MercadoPagoLogo } from '@/components/mercado-pago-logo'
@@ -112,7 +112,10 @@ export function MercadoPago() {
                 <p className="num mt-2 text-3xl font-semibold tracking-tight">{money(configured.saldo)}</p>
                 <ul className="mt-3 divide-y divide-border text-sm">
                   <li className="flex items-center justify-between gap-3 py-1.5">
-                    <span className="text-fg-muted">Última movimentação</span>
+                    <span className="flex items-center gap-2 text-fg-muted">
+                      <Receipt className="size-4 shrink-0" aria-hidden="true" />
+                      Última movimentação
+                    </span>
                     <span className="min-w-0 truncate text-right">
                       {last ? (
                         <>
@@ -125,7 +128,10 @@ export function MercadoPago() {
                     </span>
                   </li>
                   <li className="flex items-center justify-between gap-3 py-1.5">
-                    <span className="text-fg-muted">Rendimento da conta</span>
+                    <span className="flex items-center gap-2 text-fg-muted">
+                      <ChartNoAxesCombined className="size-4 shrink-0" aria-hidden="true" />
+                      Rendimento da conta
+                    </span>
                     <span className={configured.saldoPct > 0 ? '' : 'text-fg-subtle'}>{configured.saldoPct > 0 ? configured.saldoPct + '% do CDI' : 'não informado'}</span>
                   </li>
                 </ul>
