@@ -1,6 +1,7 @@
 import {pixCode, qrSvg, qrPng} from './pix.mjs';
 import {getEngine} from './engine.js';
 import {criarPix, criarPreferenciaCartao, taxaCartao, valorCartao, buscarPagamento, assinaturaOk, montarRef, lerRef, MP_API} from './mercadopago.mjs';
+import {gerarVapid, enviarPush, inscricaoValida} from './push.mjs';
 import {estadoNovo, aplicar, rendimento, visao, descobrirPorquinhos, lerCdi, conferir, registrarHistorico, resumoSemanal} from './mpconta.mjs';
 // BarnaBank: bot do Telegram + nuvem para sincronizar o app.
 // Roda como Cloudflare Worker. Precisa de:
@@ -12,6 +13,7 @@ import {estadoNovo, aplicar, rendimento, visao, descobrirPorquinhos, lerCdi, con
 //   PUT  /api/state        o app envia os dados atualizados e confirma as mensagens aplicadas
 //   GET  /api/backups[/d]  backups diários (últimos 30 dias)
 //   GET|POST|DELETE /api/link  vincular o Telegram à conta do app (login do app, não a SYNC_KEY)
+//   GET|POST|DELETE /api/push  notificação no aparelho (Web Push): chave pública, inscrever, cancelar, testar
 //   GET|PUT /api/prefs     lembretes: o que ligar, a hora e o dia do resumo da semana (o app edita)
 //
 // Contas: cada conta do app (Supabase) tem os dados separados no KV, com o prefixo "u:<id>:" (scoped()).
@@ -39,6 +41,7 @@ export default {
       if (url.pathname === '/api/state') return await api(req, env, ctx, url);
       if (url.pathname === '/api/link') return await apiLink(req, url, env);
       if (url.pathname === '/api/prefs') return await apiPrefs(req, url, env);
+      if (url.pathname === '/api/push') return await apiPush(req, url, env);
       if (url.pathname === '/api/mpconta') return await apiMpConta(req, url, env);
       if (url.pathname.startsWith('/api/photo/')) return await apiPhoto(req, url, env);
       if (url.pathname.startsWith('/api/claim/')) return await apiClaim(req, url, env);
@@ -119,7 +122,7 @@ async function putIfChanged(env, key, v, ignore) {
 }
 // ---------------------------------------------------------------- contas (vários donos no mesmo bot)
 // Chaves que valem para o bot inteiro, em qualquer conta. O resto ganha o prefixo "u:<conta>:".
-const GLOBAL_KEYS = new Set(['origin', 'botName', 'hook', 'hookCheck', 'seenUpd']);
+const GLOBAL_KEYS = new Set(['vapid', 'origin', 'botName', 'hook', 'hookCheck', 'seenUpd']);
 const rootOf = env => env.ROOT || env.BB;
 // o mesmo env, mas com o KV da conta: todo o código que usa env.BB passa a ler e gravar só os dados dela
 function scoped(env, uid) {
@@ -258,6 +261,65 @@ async function remindersFor(env, h) {
   await dailyReminder(env);
   if (prefs.friends !== false) await friendReminders(env);
 }
+// ---------------------------------------------------------------- notificação no aparelho (Web Push)
+// O Worker tem um par de chaves VAPID próprio, criado na primeira vez e guardado no KV; cada aparelho inscrito fica em 'push' (da conta).
+const PUSH_SUBJECT = env => String(env.PUSH_SUBJECT || 'https://urlmistas.github.io/BarnaBank/');
+const MAX_PUSH_DEVICES = 8;
+async function getVapid(env) {
+  const root = {BB: rootOf(env)};
+  let v = await getJSON(root, 'vapid', null);
+  if (!v || !v.pub || !v.jwk) { v = await gerarVapid(); await putJSON(root, 'vapid', v); }
+  return v;
+}
+// manda para todos os aparelhos da conta; apaga os que o serviço de push disse que não existem mais. Nunca lança erro.
+async function pushTo(env, payload) {
+  try {
+    const subs = await getJSON(env, 'push', []);
+    if (!subs.length) return {sent: 0};
+    const vapid = await getVapid(env);
+    const alive = [];
+    let sent = 0;
+    for (const sub of subs) {
+      const r = await enviarPush((u, i) => fetch(u, i), vapid, sub, {url: './', ...payload}, {subject: PUSH_SUBJECT(env)});
+      if (r.ok) sent++;
+      if (!r.gone) alive.push(sub);
+    }
+    if (alive.length !== subs.length) await putJSON(env, 'push', alive);
+    return {sent};
+  } catch (e) {
+    return {sent: 0};
+  }
+}
+async function apiPush(req, url, env) {
+  const w = await who(req, url, env);
+  if (!w) return json({error: 'unauthorized'}, 401);
+  const sc = scoped(env, w.uid);
+  if (req.method === 'GET') {
+    const subs = await getJSON(sc, 'push', []);
+    return json({key: (await getVapid(env)).pub, devices: subs.length});
+  }
+  const body = await req.json().catch(() => null) || {};
+  if (req.method === 'POST' && body.test) {
+    const r = await pushTo(sc, {title: 'BarnaBank', body: 'Notificações ligadas neste aparelho. 🎉', tag: 'teste'});
+    return json({ok: true, sent: r.sent});
+  }
+  if (req.method === 'POST') {
+    if (!inscricaoValida(body.subscription)) return json({error: 'inscrição inválida'}, 400);
+    const {endpoint, keys} = body.subscription;
+    const subs = (await getJSON(sc, 'push', [])).filter(x => x.endpoint !== endpoint);
+    subs.push({endpoint, keys: {p256dh: keys.p256dh, auth: keys.auth}, at: new Date().toISOString()});
+    const keep = subs.slice(-MAX_PUSH_DEVICES);
+    await putJSON(sc, 'push', keep);
+    return json({ok: true, devices: keep.length});
+  }
+  if (req.method === 'DELETE') {
+    const subs = (await getJSON(sc, 'push', [])).filter(x => x.endpoint !== body.endpoint);
+    await putJSON(sc, 'push', subs);
+    return json({ok: true, devices: subs.length});
+  }
+  return json({error: 'method'}, 405);
+}
+
 // o app lê e grava as preferências (login da conta ou SYNC_KEY)
 async function apiPrefs(req, url, env) {
   const w = await who(req, url, env);
@@ -380,6 +442,7 @@ async function asaasHook(req, env) {
   await env.BB.put(key, '1', {expirationTtl: 60 * 60 * 24 * 7});
   const owner = await env.BB.get('owner');
   if (owner) await say(env, owner, '💰 Pix recebido: <b>' + brl(p.value) + '</b>' + (p.description ? '\n' + esc(p.description) : ''));
+  await pushTo(env, {title: 'Pix recebido', body: brl(p.value) + (p.description ? ' · ' + String(p.description).slice(0, 80) : ''), tag: 'pagamento'});
   return json({ok: true});
 }
 // ---------------------------------------------------------------- Pix pelo Mercado Pago (cobrança com baixa automática)
@@ -1316,6 +1379,8 @@ async function dailyReminder(env) {
     if (late.length) out += '\n\n<b>Atrasado</b>\n' + late.map(i => '• ' + esc(i.title) + ' (desde ' + fmtDate(i.date) + '): ' + brl(i.amount)).join('\n');
     out += '\n\nResponda <code>recebi 20 do Fulano</code> quando alguém pagar' + (late.some(i => i.dir === 'in') ? ', ou /cobrar para mandar a cobrança' : '') + '.';
     await say(env, owner, out + stale(s));
+    const parts = [dueToday.length && dueToday.length + ' vence(m) hoje', dueTomorrow.length && dueTomorrow.length + ' amanhã', late.length && late.length + ' atrasado(s)'].filter(Boolean);
+    await pushTo(env, {title: 'Bom dia! Vencimentos', body: parts.join(' · '), tag: 'diario'});
   }
   // dia 1: resumo do mês que passou (uma vez)
   if (prefs.monthly !== false && today.slice(8, 10) === '01' && s.lastMonth && !sentA[month + ':monthly']) {
@@ -1536,6 +1601,7 @@ async function launchOp(env, chat, op, text) {
   // notificação do banco
   const head = op.repeat ? '🔁 Repetido' : op.type === 'pay' && op.kind === 'receivable' ? (op.via === 'pix' ? '💰 <b>Pagamento recebido no Pix!</b>' : op.via === 'cartao' ? '💳 <b>Pagamento recebido no cartão!</b>' : '💰 <b>Pagamento recebido!</b>') : '🏦 ' + (op.bank ? esc(op.bank) + ' · ' : '') + (op.type === 'pay' ? 'pagamento' :op.card ? 'compra no cartão' : op.kind === 'entrada' ? 'entrada' : 'gasto');
   await pushRecent(env, op, r ? esc(r.msg) : describe(op));
+  if (op.type === 'pay' && op.kind === 'receivable') await pushTo(env, {title: 'Pagamento recebido', body: String(r ? r.msg : describe(op)).replace(/<[^>]+>/g, '').slice(0, 140), tag: 'pagamento'});
   return say(env, chat, head + '\n✅ ' + (r ? esc(r.msg) : describe(op)) + later, {reply_markup: {inline_keyboard: [undoBtn]}});
 }
 // últimos lançamentos feitos pelo bot (para apagar ou corrigir)

@@ -13,6 +13,7 @@ import { useAppData } from './data-context'
 import { SyncConflictDialog } from './SyncConflictDialog'
 import { SearchDialog } from './SearchDialog'
 import { SimulatorDialog } from './SimulatorDialog'
+import { QuickAdd } from './QuickAdd'
 import { useShortcuts } from './use-shortcuts'
 import type { ShortcutAction } from '@/lib/shortcuts'
 
@@ -182,6 +183,8 @@ export function AppShell() {
           {outlet}
         </motion.main>
       </AnimatePresence>
+
+      <QuickAdd />
 
       <nav
         aria-label="Seções"

@@ -53,6 +53,7 @@ function InicioReady({ data, today }: { data: AppData; today: string }) {
         brief: monthBrief(data, today),
         spending: spendingAlerts(data, today),
         series: data.wallets.length ? balanceSeries(data, addDaysISO(today, -29), today) : [],
+        compare: monthCompare(data, today),
       }
     }, [data, today])
     return (
@@ -67,7 +68,7 @@ function InicioReady({ data, today }: { data: AppData; today: string }) {
             <CategoryCard data={data} today={today} />
             <Upcoming items={view.items} />
           </div>
-          <MonthCard summary={view.summary} series={view.series} />
+          <MonthCard summary={view.summary} series={view.series} compare={view.compare} />
         </div>
       </div>
     )
@@ -172,6 +173,22 @@ function MonthBriefCard({ brief, today }: { brief: MonthBrief; today: string }) 
       )}
     </section>
   )
+}
+
+interface MonthCompare {
+  prevName: string
+  prevOut: number
+  /** gastos do mês até agora, em % do que o mês passado fechou */
+  pct: number
+}
+
+/** gastos deste mês contra o total do mês passado (o mês passado inteiro: o atual ainda está em andamento) */
+function monthCompare(data: AppData, today: string): MonthCompare | null {
+  const prev = ymOf(addDaysISO(today.slice(0, 7) + '-01', -1))
+  const prevOut = monthSpending(data, prev).total
+  if (prevOut < 0.005) return null
+  const cur = monthSpending(data, ymOf(today)).total
+  return { prevName: MONTHS[Number(prev.slice(5, 7)) - 1], prevOut, pct: Math.round((cur / prevOut) * 100) }
 }
 
 /** top categorias de gasto do mês, com a variação contra o mês passado */
@@ -426,7 +443,15 @@ function UpcomingRow({ item }: { item: UpcomingItem }) {
   )
 }
 
-function MonthCard({ summary, series }: { summary: ReturnType<typeof dashboardSummary>; series: { date: string; total: number }[] }) {
+function MonthCard({
+  summary,
+  series,
+  compare,
+}: {
+  summary: ReturnType<typeof dashboardSummary>
+  series: { date: string; total: number }[]
+  compare: MonthCompare | null
+}) {
   const { money, today } = useAppData()
   const month = MONTHS[parseISO(today).getMonth()]
   const net = summary.monthNet
@@ -447,6 +472,14 @@ function MonthCard({ summary, series }: { summary: ReturnType<typeof dashboardSu
             <Figure label="Saiu" value={money(summary.monthOut)} />
             <Figure label="Sobrou" value={money(net)} tone={net > 0.005 ? 'pos' : net < -0.005 ? 'neg' : undefined} />
           </dl>
+          {compare && (
+            <p className="mt-3 text-xs text-fg-muted">
+              <span className="first-letter:uppercase">{compare.prevName}</span> fechou com <span className="num">{money(compare.prevOut)}</span> em gastos.{' '}
+              <span className={cn('font-medium', compare.pct >= 100 ? 'text-neg' : 'text-fg')}>
+                {compare.pct >= 100 ? `Você já passou: ${compare.pct}% disso.` : `Você está em ${compare.pct}% disso.`}
+              </span>
+            </p>
+          )}
           {series.length > 1 && (
             <div className="mt-5 border-t border-border pt-4">
               <p className="mb-2 text-xs text-fg-muted">Saldo nos últimos 30 dias</p>

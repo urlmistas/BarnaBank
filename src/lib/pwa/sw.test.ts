@@ -37,10 +37,20 @@ function loadSw(fetchImpl: (r: Request) => Promise<Response>) {
     },
   }
   const src = readFileSync(new URL('../../../public/sw.js', import.meta.url), 'utf8').replace(/__BUILD_ID__/g, 'teste')
+  const shown: { title: string; opts: Record<string, unknown> }[] = []
+  const opened: string[] = []
+  const windows: { url: string; focused: boolean; focus: () => Promise<void> }[] = []
   const self = {
     location: new URL('https://x.github.io/BarnaBank/sw.js'),
-    registration: { scope: 'https://x.github.io/BarnaBank/' },
-    clients: { claim: async () => {} },
+    registration: {
+      scope: 'https://x.github.io/BarnaBank/',
+      showNotification: async (title: string, opts: Record<string, unknown>) => void shown.push({ title, opts }),
+    },
+    clients: {
+      claim: async () => {},
+      matchAll: async () => windows,
+      openWindow: async (u: string) => void opened.push(u),
+    },
     skipWaiting: () => {},
     addEventListener: (t: string, h: Handler) => (handlers[t] = h),
   }
@@ -52,10 +62,56 @@ function loadSw(fetchImpl: (r: Request) => Promise<Response>) {
     handlers.fetch({ request: fake, respondWith: (p: Promise<Response>) => (responded = p) })
     return responded ? await responded : undefined
   }
-  return { fire, stores, handlers, activate: () => new Promise<void>((ok) => handlers.activate({ waitUntil: (p: Promise<void>) => p.then(ok) })) }
+  return { fire, stores, handlers, shown, opened, windows, activate: () => new Promise<void>((ok) => handlers.activate({ waitUntil: (p: Promise<void>) => p.then(ok) })) }
 }
 
 const ok = (body: string) => new Response(body, { status: 200 })
+
+describe('service worker: notificações', () => {
+  const push = async (sw: ReturnType<typeof loadSw>, data: unknown) => {
+    const waits: Promise<unknown>[] = []
+    sw.handlers.push({ data: { json: () => data, text: () => String(data) }, waitUntil: (p: Promise<unknown>) => waits.push(p) })
+    await Promise.all(waits)
+  }
+  const click = async (sw: ReturnType<typeof loadSw>, url?: string) => {
+    const waits: Promise<unknown>[] = []
+    let closed = false
+    sw.handlers.notificationclick({ notification: { close: () => (closed = true), data: url ? { url } : {} }, waitUntil: (p: Promise<unknown>) => waits.push(p) })
+    await Promise.all(waits)
+    return closed
+  }
+
+  it('mostra o aviso com título, texto, ícone e etiqueta', async () => {
+    const sw = loadSw(async () => ok('x'))
+    await push(sw, { title: 'Pix recebido', body: 'R$ 50,00', tag: 'pagamento' })
+    expect(sw.shown).toHaveLength(1)
+    expect(sw.shown[0].title).toBe('Pix recebido')
+    expect(sw.shown[0].opts).toMatchObject({ body: 'R$ 50,00', tag: 'pagamento', icon: 'https://x.github.io/BarnaBank/icons/icon-192.png' })
+  })
+
+  it('sem dados ainda mostra um aviso (o navegador exige)', async () => {
+    const sw = loadSw(async () => ok('x'))
+    const waits: Promise<unknown>[] = []
+    sw.handlers.push({ data: null, waitUntil: (p: Promise<unknown>) => waits.push(p) })
+    await Promise.all(waits)
+    expect(sw.shown[0].title).toBe('BarnaBank')
+  })
+
+  it('tocar no aviso fecha, e abre o app se não houver janela', async () => {
+    const sw = loadSw(async () => ok('x'))
+    expect(await click(sw, './')).toBe(true)
+    expect(sw.opened).toEqual(['https://x.github.io/BarnaBank/'])
+  })
+
+  it('tocar no aviso volta para a janela que já está aberta', async () => {
+    const sw = loadSw(async () => ok('x'))
+    const win = { url: 'https://x.github.io/BarnaBank/#/pessoas', focused: false, focus: async () => void (win.focused = true) }
+    sw.windows.push(win)
+    await click(sw)
+    expect(win.focused).toBe(true)
+    expect(sw.opened).toEqual([])
+  })
+})
 
 describe('service worker', () => {
   it('não toca em requisições de outra origem (Supabase, worker do bot)', async () => {

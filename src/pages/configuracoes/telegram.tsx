@@ -6,6 +6,7 @@ import { Select } from '@/components/ui/select'
 import { botErrorText } from '@/lib/sync/worker'
 import { codeLabel, linkCreate, linkRemove, linkStatus, type LinkCode, type LinkStatus } from '@/lib/sync/telegram-link'
 import { cn } from '@/lib/utils'
+import { PushError, disablePush, enablePush, pushEnabled, pushSupported, testPush } from '@/lib/sync/push'
 import { DEFAULT_BOT_PREFS, WEEKDAYS, getBotPrefs, hourLabel, putBotPrefs, type BotPrefs } from '@/lib/sync/bot-prefs'
 import { Row, Section, Switch } from './layout'
 
@@ -310,9 +311,76 @@ export function BotPrefsSection() {
       <Row label="Avisar quem me deve" hint="Lembrete no Telegram para quem entrou pelo seu convite: véspera, dia do vencimento e a cada 3 dias de atraso.">
         <Switch label="Avisar quem me deve" checked={p.friends} onChange={(v) => void change({ friends: v })} />
       </Row>
+      <PushRow />
       <p role="alert" aria-live="assertive" className={cn('px-4 text-xs text-neg sm:px-5', err ? 'py-2.5' : 'hidden')}>
         {err}
       </p>
     </Section>
+  )
+}
+
+/** liga ou desliga a notificação neste aparelho (Web Push); o bot manda os avisos mesmo com o app fechado */
+function PushRow() {
+  const { botToken } = useAppData()
+  const supported = pushSupported()
+  const [on, setOn] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState<string | null>(null)
+  const env = useCallback(() => ({ fetcher: (url: string, init?: RequestInit) => fetch(url, init), token: botToken }), [botToken])
+
+  useEffect(() => {
+    let live = true
+    void pushEnabled().then((v) => live && setOn(v))
+    return () => {
+      live = false
+    }
+  }, [])
+
+  const fail = (e: unknown) => setMsg(e instanceof PushError ? e.message : botErrorText(e))
+  async function toggle(next: boolean) {
+    setBusy(true)
+    setMsg(null)
+    try {
+      if (next) await enablePush(env())
+      else await disablePush(env())
+      setOn(await pushEnabled())
+    } catch (e) {
+      fail(e)
+      setOn(await pushEnabled())
+    } finally {
+      setBusy(false)
+    }
+  }
+  async function test() {
+    setBusy(true)
+    setMsg(null)
+    try {
+      const n = await testPush(env())
+      setMsg(n > 0 ? 'Teste enviado. Deve chegar em instantes.' : 'Nenhum aparelho recebeu. Desligue e ligue de novo.')
+    } catch (e) {
+      fail(e)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Row
+      label="Notificação neste aparelho"
+      hint={
+        supported
+          ? msg ?? 'Avisa quando alguém pagar e no resumo do dia, mesmo com o app fechado.'
+          : 'Este navegador não suporta. No iPhone, instale o BarnaBank na tela inicial (Compartilhar → Adicionar à Tela de Início).'
+      }
+    >
+      <div className="flex items-center gap-3">
+        {on && (
+          <Button variant="outline" size="sm" disabled={busy} onClick={() => void test()}>
+            Testar
+          </Button>
+        )}
+        <Switch label="Notificação neste aparelho" checked={on} onChange={(v) => void toggle(v)} disabled={!supported || busy} />
+      </div>
+    </Row>
   )
 }

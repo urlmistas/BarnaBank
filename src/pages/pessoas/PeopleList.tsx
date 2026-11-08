@@ -15,6 +15,7 @@ import { cn } from '@/lib/utils'
 import { Avatar, SignedMoney, StatusBadge } from './parts'
 import { personHref } from './links'
 import { lateChargeHref } from './charge-link'
+import { personReliability } from '@/lib/finance/trust'
 import { PEOPLE_SIDES, SIDE_LABEL, rowsOfSide, type PeopleSide } from './people-sides'
 
 const FILTER_LABEL: Record<PeopleFilter, string> = {
@@ -205,6 +206,10 @@ function PersonRowLink({ row, filter, selected, href }: { row: PersonRow; filter
     sub = (st.openCount > 1 ? `${st.openCount} dívidas · ` : '') + 'em dia' + (when ? ' · ' + when : '')
   } else sub = 'quitado'
 
+  // histórico de pagamento (precisa de pelo menos 2 parcelas para não rotular com pouco dado)
+  const rel = lateTag ? null : personReliability(row.debts, row.key, today)
+  const relShown = rel && rel.total >= 2 ? rel : null
+
   const dirLabel = settledView ? 'quitado' : amount > 0 ? 'a receber' : amount < 0 ? 'eu devo' : 'saldo zerado'
 
   const chargeHref = filter === 'quitados' ? null : lateChargeHref(
@@ -227,7 +232,7 @@ function PersonRowLink({ row, filter, selected, href }: { row: PersonRow; filter
         to={href}
         data-row
         aria-current={selected ? 'page' : undefined}
-        aria-label={`${row.name}, ${sub}, ${dirLabel} ${money(Math.abs(amount))}`}
+        aria-label={`${row.name}, ${sub}${relShown ? ', ' + relShown.label.toLowerCase() : ''}, ${dirLabel} ${money(Math.abs(amount))}`}
         className={cn('flex items-center gap-3 rounded-lg px-4 py-4 after:absolute after:inset-0 after:rounded-lg focus-visible:outline-offset-[-2px]', chargeHref && 'pr-14')}
       >
         <span className="relative z-10 shrink-0">
@@ -242,7 +247,10 @@ function PersonRowLink({ row, filter, selected, href }: { row: PersonRow; filter
               <span className="truncate text-fg-subtle">{lateTag.days}</span>
             </span>
           ) : (
-            <span className={cn('block truncate text-xs', late ? 'text-neg' : 'text-fg-subtle')}>{sub}</span>
+            <span className={cn('block truncate text-xs', late ? 'text-neg' : 'text-fg-subtle')}>
+              {sub}
+              {relShown && <span className={relShown.cls === 'good' ? 'text-pos/70' : relShown.cls === 'bad' ? 'text-neg' : undefined}> · {relShown.label.toLowerCase()}</span>}
+            </span>
           )}
         </span>
         {/* verde vivo só para o que já foi recebido; o que ainda está a receber fica em verde discreto */}

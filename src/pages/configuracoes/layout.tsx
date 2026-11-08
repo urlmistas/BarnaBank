@@ -33,16 +33,17 @@ export function Row({ label, hint, htmlFor, children }: { label: string; hint?: 
 }
 
 /** interruptor liga/desliga (role=switch) */
-export function Switch({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label: string }) {
+export function Switch({ checked, onChange, label, disabled }: { checked: boolean; onChange: (v: boolean) => void; label: string; disabled?: boolean }) {
   return (
     <button
       type="button"
       role="switch"
       aria-checked={checked}
       aria-label={label}
+      disabled={disabled}
       onClick={() => onChange(!checked)}
       className={cn(
-        'relative h-6 w-11 shrink-0 cursor-pointer rounded-full border transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-surface',
+        'relative h-6 w-11 shrink-0 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 rounded-full border transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-surface',
         checked ? 'border-accent bg-accent' : 'border-border-strong bg-surface-2',
       )}
     >

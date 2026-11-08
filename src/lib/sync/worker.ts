@@ -103,7 +103,7 @@ async function accountToken(env: BotEnv): Promise<string> {
   }
 }
 
-export async function call<T = BotState>(env: BotEnv, cfg: Pick<BotCfg, 'url' | 'key'>, method: 'GET' | 'PUT', body?: unknown, path = '/api/state'): Promise<T> {
+export async function call<T = BotState>(env: BotEnv, cfg: Pick<BotCfg, 'url' | 'key'>, method: 'GET' | 'PUT' | 'POST' | 'DELETE', body?: unknown, path = '/api/state'): Promise<T> {
   let r: Response
   try {
     const bearer = botByAccount(cfg) ? await accountToken(env) : (cfg.key ?? '')

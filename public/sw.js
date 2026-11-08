@@ -80,3 +80,38 @@ self.addEventListener('fetch', (event) => {
   else if (url.pathname.startsWith(scope.pathname + 'assets/')) event.respondWith(cacheFirstAsset(request))
   else event.respondWith(staleWhileRevalidate(request))
 })
+
+// Notificações (Web Push): o bot manda {title, body, url, tag}; o texto vem cifrado e só este aparelho lê.
+self.addEventListener('push', (event) => {
+  let d = {}
+  try {
+    d = event.data ? event.data.json() : {}
+  } catch (e) {
+    d = { body: event.data ? event.data.text() : '' }
+  }
+  const scope = self.registration.scope
+  event.waitUntil(
+    self.registration.showNotification(d.title || 'BarnaBank', {
+      body: d.body || '',
+      icon: scope + 'icons/icon-192.png',
+      badge: scope + 'icons/icon-192.png',
+      tag: d.tag || undefined,
+      data: { url: d.url || './' },
+    }),
+  )
+})
+
+// tocar no aviso abre o app (ou volta para a janela que já está aberta)
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close()
+  const scope = self.registration.scope
+  const target = new URL((event.notification.data && event.notification.data.url) || './', scope).href
+  event.waitUntil(
+    (async () => {
+      const all = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })
+      const mine = all.find((c) => c.url.startsWith(scope))
+      if (mine) return mine.focus()
+      return self.clients.openWindow(target)
+    })(),
+  )
+})
