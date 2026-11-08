@@ -7,11 +7,9 @@ import { useMpTotal } from '@/app/use-mp-total'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Input } from '@/components/ui/input'
-import { Segmented } from '@/components/ui/segmented'
 import { dashboardAlert, dashboardSummary, upcomingItems, type DashboardAlert, type UpcomingItem } from '@/lib/finance/dashboard'
-import { REASON_TEXT, debtPlan, type PlanStrategy } from '@/lib/finance/debt-plan'
-import { formatMoneyInput, parseMoney } from '@/lib/money-input'
+import { debtPlan } from '@/lib/finance/debt-plan'
+import { nameKey } from '@/lib/finance/people'
 import { briefHeadline, monthBrief, type MonthBrief } from '@/lib/finance/month-brief'
 import { alertText, hideAlert, readHiddenAlerts, spendingAlerts, type SpendingAlert } from '@/lib/finance/alerts'
 import { balanceSeries } from '@/lib/finance/wallets'
@@ -51,17 +49,19 @@ function InicioReady({ data, today }: { data: AppData; today: string }) {
       }
     }, [data, today])
     return (
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px] lg:gap-8">
-        <div className="flex min-w-0 flex-col gap-6">
-          <Hero summary={view.summary} />
-          {view.alert && <AlertRow alert={view.alert} />}
-          <MonthBriefCard brief={view.brief} today={today} />
-          <DebtPlanCard data={data} today={today} />
-          <SpendingAlerts alerts={view.spending} today={today} />
-          <CategoryCard data={data} today={today} />
-          <Upcoming items={view.items} />
+      <div className="flex flex-col gap-6">
+        <Hero summary={view.summary} />
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px] lg:gap-8">
+          <div className="flex min-w-0 flex-col gap-6">
+            {view.alert && <AlertRow alert={view.alert} />}
+            <MonthBriefCard brief={view.brief} today={today} />
+            <PayNextCard data={data} today={today} />
+            <SpendingAlerts alerts={view.spending} today={today} />
+            <CategoryCard data={data} today={today} />
+            <Upcoming items={view.items} />
+          </div>
+          <MonthCard summary={view.summary} series={view.series} />
         </div>
-        <MonthCard summary={view.summary} series={view.series} />
       </div>
     )
 }
@@ -121,7 +121,7 @@ function AlertRow({ alert }: { alert: DashboardAlert }) {
         </span>
       </p>
       <Button asChild variant="ghost" size="sm" className="shrink-0">
-        <Link to="/pessoas">
+        <Link to={late ? '/pessoas?f=atrasados' : '/pessoas'}>
           Ver <ArrowRight aria-hidden="true" />
         </Link>
       </Button>
@@ -206,102 +206,58 @@ function CategoryCard({ data, today }: { data: AppData; today: string }) {
   )
 }
 
-const PLAN_KEY = 'barnabank_debt_plan'
+const PAY_LIMIT = 4
 
-function readPlanPrefs(): { strategy: PlanStrategy; monthly: string } {
-  try {
-    const v = JSON.parse(localStorage.getItem(PLAN_KEY) || '{}')
-    return { strategy: v.strategy === 'menor' ? 'menor' : 'juros', monthly: typeof v.monthly === 'string' ? v.monthly : '' }
-  } catch {
-    return { strategy: 'juros', monthly: '' }
-  }
-}
-
-/** ordem sugerida para quitar as dívidas que eu devo, e em quantos meses fecha com um valor mensal */
-function DebtPlanCard({ data, today }: { data: AppData; today: string }) {
+/** dívidas que eu devo, na ordem em que vencem (atrasadas primeiro): quanto sai e quando */
+function PayNextCard({ data, today }: { data: AppData; today: string }) {
   const { money } = useAppData()
-  const [prefs, setPrefs] = useState(readPlanPrefs)
-  const monthlyNum = parseMoney(prefs.monthly)
-  const plan = useMemo(
-    () => debtPlan(data, today, prefs.strategy, Number.isFinite(monthlyNum) ? monthlyNum : 0),
-    [data, today, prefs.strategy, monthlyNum],
+  const plan = useMemo(() => debtPlan(data, today), [data, today])
+  const rows = useMemo(
+    () => [...plan.debts].sort((a, b) => (a.nextDue ?? '9999') .localeCompare(b.nextDue ?? '9999') || a.name.localeCompare(b.name, 'pt-BR')),
+    [plan],
   )
-  const inputId = useId()
-  if (!plan.debts.length) return null
-  const update = (next: Partial<typeof prefs>) => {
-    const v = { ...prefs, ...next }
-    setPrefs(v)
-    try {
-      localStorage.setItem(PLAN_KEY, JSON.stringify(v))
-    } catch {
-      /* sem armazenamento: vale só nesta sessão */
-    }
-  }
+  if (!rows.length) return null
+  const shown = rows.slice(0, PAY_LIMIT)
+  const next = rows.reduce((t, d) => t + d.installment, 0)
   return (
-    <section aria-label="Plano para quitar dívidas" className="rounded-md border border-border bg-surface px-4 py-3">
-      <h2 className="text-sm font-medium">Plano para quitar dívidas</h2>
-      <p className="mt-0.5 text-xs text-fg-muted">
-        Parcelas somam <span className="num">{money(plan.minMonthly)}</span> por mês · falta pagar{' '}
-        <span className="num">{money(plan.totalRemaining)}</span>
-        {plan.totalOverdue > 0.005 && <> · <span className="num">{money(plan.totalOverdue)}</span> já vencido</>}
-      </p>
-      <Segmented<PlanStrategy>
-        id="plano-estrategia"
-        label="Ordem do plano"
-        className="mt-3"
-        value={prefs.strategy}
-        onChange={(strategy) => update({ strategy })}
-        options={[
-          { value: 'juros', label: 'Juros primeiro' },
-          { value: 'menor', label: 'Menor saldo primeiro' },
-        ]}
-      />
-      <ol className="mt-3 divide-y divide-border text-sm">
-        {plan.debts.map((d, i) => (
-          <li key={d.id} className="flex items-center gap-3 py-2">
-            <span className="num w-5 shrink-0 text-fg-subtle">{i + 1}</span>
-            <p className="min-w-0 flex-1">
-              <b className="font-medium">{d.name}</b>
-              <span className="block text-xs text-fg-muted">
-                {REASON_TEXT[d.reason]}
-                {d.monthlyRate > 0 && <> · {String(d.monthlyRate).replace('.', ',')}% ao mês</>}
-                {d.paidInMonth !== null && <> · quita {d.paidInMonth === 1 ? 'neste mês' : `em ${d.paidInMonth} meses`}</>}
-              </span>
-            </p>
-            <p className="shrink-0 text-right">
-              <span className="num block font-medium">{money(d.installment)}</span>
-              <span className="block text-xs text-fg-muted">
-                {d.installment < d.remaining - 0.005 ? <>parcela · falta <span className="num">{money(d.remaining)}</span></> : 'última parcela'}
-              </span>
-            </p>
-          </li>
-        ))}
-      </ol>
-      <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2">
-        <label htmlFor={inputId} className="text-sm text-fg-muted">
-          Posso pagar por mês
-        </label>
-        <Input
-          id={inputId}
-          inputMode="decimal"
-          placeholder="0,00"
-          className="w-32"
-          value={prefs.monthly}
-          onChange={(e) => update({ monthly: e.target.value })}
-          onBlur={() => Number.isFinite(monthlyNum) && update({ monthly: formatMoneyInput(monthlyNum) })}
-        />
+    <section aria-labelledby="pagar-titulo" className="rounded-md border border-border bg-surface px-4 py-3">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
+        <h2 id="pagar-titulo" className="text-sm font-medium">
+          Próximos a pagar
+        </h2>
+        <p className="text-xs text-fg-muted">
+          {plural(rows.length, 'dívida', 'dívidas')} · parcelas somam <span className="num">{money(next)}</span>
+        </p>
       </div>
-      {plan.belowMin && (
-        <p role="status" className="mt-2 text-sm font-medium text-neg">
-          Não cobre as parcelas: o mínimo é {money(plan.minMonthly)} por mês.
-        </p>
+      <ul className="mt-2 divide-y divide-border">
+        {shown.map((d) => {
+          const late = d.overdue > 0.005
+          const when = !d.nextDue ? '' : late ? lateLabel(d.nextDue, today) : relativeDay(d.nextDue, today)
+          return (
+            <li key={d.id}>
+              <Link
+                to={'/pessoas/' + encodeURIComponent(nameKey(d.name))}
+                className="-mx-2 flex items-center gap-3 rounded-sm px-2 py-2 transition-colors hover:bg-surface-2 focus-visible:bg-surface-2"
+                aria-label={`${d.name}, ${when}, parcela ${money(d.installment)}`}
+              >
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-medium">{d.name}</span>
+                  <span className={cn('block truncate text-xs', late ? 'text-neg' : 'text-fg-muted')}>
+                    {when}
+                    {d.installment < d.remaining - 0.005 && <span className="text-fg-subtle"> · falta {money(d.remaining)} no total</span>}
+                  </span>
+                </span>
+                <span className="num shrink-0 text-sm font-medium text-neg">{money(d.installment)}</span>
+              </Link>
+            </li>
+          )
+        })}
+      </ul>
+      {rows.length > PAY_LIMIT && (
+        <Link to="/pessoas?f=abertos" className="mt-2 inline-flex items-center gap-1 text-xs text-fg-muted hover:text-fg">
+          Ver as outras {rows.length - PAY_LIMIT} <ArrowRight aria-hidden="true" className="size-3" />
+        </Link>
       )}
-      {plan.months !== null && (
-        <p role="status" className="mt-2 text-sm font-medium">
-          {plan.months === 1 ? 'Quita tudo em 1 mês.' : `Quita tudo em ${plan.months} meses.`}
-        </p>
-      )}
-      <p className="mt-2 text-xs text-fg-subtle">Paga a parcela de cada dívida todo mês e usa a sobra na primeira da fila. Não projeta juros novos nem renegociação.</p>
     </section>
   )
 }
@@ -438,7 +394,7 @@ function MonthCard({ summary, series }: { summary: ReturnType<typeof dashboardSu
   const month = MONTHS[parseISO(today).getMonth()]
   const net = summary.monthNet
   return (
-    <aside aria-labelledby="mes-titulo" className="lg:pt-1">
+    <aside aria-labelledby="mes-titulo">
       <Card>
         <CardHeader>
           <CardTitle id="mes-titulo" className="first-letter:uppercase">

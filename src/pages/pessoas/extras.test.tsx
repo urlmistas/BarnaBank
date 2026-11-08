@@ -118,6 +118,19 @@ describe('Pessoas: WhatsApp', () => {
     expect(text).toContain('*Pix:* ana@pix.com')
   })
 
+  it('"Cobrar" no topo da pessoa em atraso abre o WhatsApp com a cobrança; sem telefone não aparece', async () => {
+    seed({ contacts: { 'ana souza': { phone: '11999998888' } } }, { pixKey: 'ana@pix.com' })
+    mount()
+    const cobrar = (await screen.findByRole('link', { name: 'Cobrar' })) as HTMLAnchorElement
+    expect(cobrar.href.startsWith('https://wa.me/5511999998888?text=')).toBe(true)
+    expect(decodeURIComponent(cobrar.href.split('?text=')[1])).toContain('*Pix:* ana@pix.com')
+    cleanup()
+    seed()
+    mount()
+    await screen.findByRole('heading', { name: 'Ana Souza' })
+    expect(screen.queryByRole('link', { name: 'Cobrar' })).toBeNull()
+  })
+
   it('sem telefone o botão avisa onde cadastrar', async () => {
     seed()
     mount()

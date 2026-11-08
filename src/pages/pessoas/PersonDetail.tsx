@@ -14,6 +14,8 @@ import { openPrintWindow } from '@/lib/print/html'
 import { useDocCtx } from '@/lib/print/use-doc-ctx'
 import { useToast } from '@/components/ui/toast'
 import { whatsPhone } from '@/lib/finance/groups'
+import { whatsappLink } from '@/lib/finance/whatsapp'
+import { chargeLinkFor } from './charge-link'
 import { personDetail, type DebtView, type HistoryItem, type InstView, type PersonDetail } from '@/lib/finance/people'
 import type { DebtCalc } from '@/lib/finance/debts'
 import { plural } from '@/lib/format'
@@ -47,7 +49,7 @@ export function PersonDetailView({
   calc: DebtCalc
   backHref: string
 }) {
-  const { today, date, money, canCreate } = useAppData()
+  const { today, date, money, canCreate, baseSettings } = useAppData()
   const p = useMemo(() => personDetail(data, personKey, today, date, calc), [data, personKey, today, date, calc])
   const headingRef = useRef<HTMLHeadingElement>(null)
   const [newDebt, setNewDebt] = useState(false)
@@ -63,6 +65,18 @@ export function PersonDetailView({
 
   const f = personFacts(p, today)
   const phone = whatsPhone(data.contacts[p.key]?.phone)
+  // "Cobrar": WhatsApp com a mensagem pronta da dívida atrasada que me devem (a mais antiga primeiro)
+  const lateDebt = p.debts.find((v) => v.kind !== 'payable' && !v.paid && v.status === 'atrasado')
+  const chargeHref = lateDebt
+    ? whatsappLink(lateDebt.debt, data.contacts[p.key], {
+        today,
+        money,
+        date,
+        groupTitle: lateDebt.groupTitle,
+        pixKey: typeof baseSettings.pixKey === 'string' ? baseSettings.pixKey : undefined,
+        link: chargeLinkFor(lateDebt.debt),
+      })
+    : null
   const t = p.totals
   const tiles: { label: string; value: number; icon: LucideIcon; tone?: string }[] = []
   if (p.hasReceivable) {
@@ -111,6 +125,14 @@ export function PersonDetailView({
             <Button size="sm" onClick={() => setNewDebt(true)}>
               <Plus aria-hidden="true" />
               Nova dívida
+            </Button>
+          )}
+          {chargeHref && (
+            <Button asChild size="sm" variant="outline">
+              <a href={chargeHref} target="_blank" rel="noreferrer" aria-label="Cobrar">
+                <HandCoins aria-hidden="true" />
+                <span className="hidden sm:inline">Cobrar</span>
+              </a>
             </Button>
           )}
           {phone && (
