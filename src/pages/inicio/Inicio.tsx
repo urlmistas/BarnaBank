@@ -16,6 +16,7 @@ import { briefHeadline, monthBrief, type MonthBrief } from '@/lib/finance/month-
 import { alertText, hideAlert, readHiddenAlerts, spendingAlerts, type SpendingAlert } from '@/lib/finance/alerts'
 import { balanceSeries } from '@/lib/finance/wallets'
 import { addDaysISO, parseISO, ymOf } from '@/lib/finance/dates'
+import { categoryRanking, monthSpending } from '@/lib/finance/reports'
 import { MONTHS, lateLabel, plural, relativeDay } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import type { AppData } from '@/lib/types'
@@ -57,6 +58,7 @@ function InicioReady({ data, today }: { data: AppData; today: string }) {
           <MonthBriefCard brief={view.brief} today={today} />
           <DebtPlanCard data={data} today={today} />
           <SpendingAlerts alerts={view.spending} today={today} />
+          <CategoryCard data={data} today={today} />
           <Upcoming items={view.items} />
         </div>
         <MonthCard summary={view.summary} series={view.series} />
@@ -161,6 +163,45 @@ function MonthBriefCard({ brief, today }: { brief: MonthBrief; today: string }) 
           {brief.lateInCount > 0 && <>{plural(brief.lateInCount, 'recebimento atrasado ficou', 'recebimentos atrasados ficaram')} fora da conta.</>}
         </p>
       )}
+    </section>
+  )
+}
+
+/** top categorias de gasto do mês, com a variação contra o mês passado */
+function CategoryCard({ data, today }: { data: AppData; today: string }) {
+  const { money } = useAppData()
+  const rows = useMemo(() => {
+    const ym = ymOf(today)
+    const prev = ymOf(addDaysISO(today.slice(0, 7) + '-01', -1))
+    return categoryRanking(monthSpending(data, ym), monthSpending(data, prev)).slice(0, 5)
+  }, [data, today])
+  if (!rows.length) return null
+  const top = rows[0].amount
+  return (
+    <section aria-label={`Gastos de ${MONTHS[parseISO(today).getMonth()]} por categoria`} className="rounded-md border border-border bg-surface px-4 py-3">
+      <div className="flex items-baseline justify-between gap-3">
+        <h2 className="text-sm font-medium">Gastos do mês por categoria</h2>
+        <Link to="/relatorios?g=categorias" className="inline-flex items-center gap-1 text-xs text-fg-muted hover:text-fg">
+          Ver tudo <ArrowRight aria-hidden="true" className="size-3" />
+        </Link>
+      </div>
+      <ul className="mt-3 flex flex-col gap-2.5">
+        {rows.map((r) => (
+          <li key={r.key}>
+            <div className="flex items-baseline justify-between gap-3 text-sm">
+              <span className="truncate">{r.name}</span>
+              <span className="num shrink-0 font-medium">{money(r.amount)}</span>
+            </div>
+            <div aria-hidden="true" className="mt-1 h-1.5 overflow-hidden rounded-full bg-surface-2">
+              <div className="h-full rounded-full bg-accent" style={{ width: Math.max(4, (r.amount / top) * 100) + '%' }} />
+            </div>
+            <p className="mt-0.5 text-xs text-fg-subtle">
+              {Math.round(r.share * 100)}% dos gastos
+              {r.prev > 0 && r.diff !== 0 && ` · ${r.diff > 0 ? '+' : '−'}${money(Math.abs(r.diff))} que mês passado`}
+            </p>
+          </li>
+        ))}
+      </ul>
     </section>
   )
 }
