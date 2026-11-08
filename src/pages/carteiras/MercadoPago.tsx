@@ -2,7 +2,7 @@ import { useCallback, useEffect, useId, useState, type FormEvent } from 'react'
 import { BanknoteCheck, ChartNoAxesCombined, Info, PiggyBank, Loader2, Plus, Receipt, RefreshCw, Settings2, Trash, Zap } from 'lucide-react'
 import { useAppData } from '@/app/data-context'
 import { Button } from '@/components/ui/button'
-import { MercadoPagoLogo } from '@/components/mercado-pago-logo'
+import mpLogo from '@/assets/mercadopago.png'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -19,8 +19,8 @@ import { BOT_URL } from '@/lib/sync/telegram-link'
 import { botErrorText } from '@/lib/sync/worker'
 import type { AppData } from '@/lib/types'
 import { cn } from '@/lib/utils'
-import viagem from '@/assets/porquinhos/viagem.webp'
-import emergencia from '@/assets/porquinhos/emergencia.webp'
+import viagem from '@/assets/porquinhos/viagem.png'
+import emergencia from '@/assets/porquinhos/emergencia.png'
 
 // Mercado Pago: saldo e porquinhos estimados. O Mercado Pago não entrega saldo nem rendimento, então o dono
 // informa os valores de hoje e o bot acompanha as movimentações novas e o CDI. Só aparece para o dono.
@@ -128,7 +128,7 @@ export function MercadoPago() {
     <Card className="mt-6">
       <CardHeader>
         <CardTitle className="flex items-center gap-2.5">
-          <MercadoPagoLogo className="size-7 text-[#00b1ea]" />
+          <img src={mpLogo} alt="" aria-hidden="true" className="size-7" />
           Mercado Pago
         </CardTitle>
         <div className="flex items-center gap-1">
