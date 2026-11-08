@@ -1,12 +1,12 @@
-import { motion } from 'motion/react'
 import { cn } from '@/lib/utils'
 
-// Ícone "loader-circle" (lucide-animated): só o arco gira, em volta do próprio centro, sem parar.
+// Ícone "loader-circle" (lucide-animated): o arco gira sem parar em volta do centro (0,8 s por volta).
+// Animação em CSS puro: a do `motion` em <path> não girava de verdade neste navegador (a matriz de transformação ficava parada).
 export function LoaderCircleIcon({ className, size = 16 }: { className?: string; size?: number }) {
   return (
     <svg
       aria-hidden="true"
-      className={cn(className)}
+      className={cn('animate-spin [animation-duration:0.8s]', className)}
       fill="none"
       height={size}
       stroke="currentColor"
@@ -17,12 +17,7 @@ export function LoaderCircleIcon({ className, size = 16 }: { className?: string;
       width={size}
       xmlns="http://www.w3.org/2000/svg"
     >
-      <motion.path
-        animate={{ rotate: 360 }}
-        d="M21 12a9 9 0 1 1-6.219-8.56"
-        style={{ transformOrigin: '12px 12px' }}
-        transition={{ repeat: Number.POSITIVE_INFINITY, duration: 0.8, ease: 'linear' }}
-      />
+      <path d="M21 12a9 9 0 1 1-6.219-8.56" />
     </svg>
   )
 }
