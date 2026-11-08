@@ -20,6 +20,7 @@ export function Tooltip({
   align = 'center',
   className,
   bubbleClassName,
+  arrowClassName,
 }: {
   label: string
   children: ReactNode
@@ -30,6 +31,8 @@ export function Tooltip({
   className?: string
   /** classes extras só do balão (ex.: `md:hidden` para escondê-lo em telas grandes) */
   bubbleClassName?: string
+  /** classes extras só da setinha (ex.: `right-[5px]` para centralizar em um controle pequeno com `align="end"`) */
+  arrowClassName?: string
 }) {
   return (
     <span className={cn('group/tip relative inline-flex', className)}>
@@ -45,7 +48,7 @@ export function Tooltip({
         )}
       >
         {label}
-        <span aria-hidden="true" className={cn('absolute size-2.5 rotate-45 rounded-[2px] bg-fg', ARROW_SIDE[side], ARROW_ALIGN[align])} />
+        <span aria-hidden="true" className={cn('absolute size-2.5 rotate-45 rounded-[2px] bg-fg', ARROW_SIDE[side], ARROW_ALIGN[align], arrowClassName)} />
       </span>
     </span>
   )

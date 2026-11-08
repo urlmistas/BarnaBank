@@ -7,10 +7,11 @@ interface ToastItem {
   id: number
   message: string
   undo?: () => void
+  icon?: ReactNode
 }
 
 interface ToastApi {
-  show: (message: string, undo?: () => void) => void
+  show: (message: string, undo?: () => void, icon?: ReactNode) => void
 }
 
 const Ctx = createContext<ToastApi | null>(null)
@@ -20,8 +21,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const [item, setItem] = useState<ToastItem | null>(null)
   const seq = useRef(0)
 
-  const show = useCallback((message: string, undo?: () => void) => {
-    setItem({ id: ++seq.current, message, undo })
+  const show = useCallback((message: string, undo?: () => void, icon?: ReactNode) => {
+    setItem({ id: ++seq.current, message, undo, icon })
   }, [])
 
   useEffect(() => {
@@ -49,6 +50,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               transition={{ duration: 0.2, ease: [0.2, 0, 0, 1] }}
               className="pointer-events-auto flex max-w-md items-center gap-3 rounded-lg border border-border-strong bg-surface py-2 pr-2 pl-4 text-sm"
             >
+              {item.icon && <span className="shrink-0 text-pos [&_svg]:size-4">{item.icon}</span>}
               <span className="min-w-0">{item.message}</span>
               {item.undo && (
                 <Button

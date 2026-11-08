@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useId, useState, type FormEvent } from 'react'
-import { BanknoteCheck, ChartNoAxesCombined, Info, PiggyBank, Loader2, Plus, RefreshCw, RotateCcwClock, Settings2, Trash, Zap } from 'lucide-react'
+import { BanknoteCheck, ChartNoAxesCombined, Info, PiggyBank, Loader2, Plus, RefreshCw, RotateCcwClock, SaveCheck, Settings2, Trash, Zap } from 'lucide-react'
 import { useAppData } from '@/app/data-context'
 import { Button } from '@/components/ui/button'
 import mpLogo from '@/assets/mercadopago.png'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { LoaderCircleIcon } from '@/components/ui/loader-circle-icon'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Tooltip } from '@/components/ui/tooltip'
 import { useToast } from '@/components/ui/toast'
@@ -82,7 +83,7 @@ export function MercadoPago() {
     setErr(null)
     try {
       setView(await mpView(fetcher, await botToken(), undefined, true))
-      toast.show('Dados atualizados!')
+      toast.show('Dados atualizados!', undefined, <SaveCheck aria-hidden="true" />)
     } catch (e) {
       setErr(botErrorText(e))
       setView((v) => v ?? null)
@@ -177,7 +178,7 @@ export function MercadoPago() {
         <div className="flex items-center gap-1">
           <Tooltip label="Atualizar" side="bottom">
             <Button variant="ghost" size="icon" className={HOVER} aria-label="Atualizar" disabled={busy || loading} onClick={() => void load()}>
-              {busy ? <Loader2 className="animate-spin" /> : <RefreshCw />}
+              {busy ? <LoaderCircleIcon /> : <RefreshCw />}
             </Button>
           </Tooltip>
           {configured && (
@@ -246,7 +247,7 @@ export function MercadoPago() {
                     {last ? (
                       <span className="flex shrink-0 items-center gap-1.5">
                         <span className={cn('num', last.sinal > 0 && 'text-pos')}>{(last.sinal > 0 ? '+' : '−') + money(last.valor)}</span>
-                        <Tooltip label={last.label + ' · ' + when(last.at)} side="top" align="end">
+                        <Tooltip label={last.label + ' · ' + when(last.at)} side="top" align="end" arrowClassName="right-[5px]">
                           <button type="button" aria-label={'Detalhes da última movimentação: ' + last.label + ', ' + when(last.at)} className="inline-flex size-5 items-center justify-center rounded-full text-fg-subtle transition-colors hover:text-fg">
                             <Info className="size-4" aria-hidden="true" />
                           </button>
