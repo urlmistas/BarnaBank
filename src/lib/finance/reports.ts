@@ -402,3 +402,50 @@ export function cardsReport(data: AppData, months: YearMonth[], chart: { key: Ye
   const series: CardMonthPoint[] = chart.map(({ key, inPeriod }) => ({ key, inPeriod, charges: perMonth.get(key) ?? 0 }))
   return { rows, series, charges: round2(rows.reduce((s, r) => s + r.charges, 0)), paid: round2(rows.reduce((s, r) => s + r.paid, 0)) }
 }
+
+// ---------------------------------------------------------------- projetos (#etiquetas na observação)
+
+const TAG_RE = /#([\p{L}\p{N}_-]+)/gu
+
+/** etiquetas "#viagem" de um texto (sem o #, sem repetir, na ordem em que aparecem) */
+export function tagsOf(text: unknown): string[] {
+  const out: string[] = []
+  const seen = new Set<string>()
+  for (const m of String(text ?? '').matchAll(TAG_RE)) {
+    const k = normTxt(m[1])
+    if (!seen.has(k)) {
+      seen.add(k)
+      out.push(m[1])
+    }
+  }
+  return out
+}
+
+/** algum lançamento ou compra no cartão tem etiqueta de projeto? */
+export function hasProjects(data: Pick<AppData, 'transactions' | 'cardPurchases'>): boolean {
+  return data.transactions.some((t) => t && t.type === 'gasto' && tagsOf(t.note).length > 0) || data.cardPurchases.some((p) => tagsOf(p.note ?? p.desc).length > 0)
+}
+
+/**
+ * Gastos do mês por projeto: o que tem "#etiqueta" na observação (lançamento de gasto ou compra no cartão). Um gasto com
+ * duas etiquetas conta nas duas. Não entram as contas fixas nem os lançamentos gerados ao pagar fatura.
+ */
+export function monthProjects(data: AppData, key: YearMonth): Spending {
+  const res = emptySpending()
+  for (const t of data.transactions) {
+    if (!t || t.type !== 'gasto' || ymOf(t.date) !== key) continue
+    if (t.auto && /^(card|bill):/.test(t.auto)) continue
+    for (const tag of tagsOf(t.note)) addTo(res, tag, num(t.amount), 'other')
+  }
+  for (const p of data.cardPurchases) {
+    const tags = tagsOf(p.note ?? p.desc)
+    if (!tags.length) continue
+    const n = Math.max(1, parseInt(String(p.installments), 10) || 1)
+    const off = ymDiff(key, ymOf(p.date))
+    if (off < 0 || off >= n) continue
+    for (const tag of tags) addTo(res, tag, splitEqual(p.amount, n)[off], 'card')
+  }
+  return res
+}
+
+export const periodProjects = (data: AppData, months: YearMonth[]) => sumMonths(months.map((k) => monthProjects(data, k)))

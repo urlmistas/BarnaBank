@@ -13,7 +13,7 @@ import { openPrintWindow } from '@/lib/print/html'
 import { useDocCtx } from '@/lib/print/use-doc-ctx'
 import { TabPanel, Tabs } from '@/components/ui/tabs'
 import {
-  clampAnchor, pctChange, periodMonths, periodSummary, previousMonths, reportRange, REPORT_PERIODS, stepAnchor,
+  clampAnchor, hasProjects, pctChange, periodMonths, periodSummary, previousMonths, reportRange, REPORT_PERIODS, stepAnchor,
   type ReportPeriod, type ReportRange,
 } from '@/lib/finance/reports'
 import { EPS, ymOf } from '@/lib/finance/dates'
@@ -70,7 +70,7 @@ function Report({ data, today, range }: { data: AppData; today: string; range: R
     const anchor = clampAnchor(kind, rawM && YM_RE.test(rawM) ? rawM : now, range)
     // abas sem nenhum dado de origem somem (sem carteira não há saldo, etc.)
     const available = CHART_KINDS.filter(
-      (k) => (k !== 'saldo' || data.wallets.length > 0) && (k !== 'pessoas' || data.debts.length > 0) && (k !== 'cartoes' || data.cards.length > 0),
+      (k) => (k !== 'saldo' || data.wallets.length > 0) && (k !== 'pessoas' || data.debts.length > 0) && (k !== 'cartoes' || data.cards.length > 0) && (k !== 'projetos' || hasProjects(data)),
     )
     const chart: ChartKind = available.find((k) => k === rawG) ?? 'fluxo'
     const months = periodMonths(kind, anchor, today)

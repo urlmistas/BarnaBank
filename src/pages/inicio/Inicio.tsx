@@ -1,7 +1,7 @@
 import { lazy, Suspense, useId, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
-import { ArrowRight, CalendarCheck, Check, CircleAlert, Clock, Inbox, TriangleAlert, X } from 'lucide-react'
+import { ArrowRight, CalendarCheck, Check, CircleAlert, CreditCard, Clock, Inbox, TriangleAlert, X } from 'lucide-react'
 import { useAppData } from '@/app/data-context'
 import { useMpTotal } from '@/app/use-mp-total'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -19,6 +19,7 @@ import { alertText, hideAlert, readHiddenAlerts, spendingAlerts, type SpendingAl
 import { balanceSeries } from '@/lib/finance/wallets'
 import { addDaysISO, parseISO, ymOf } from '@/lib/finance/dates'
 import { categoryRanking, monthSpending } from '@/lib/finance/reports'
+import { cardNotices, type CardNotice } from '@/lib/finance/card-notices'
 import { MONTHS, firstName, lateLabel, plural, relativeDay } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import type { AppData } from '@/lib/types'
@@ -54,6 +55,7 @@ function InicioReady({ data, today }: { data: AppData; today: string }) {
         spending: spendingAlerts(data, today),
         series: data.wallets.length ? balanceSeries(data, addDaysISO(today, -29), today) : [],
         compare: monthCompare(data, today),
+        cardNotices: cardNotices(data, today),
       }
     }, [data, today])
     return (
@@ -62,6 +64,7 @@ function InicioReady({ data, today }: { data: AppData; today: string }) {
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px] lg:gap-8">
           <div className="flex min-w-0 flex-col gap-6">
             {view.alert && <AlertRow alert={view.alert} />}
+            <CardNotices notices={view.cardNotices} />
             <MonthBriefCard brief={view.brief} today={today} />
             <PayNextCard data={data} today={today} />
             <SpendingAlerts alerts={view.spending} today={today} />
@@ -134,6 +137,45 @@ function AlertRow({ alert }: { alert: DashboardAlert }) {
         </Link>
       </Button>
     </div>
+  )
+}
+
+const when = (days: number) => (days === 0 ? 'hoje' : days === 1 ? 'amanhã' : `em ${days} dias`)
+
+/** faturas de cartão que fecham ou vencem em até 3 dias, ou que já venceram */
+function CardNotices({ notices }: { notices: CardNotice[] }) {
+  const { money, date } = useAppData()
+  if (!notices.length) return null
+  return (
+    <section aria-label="Faturas de cartão" className="rounded-md border border-border bg-surface">
+      <ul className="divide-y divide-border">
+        {notices.slice(0, 3).map((n) => {
+          const late = n.kind === 'late'
+          const title =
+            n.kind === 'closing'
+              ? `Fatura do ${n.card.name} fecha ${when(n.days)}`
+              : n.kind === 'due'
+                ? `Fatura do ${n.card.name} vence ${when(n.days)}`
+                : `Fatura do ${n.card.name} venceu há ${plural(-n.days, 'dia', 'dias')}`
+          const sub =
+            n.kind === 'closing' && n.bestDay
+              ? `${money(n.amount)} até agora · compras a partir de ${date(n.bestDay)} entram só na fatura seguinte`
+              : `${money(n.amount)} a pagar`
+          return (
+            <li key={n.card.id + n.key + n.kind}>
+              <Link to={n.to} className="group flex items-center gap-3 px-4 py-3 transition-colors hover:bg-surface-2 focus-visible:bg-surface-2">
+                <CreditCard aria-hidden="true" className={cn('size-4 shrink-0', late ? 'text-neg' : 'text-accent-text')} />
+                <span className="min-w-0 flex-1">
+                  <span className={cn('block truncate text-sm font-medium', late && 'text-neg')}>{title}</span>
+                  <span className="block truncate text-xs text-fg-muted">{sub}</span>
+                </span>
+                <ArrowRight aria-hidden="true" className={cn('size-4 shrink-0 text-fg-muted', ARROW_SLIDE)} />
+              </Link>
+            </li>
+          )
+        })}
+      </ul>
+    </section>
   )
 }
 

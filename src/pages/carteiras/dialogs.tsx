@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Field, Modal } from '@/components/ui/modal'
 import { Select } from '@/components/ui/select'
-import { checkTx, checkWallet, createTx, createWallet, emptyTxInput, findTxIndex, txToInput, updateTx, updateWallet, usedCategories, type TxInput } from '@/lib/finance/wallet-mutations'
+import { checkTx, checkWallet, createTx, createWallet, emptyTxInput, findSimilarTx, findTxIndex, txToInput, updateTx, updateWallet, usedCategories, type TxInput } from '@/lib/finance/wallet-mutations'
 import { getRecurring, setRecurring } from '@/lib/finance/plan-store'
 import { recurringFromTx } from '@/lib/finance/recurring'
 import { formatMoneyInput, parseMoney } from '@/lib/money-input'
@@ -134,7 +134,7 @@ export function TxFormDialog({ open, onClose, txId, walletId }: { open: boolean;
 }
 
 function TxForm({ txId, walletId, onClose }: { txId?: string; walletId?: string; onClose: () => void }) {
-  const { result, today, money } = useAppData()
+  const { result, today, money, date: date2 } = useAppData()
   const write = useWrite()
   const data = result?.data
   const wallets = data?.wallets ?? []
@@ -151,10 +151,16 @@ function TxForm({ txId, walletId, onClose }: { txId?: string; walletId?: string;
   const [note, setNote] = useState(start.note)
   const [repeat, setRepeat] = useState(false)
   const [err, setErr] = useState<string | null>(null)
+  // aviso de lançamento parecido com um que já existe: a segunda vez em "Lançar mesmo assim" grava
+  const [similarFor, setSimilarFor] = useState<{ tx: Transaction; key: string } | null>(null)
   const transfer = type === 'transferencia'
   const walletOptions = wallets.map((w) => ({ value: w.id, label: w.name }))
   // transferência: destino padrão = a primeira carteira diferente da origem
   const toValue = to && to !== from ? to : (wallets.find((w) => w.id !== from)?.id ?? '')
+
+  const sameKey = [type, from, toValue, amount, date].join('|')
+  // o aviso só vale enquanto valor, data e carteira não mudam
+  const similar = similarFor && similarFor.key === sameKey ? similarFor.tx : null
 
   function submit(e: FormEvent) {
     e.preventDefault()
@@ -174,6 +180,14 @@ function TxForm({ txId, walletId, onClose }: { txId?: string; walletId?: string;
       )
       if (ok) onClose()
       return
+    }
+    if (!similar) {
+      const dup = findSimilarTx(data?.transactions ?? [], input)
+      if (dup) {
+        setErr(null)
+        setSimilarFor({ tx: dup, key: sameKey })
+        return
+      }
     }
     const created = createTx(input)
     const v = created.amount
@@ -241,7 +255,7 @@ function TxForm({ txId, walletId, onClose }: { txId?: string; walletId?: string;
         </Field>
       )}
       <Field label="Observação (opcional)" htmlFor={ids.note} className="mt-3">
-        <Input id={ids.note} value={note} maxLength={80} onChange={(e) => setNote(e.target.value)} />
+        <Input id={ids.note} value={note} maxLength={80} onChange={(e) => setNote(e.target.value)} placeholder="Ex.: jantar #viagem" />
       </Field>
       {!transfer && !txId && (
         <label className="mt-3 flex cursor-pointer items-center gap-2 text-sm">
@@ -250,8 +264,14 @@ function TxForm({ txId, walletId, onClose }: { txId?: string; walletId?: string;
         </label>
       )}
 
+      {similar && (
+        <p role="alert" className="mt-3 rounded-md border border-border-strong bg-surface-2 px-3 py-2 text-sm">
+          Já existe um lançamento parecido: <b className="font-medium">{money(similar.amount)}</b>
+          {similar.category ? ` em ${similar.category}` : ''} em <span className="num">{date2(similar.date)}</span>. Se for outro, lance mesmo assim.
+        </p>
+      )}
       <ErrorLine>{err}</ErrorLine>
-      <Buttons onCancel={onClose} okLabel={tx ? 'Salvar alterações' : 'Salvar lançamento'} />
+      <Buttons onCancel={onClose} okLabel={tx ? 'Salvar alterações' : similar ? 'Lançar mesmo assim' : 'Salvar lançamento'} />
     </form>
   )
 }

@@ -7,12 +7,12 @@ import { ToastProvider } from '@/components/ui/toast'
 import { STORAGE_KEY } from '@/lib/storage'
 import { QuickAdd } from './QuickAdd'
 
-function mount(data: Record<string, unknown>) {
+function mount(data: Record<string, unknown>, path = '/') {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
   render(
     <DataProvider>
       <ToastProvider>
-        <MemoryRouter>
+        <MemoryRouter initialEntries={[path]}>
           <QuickAdd />
         </MemoryRouter>
       </ToastProvider>
@@ -41,6 +41,17 @@ describe('botão "+" do celular', () => {
     expect(screen.getByRole('menuitem', { name: /Devo a alguém/ })).toBeTruthy()
     fireEvent.click(screen.getByRole('menuitem', { name: /Emprestei a alguém/ }))
     expect(await screen.findByRole('dialog', { hidden: true })).toBeTruthy()
+  })
+
+  it('atalho do ícone (?novo=emprestei) abre o formulário direto e tira o parâmetro', async () => {
+    mount({ debts: [] }, '/?novo=emprestei')
+    expect(await screen.findByRole('dialog', { hidden: true })).toBeTruthy()
+  })
+
+  it('?novo=gasto sem carteira não abre nada', async () => {
+    mount({ debts: [] }, '/?novo=gasto')
+    await screen.findByRole('button', { name: 'Adicionar' })
+    expect(screen.queryByRole('dialog', { hidden: true })).toBeNull()
   })
 
   it('sem carteira não oferece lançamento, só as dívidas', async () => {

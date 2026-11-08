@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
-import { ArrowLeft, BanknoteArrowUp, CalendarClock, Check, ChevronDown, Circle, CircleAlert, CircleCheck, CircleDashed, ClockAlert, FileDown, HandCoins, Image, Inbox, MessageCircle, Paperclip, Pencil, PiggyBank, Plus, ReceiptText, Trash2, UserRound, type LucideIcon } from 'lucide-react'
+import { ArrowLeft, BanknoteArrowUp, CalendarClock, Check, ChevronDown, Circle, CircleAlert, CircleCheck, CircleDashed, ClockAlert, FileDown, HandCoins, Image, Inbox, MessageCircle, Paperclip, Pencil, PiggyBank, Plus, ReceiptText, Share2, Trash2, UserRound, type LucideIcon } from 'lucide-react'
 import { useAppData } from '@/app/data-context'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -14,7 +14,7 @@ import { openPrintWindow } from '@/lib/print/html'
 import { useDocCtx } from '@/lib/print/use-doc-ctx'
 import { useToast } from '@/components/ui/toast'
 import { whatsPhone } from '@/lib/finance/groups'
-import { lateChargeHref } from './charge-link'
+import { lateChargeHref, lateChargeText } from './charge-link'
 import { personDetail, type DebtView, type HistoryItem, type InstView, type PersonDetail } from '@/lib/finance/people'
 import type { DebtCalc } from '@/lib/finance/debts'
 import { plural } from '@/lib/format'
@@ -71,6 +71,13 @@ export function PersonDetailView({
     { today, money, date, pixKey: typeof baseSettings.pixKey === 'string' ? baseSettings.pixKey : undefined },
     data.groups,
   )
+  // "Compartilhar": a mesma cobrança pela folha de compartilhar do celular (Telegram, SMS, e-mail…); não precisa de telefone
+  const chargeText = lateChargeText(
+    p.debts.map((v) => v.debt),
+    { today, money, date, pixKey: typeof baseSettings.pixKey === 'string' ? baseSettings.pixKey : undefined },
+    data.groups,
+  )
+  const canShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function'
   const t = p.totals
   const tiles: { label: string; value: number; icon: LucideIcon; tone?: string }[] = []
   if (p.hasReceivable) {
@@ -127,6 +134,22 @@ export function PersonDetailView({
                 <HandCoins aria-hidden="true" />
                 <span className="hidden sm:inline">Cobrar</span>
               </a>
+            </Button>
+          )}
+          {chargeText && canShare && (
+            <Button
+              size="sm"
+              variant="outline"
+              aria-label="Compartilhar cobrança"
+              onClick={() => {
+                navigator.share({ text: chargeText }).catch((e: unknown) => {
+                  // fechar a folha de compartilhar não é erro
+                  if (!(e instanceof DOMException && e.name === 'AbortError')) toast.show('Não consegui abrir o compartilhamento.')
+                })
+              }}
+            >
+              <Share2 aria-hidden="true" />
+              <span className="hidden sm:inline">Compartilhar</span>
             </Button>
           )}
           {phone && (

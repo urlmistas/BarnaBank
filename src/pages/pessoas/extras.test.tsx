@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, configure, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { DataProvider } from '@/app/data-context'
@@ -136,6 +136,24 @@ describe('Pessoas: WhatsApp', () => {
     mount('/pessoas?f=atrasados')
     const cobrar = (await screen.findByRole('link', { name: 'Cobrar Ana Souza' })) as HTMLAnchorElement
     expect(cobrar.href.startsWith('https://wa.me/5511999998888?text=')).toBe(true)
+  })
+
+  it('"Compartilhar" abre a folha de compartilhar com a cobrança, mesmo sem telefone; sem suporte o botão some', async () => {
+    seed()
+    mount()
+    await screen.findByRole('heading', { name: 'Ana Souza' })
+    expect(screen.queryByRole('button', { name: 'Compartilhar cobrança' })).toBeNull()
+    cleanup()
+    const share = vi.fn(async () => {})
+    Object.defineProperty(navigator, 'share', { value: share, configurable: true })
+    try {
+      mount()
+      fireEvent.click(await screen.findByRole('button', { name: 'Compartilhar cobrança' }))
+      expect(share).toHaveBeenCalledTimes(1)
+      expect((share.mock.calls[0] as unknown as [{ text: string }])[0].text).toContain('Oi Ana, tudo bem?')
+    } finally {
+      Reflect.deleteProperty(navigator, 'share')
+    }
   })
 
   it('sem telefone o botão avisa onde cadastrar', async () => {

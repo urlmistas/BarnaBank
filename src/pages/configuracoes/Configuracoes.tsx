@@ -16,6 +16,8 @@ import { Row, Section } from './layout'
 import { BackupSection, DefaultsSection, InstallSection, PixSection } from './sections'
 import { ShortcutsSection } from './atalhos'
 import { BotPrefsSection, TelegramSection } from './telegram'
+import { HistorySection } from './history'
+import { LockSection } from './lock'
 import { BOT_URL } from '@/lib/sync/telegram-link'
 
 // Configurações, por categoria: conta e nuvem, visual, finanças, atalhos, dados e app.
@@ -132,6 +134,8 @@ export function Configuracoes() {
             {cat === 'dados' && (
               <>
                 <DataSection />
+                <LockSection />
+                <HistorySection />
                 <BackupSection />
                 <InstallSection />
               </>

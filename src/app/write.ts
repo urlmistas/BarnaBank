@@ -1,6 +1,7 @@
 import { useCallback } from 'react'
 import { useToast } from '@/components/ui/toast'
 import { commit, restore, type StoreApi } from '@/lib/store'
+import { markUndone, recordChange } from '@/lib/history'
 
 /**
  * Grava uma alteração e avisa com "Desfazer". Devolve true se gravou.
@@ -15,9 +16,12 @@ export function useWrite() {
         toast.show(r.error)
         return false
       }
+      const hid = recordChange(message, r.before, r.after)
       toast.show(message, () => {
-        if (restore(r.before, r.after)) toast.show(undoMessage)
-        else toast.show('Os dados mudaram depois deste lançamento, então não dá para desfazer.')
+        if (restore(r.before, r.after)) {
+          if (hid) markUndone(hid)
+          toast.show(undoMessage)
+        } else toast.show('Os dados mudaram depois deste lançamento, então não dá para desfazer.')
       })
       return true
     },

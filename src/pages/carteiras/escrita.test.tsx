@@ -113,6 +113,26 @@ describe('Carteiras: escrita', () => {
     await waitFor(() => expect(stored().transactions).toHaveLength(2))
   })
 
+  it('gasto igual a um que já existe (mesmo valor, carteira e dia) avisa de duplicidade; "Lançar mesmo assim" grava', async () => {
+    seed()
+    mount('/carteiras/w1')
+    fireEvent.click(await screen.findByRole('button', { name: /^Lançamento$/ }))
+    const dlg = openDialog()
+    fireEvent.click(within(dlg).getByRole('button', { name: 'Gasto' }))
+    fireEvent.change(within(dlg).getByLabelText('Valor (R$)'), { target: { value: '30' } })
+    fireEvent.change(within(dlg).getByLabelText('Categoria'), { target: { value: 'Mercado' } })
+    fireEvent.click(within(dlg).getByRole('button', { name: 'Salvar lançamento' }))
+    expect((await within(dlg).findByText(/Já existe um lançamento parecido/)).textContent).toMatch(/Mercado/)
+    expect(stored().transactions).toHaveLength(2)
+    // mudar o valor tira o aviso
+    fireEvent.change(within(dlg).getByLabelText('Valor (R$)'), { target: { value: '31' } })
+    expect(within(dlg).queryByText(/Já existe um lançamento parecido/)).toBeNull()
+    expect(within(dlg).getByRole('button', { name: 'Salvar lançamento' })).toBeTruthy()
+    fireEvent.change(within(dlg).getByLabelText('Valor (R$)'), { target: { value: '30' } })
+    fireEvent.click(await within(dlg).findByRole('button', { name: 'Lançar mesmo assim' }))
+    await waitFor(() => expect(stored().transactions).toHaveLength(3))
+  })
+
   it('transferência exige destino diferente e grava os dois lados num lançamento só', async () => {
     seed()
     mount('/carteiras/w1')

@@ -9,6 +9,11 @@
   "orientation": "portrait",
   "background_color": "#0d0e10",
   "theme_color": "#434ce4",
+  "shortcuts": [
+    { "name": "Novo gasto", "short_name": "Novo gasto", "url": "./#/?novo=gasto", "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" }] },
+    { "name": "Emprestei a alguém", "short_name": "Emprestei", "url": "./#/?novo=emprestei", "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" }] },
+    { "name": "Pessoas em atraso", "short_name": "Em atraso", "url": "./#/pessoas?f=atrasados", "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" }] }
+  ],
   "icons": [
     { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
     { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },

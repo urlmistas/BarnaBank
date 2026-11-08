@@ -1,6 +1,6 @@
 import type { StoreApi } from '@/lib/store'
 import type { ISODate, Transaction, TransactionType, Wallet } from '@/lib/types'
-import { round2 } from './dates'
+import { daysBetweenISO, round2 } from './dates'
 import { unlinkTransaction } from './contas-mutations'
 import { newId } from './mutations'
 
@@ -141,4 +141,22 @@ export function usedCategories(list: Transaction[]): string[] {
   const set = new Set<string>()
   for (const t of list) if (t.category && t.type !== 'transferencia') set.add(t.category)
   return [...set].sort((a, b) => a.localeCompare(b, 'pt-BR'))
+}
+
+/**
+ * Lançamento que parece o mesmo que o digitado: mesmo tipo, valor, carteira (e destino, na transferência), com no máximo
+ * 1 dia de diferença. Serve para avisar de duplicidade (ex.: o Pix veio pela notificação do banco e foi lançado de novo
+ * na mão). Não conta os lançamentos automáticos das contas fixas.
+ */
+export function findSimilarTx(txs: Transaction[], input: Pick<TxInput, 'type' | 'walletId' | 'toWalletId' | 'amount' | 'date'>): Transaction | undefined {
+  if (!(input.amount > 0)) return undefined
+  return txs.find(
+    (t) =>
+      !t.auto &&
+      t.type === input.type &&
+      t.walletId === input.walletId &&
+      (input.type !== 'transferencia' || t.toWalletId === input.toWalletId) &&
+      Math.abs(t.amount - input.amount) < 0.005 &&
+      Math.abs(daysBetweenISO(t.date, input.date)) <= 1,
+  )
 }

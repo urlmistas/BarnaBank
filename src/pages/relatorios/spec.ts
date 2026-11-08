@@ -4,13 +4,14 @@ import { MONTHS } from '@/lib/format'
 
 // Tipos e textos compartilhados entre a página (sem Recharts) e o gráfico (carregado sob demanda).
 
-export type ChartKind = 'fluxo' | 'saldo' | 'categorias' | 'tipos' | 'pessoas' | 'cartoes'
-export const CHART_KINDS: ChartKind[] = ['fluxo', 'saldo', 'categorias', 'tipos', 'pessoas', 'cartoes']
+export type ChartKind = 'fluxo' | 'saldo' | 'categorias' | 'projetos' | 'tipos' | 'pessoas' | 'cartoes'
+export const CHART_KINDS: ChartKind[] = ['fluxo', 'saldo', 'categorias', 'projetos', 'tipos', 'pessoas', 'cartoes']
 
 export const CHART_LABEL: Record<ChartKind, string> = {
   fluxo: 'Entrou × saiu',
   saldo: 'Saldo',
   categorias: 'Categorias',
+  projetos: 'Projetos',
   tipos: 'Fixas × cartão',
   pessoas: 'Empréstimos',
   cartoes: 'Cartões',

@@ -1,6 +1,6 @@
 import type { AppData, ISODate, YearMonth } from '@/lib/types'
 import {
-  balanceReport, cardsReport, categoryRanking, chartMonths, flowSeries, loansByPerson, mixSeries, periodIncome, periodSpending,
+  balanceReport, cardsReport, categoryRanking, chartMonths, flowSeries, loansByPerson, mixSeries, periodIncome, periodProjects, periodSpending,
   type CatRow, type ReportRange,
 } from '@/lib/finance/reports'
 import { EPS, ymOf } from '@/lib/finance/dates'
@@ -184,6 +184,35 @@ export function buildView(kind: ChartKind, c: Ctx): ChartView {
           rows: ranking.map((r) => ({
             key: r.key,
             name: r.name,
+            value: r.amount,
+            sub: catSub(r, c.noBase) + (r.card > EPS ? ` · ${money(r.card)} no cartão` : ''),
+          })),
+        },
+      }
+    }
+    case 'projetos': {
+      const cur = periodProjects(data, months)
+      const ranking = categoryRanking(cur, periodProjects(data, prev))
+      const series: Series[] = [{ key: 'amount', name: 'Gastos', tone: 'accent' }]
+      const rows = topBars(ranking.map((r) => ({ key: r.key, name: r.name, values: { amount: r.amount } })), series)
+      return {
+        title: 'Gastos por projeto',
+        sub: 'Gastos com #etiqueta na observação; um gasto com duas etiquetas conta nas duas',
+        spec: ranking.length ? { type: 'bars', rows, series } : null,
+        empty: `Nenhum gasto com #etiqueta em ${periodText}.`,
+        legend: [],
+        dimmed: false,
+        ariaLabel: `Gráfico de barras: gastos por projeto, ${periodText}. ${rows.slice(0, 3).map((r) => `${r.label} ${money(r.values.amount)}`).join('; ')}.`,
+        table: {
+          head: ['Projeto', 'Gastos', 'No cartão', 'Período anterior'],
+          rows: ranking.map((r) => ({ key: r.key, label: r.name, cells: [r.amount, r.card, r.prev] })),
+        },
+        rank: {
+          title: 'Maiores projetos',
+          noun: ['projeto', 'projetos'],
+          rows: ranking.map((r) => ({
+            key: r.key,
+            name: '#' + r.name,
             value: r.amount,
             sub: catSub(r, c.noBase) + (r.card > EPS ? ` · ${money(r.card)} no cartão` : ''),
           })),

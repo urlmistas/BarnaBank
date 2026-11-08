@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { ArrowLeftRight, HandCoins, Plus, ReceiptText } from 'lucide-react'
 import { Menu } from '@/components/ui/menu'
 import { TxFormDialog } from '@/pages/carteiras/dialogs'
@@ -14,8 +15,23 @@ type Dlg = 'tx' | 'lent' | 'owe' | null
 export function QuickAdd() {
   const { canCreate, canEdit, result } = useAppData()
   const [dlg, setDlg] = useState<Dlg>(null)
-  if (!canCreate) return null
+  const [params, setParams] = useSearchParams()
   const hasWallets = (result?.data.wallets.length ?? 0) > 0
+  const want = params.get('novo')
+  // atalhos do ícone do app (manifesto) abrem o formulário por ?novo=gasto|emprestei|devo e a URL volta ao normal
+  useEffect(() => {
+    if (!want) return
+    if (!result) return
+    const next: Dlg = want === 'gasto' ? 'tx' : want === 'emprestei' ? 'lent' : want === 'devo' ? 'owe' : null
+    const ok = next === 'tx' ? canCreate && canEdit && hasWallets : !!next && canCreate
+    if (ok) setDlg(next)
+    const p = new URLSearchParams(params)
+    p.delete('novo')
+    setParams(p, { replace: true })
+    // só quando o parâmetro aparece
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [want, !!result])
+  if (!canCreate) return null
   const close = () => setDlg(null)
   return (
     <>
