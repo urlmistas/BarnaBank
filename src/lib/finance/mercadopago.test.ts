@@ -1,40 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import type { Transaction } from '@/lib/types'
-import type { MpMov } from '@/lib/sync/mpconta'
-import { isMpWallet, mpAdjustment, mpImpKey, mpNewTransactions, mpToday } from './mercadopago'
+import { isMpWallet } from './mercadopago'
 
-const mov = (o: Partial<MpMov>): MpMov => ({ id: '1', at: '2026-11-07T14:30:00.000Z', tipo: 'saida', label: 'Pix enviado', valor: 15, sinal: -1, pot: '', ...o })
-
-describe('mpNewTransactions', () => {
-  it('vira gasto ou entrada na carteira, com a data de Brasília', () => {
-    const r = mpNewTransactions([mov({}), mov({ id: '2', tipo: 'entrada', label: 'Pix recebido', valor: 100, sinal: 1, at: '2026-11-08T02:30:00.000Z' })], 'w1', [])
-    expect(r).toHaveLength(2)
-    expect(r[0]).toMatchObject({ id: 'mp1', walletId: 'w1', type: 'gasto', amount: 15, date: '2026-11-07', category: 'Transferências', imp: 'mp:1' })
-    expect(r[1]).toMatchObject({ type: 'entrada', amount: 100, category: 'Pix recebido', date: '2026-11-07' }) // 23h30 do dia 7 em Brasília
-  })
-  it('não lança duas vezes', () => {
-    const have = [{ id: 'x', walletId: 'w1', type: 'gasto', amount: 15, date: '2026-11-07', imp: mpImpKey('1') }] as Transaction[]
-    expect(mpNewTransactions([mov({}), mov({ id: '3', valor: 7 })], 'w1', have).map((t) => t.id)).toEqual(['mp3'])
-  })
-  it('guardado e resgate de porquinho não entram', () => {
-    expect(mpNewTransactions([mov({ tipo: 'guardar' }), mov({ id: '2', tipo: 'resgate', sinal: 1 })], 'w1', [])).toEqual([])
-  })
-  it('ignora valor zero e data inválida', () => {
-    expect(mpNewTransactions([mov({ valor: 0 }), mov({ id: '2', at: 'xx' })], 'w1', [])).toEqual([])
-  })
-})
-
-describe('carteira Mercado Pago', () => {
+describe('carteira Mercado Pago (antiga, criada sozinha)', () => {
   it('acha a carteira pelo nome, sem ligar para maiúscula ou espaço', () => {
     expect(isMpWallet({ name: '  mercado PAGO ' })).toBe(true)
     expect(isMpWallet({ name: 'Nubank' })).toBe(false)
-  })
-  it('ajuste: cobre a diferença para o saldo da carteira bater com o total', () => {
-    expect(mpAdjustment(114.25, 0, 'w1', '2026-11-07', 'k')).toMatchObject({ type: 'entrada', amount: 114.25, walletId: 'w1', imp: 'mp:ajuste:k' })
-    expect(mpAdjustment(100, 130.5, 'w1', '2026-11-07', 'k')).toMatchObject({ type: 'gasto', amount: 30.5 })
-    expect(mpAdjustment(50, 50.004, 'w1', '2026-11-07', 'k')).toBeNull()
-  })
-  it('hoje no horário de Brasília', () => {
-    expect(mpToday(new Date('2026-11-08T01:00:00Z'))).toBe('2026-11-07')
   })
 })

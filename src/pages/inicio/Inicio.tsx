@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
 import { ArrowRight, CalendarCheck, CircleAlert, Clock, Inbox, TriangleAlert, X } from 'lucide-react'
 import { useAppData } from '@/app/data-context'
+import { useMpTotal } from '@/app/use-mp-total'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -65,14 +66,18 @@ function InicioReady({ data, today }: { data: AppData; today: string }) {
 
 function Hero({ summary }: { summary: ReturnType<typeof dashboardSummary> }) {
   const { money } = useAppData()
-  const [main, cents] = splitCents(money(summary.balance))
+  // o Mercado Pago entra pelo total do painel (conta + porquinhos), sem precisar de uma carteira no app
+  const mp = useMpTotal()
+  const balance = summary.balance + (mp ?? 0)
+  const walletCount = summary.walletCount + (mp === null ? 0 : 1)
+  const [main, cents] = splitCents(money(balance))
   return (
     <section aria-labelledby="saldo-titulo" className="pt-1 pb-2">
       <h1 id="saldo-titulo" className="text-sm font-medium text-fg-muted">
         Saldo em carteiras
-        {summary.walletCount > 0 && <span className="text-fg-subtle"> · {plural(summary.walletCount, 'carteira', 'carteiras')}</span>}
+        {walletCount > 0 && <span className="text-fg-subtle"> · {plural(walletCount, 'carteira', 'carteiras')}</span>}
       </h1>
-      <p className={cn('num mt-2 text-4xl font-semibold tracking-tight', summary.balance < 0 && 'text-neg')}>
+      <p className={cn('num mt-2 text-4xl font-semibold tracking-tight', balance < 0 && 'text-neg')}>
         {main}
         <span className="text-fg-subtle">{cents}</span>
       </p>
@@ -88,7 +93,7 @@ function Hero({ summary }: { summary: ReturnType<typeof dashboardSummary> }) {
           </div>
         )}
       </dl>
-      {summary.walletCount === 0 && (
+      {walletCount === 0 && (
         <p className="mt-3 text-sm text-fg-subtle">Nenhuma carteira cadastrada. O saldo aparece quando houver carteiras.</p>
       )}
     </section>

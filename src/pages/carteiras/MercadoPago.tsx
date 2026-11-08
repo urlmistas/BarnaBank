@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useRef, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useId, useState, type FormEvent } from 'react'
 import { BanknoteCheck, ChartNoAxesCombined, Info, PiggyBank, Loader2, Plus, RefreshCw, RotateCcwClock, SaveCheck, Settings2, Trash, Zap } from 'lucide-react'
 import { useAppData } from '@/app/data-context'
 import { Button } from '@/components/ui/button'
@@ -10,16 +10,14 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Tooltip } from '@/components/ui/tooltip'
 import { useToast } from '@/components/ui/toast'
 import { Field, Modal } from '@/components/ui/modal'
-import { isMpWallet, MP_WALLET, mpAdjustment, mpNewTransactions, mpToday } from '@/lib/finance/mercadopago'
-import { walletBalance } from '@/lib/finance/wallets'
+import { isMpWallet } from '@/lib/finance/mercadopago'
+import { removeWallet } from '@/lib/finance/wallet-mutations'
 import { formatMoneyInput, maskMoney, parseMoney } from '@/lib/money-input'
 import { commit } from '@/lib/store'
-import { newId } from '@/lib/finance/mutations'
 import { Switch } from '@/pages/configuracoes/layout'
 import { mpConfirm, mpFind, mpSave, mpView, type MpConferencia, type MpFound, type MpPot, type MpView } from '@/lib/sync/mpconta'
 import { BOT_URL } from '@/lib/sync/telegram-link'
 import { botErrorText } from '@/lib/sync/worker'
-import type { AppData } from '@/lib/types'
 import { cn } from '@/lib/utils'
 import viagem from '@/assets/porquinhos/viagem.png'
 import emergencia from '@/assets/porquinhos/emergencia.png'
@@ -34,9 +32,6 @@ const potIcon = (name: string): string | undefined => {
   if (/emerg/.test(n)) return emergencia
   return undefined
 }
-
-// '' = ainda não escolheu (a integração vem ligada), 'nao' = desligou de propósito, qualquer outro valor = ligada
-const lancaNaCarteira = (c: string) => c !== 'nao'
 
 // "hoje às 23:27", "ontem às 23:27" ou "07/11 às 23:27"
 const whenRel = (iso: string) => {
@@ -76,7 +71,6 @@ export function MercadoPago() {
   const toast = useToast()
   const [respondida, setRespondida] = useState(false)
   const [asking, setAsking] = useState(false)
-  const reparou = useRef(false)
 
   const fetcher = useCallback((url: string, init?: RequestInit) => fetch(url, init), [])
   const load = useCallback(async () => {
@@ -115,23 +109,15 @@ export function MercadoPago() {
   const configured = view && view.configured ? view : null
   const data = result?.data
 
-  // entradas e saídas do Mercado Pago viram lançamentos na carteira escolhida (sem repetir os que já estão lá)
+  // o Mercado Pago não é uma carteira do app (o Início soma o total do painel direto): apaga a carteira que uma versão anterior criou sozinha,
+  // só se ela tiver apenas lançamentos automáticos (nada que você tenha digitado)
   useEffect(() => {
-    if (!configured || !lancaNaCarteira(configured.carteira) || !data || !canCreate) return
+    if (!data || !canCreate) return
     const w = data.wallets.find(isMpWallet)
-    const ajustada = !!w && data.transactions.some((t) => t.walletId === w.id && t.imp?.startsWith('mp:ajuste:'))
-    if (!ajustada) {
-      // o Mercado Pago é a carteira principal: nasce sozinha e o saldo dela passa a ser o total do Mercado Pago (uma vez só).
-      // Cobre quem configurou antes da carteira existir ou sem ter passado pela janela de valores.
-      if (!reparou.current) {
-        reparou.current = true
-        ajustarCarteira(data, configured, configured)
-      }
-      return
-    }
-    const novas = mpNewTransactions(configured.lancar, w.id, data.transactions)
-    if (novas.length) commit((api) => api.transactions.push(...novas))
-  }, [configured, data, canCreate])
+    if (!w) return
+    if (data.transactions.some((t) => (t.walletId === w.id || t.toWalletId === w.id) && !t.imp?.startsWith('mp:'))) return
+    commit((api) => removeWallet(api, w.id))
+  }, [data, canCreate])
 
   // de vez em quando pergunta se o saldo bate com o app (passou um dia da última confirmação e não foi dispensado há pouco)
   const confAt = configured?.conferencia?.at
@@ -416,21 +402,6 @@ function Conferencia({ c, money }: { c: MpConferencia; money: (v: number) => str
   )
 }
 
-// a carteira Mercado Pago passa a valer o total informado: lança o que faltava entrar e cobre a diferença com um ajuste
-function ajustarCarteira(data: AppData, v: MpView, antes: MpView | null) {
-  commit((api) => {
-    let w = api.wallets.find(isMpWallet)
-    if (!w) {
-      w = { id: newId(), name: MP_WALLET, icon: 'wallet' }
-      api.wallets.push(w)
-    }
-    api.transactions.push(...mpNewTransactions(antes?.lancar ?? [], w.id, api.transactions))
-    const snap: AppData = { ...data, debts: api.debts, wallets: api.wallets, transactions: api.transactions }
-    const aj = mpAdjustment(v.total, walletBalance(snap, w.id), w.id, mpToday(), newId())
-    if (aj) api.transactions.push(aj)
-  })
-}
-
 // campo com texto fixo antes (R$) ou depois (% do CDI) do valor
 function Affix({ pre, post, className, ...props }: Omit<React.ComponentProps<'input'>, 'prefix'> & { pre?: string; post?: string }) {
   return (
@@ -457,9 +428,7 @@ function SetupForm({ mode, current, onClose, onSaved }: { mode: Modo; current: M
   // sem configuração ainda, tem que informar tudo
   const showConta = mode !== 'porquinhos' || !current
   const showPots = mode !== 'conta' || !current
-  const { botToken, result, canCreate } = useAppData()
-  // lança as entradas e saídas na carteira Mercado Pago do app (ligado na primeira vez)
-  const [lancar, setLancar] = useState(current ? current.carteira !== 'nao' : true)
+  const { botToken } = useAppData()
   const [avisos, setAvisos] = useState(current?.avisos ?? true)
   const saldoId = useId()
   const pctId = useId()
@@ -519,8 +488,7 @@ function SetupForm({ mode, current, onClose, onSaved }: { mode: Modo; current: M
     setBusy(true)
     setErr(null)
     try {
-      const v = await mpSave((u, i) => fetch(u, i), await botToken(), { saldo: s, saldoPct: sp, pots, carteira: lancar ? 'mp' : 'nao', avisos })
-      if (lancaNaCarteira(v.carteira) && canCreate && result) ajustarCarteira(result.data, v, current)
+      const v = await mpSave((u, i) => fetch(u, i), await botToken(), { saldo: s, saldoPct: sp, pots, carteira: 'nao', avisos })
       onSaved(v)
     } catch (e2) {
       setErr(botErrorText(e2))
@@ -543,15 +511,6 @@ function SetupForm({ mode, current, onClose, onSaved }: { mode: Modo; current: M
         </Field>
       </div>
       <p className="mt-5 text-xs font-medium tracking-wide text-fg-subtle uppercase">Integração</p>
-      {canCreate && (
-        <div className="mt-2">
-          <div className="flex items-center justify-between gap-4">
-            <span className="text-sm">Lançar entradas e saídas na carteira Mercado Pago do app</span>
-            <Switch checked={lancar} onChange={setLancar} label="Lançar na carteira Mercado Pago" />
-          </div>
-          <p className="mt-1 text-xs text-fg-subtle">A carteira é criada sozinha e o saldo dela passa a ser o total do Mercado Pago (conta + porquinhos). O guardado nos porquinhos não vira gasto.</p>
-        </div>
-      )}
       <div className="mt-3 flex items-center justify-between gap-4">
         <span className="text-sm">Avisar no Telegram quando entrar, sair ou for guardado</span>
         <Switch checked={avisos} onChange={setAvisos} label="Avisar no Telegram" />
