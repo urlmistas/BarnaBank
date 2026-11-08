@@ -74,10 +74,10 @@ export interface MpSave {
   avisos: boolean
 }
 
-async function call<T>(fetcher: Fetch, token: string, method: 'GET' | 'POST' | 'DELETE', body?: unknown, base = BOT_URL): Promise<T> {
+async function call<T>(fetcher: Fetch, token: string, method: 'GET' | 'POST' | 'DELETE', body?: unknown, base = BOT_URL, query = ''): Promise<T> {
   let r: Response
   try {
-    r = await fetcher(base + '/api/mpconta', {
+    r = await fetcher(base + '/api/mpconta' + query, {
       method,
       headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
       body: body === undefined ? undefined : JSON.stringify(body),
@@ -90,9 +90,9 @@ async function call<T>(fetcher: Fetch, token: string, method: 'GET' | 'POST' | '
 }
 
 /** null = esta conta não usa (rota desligada ou de outro dono); { configured: false } = ainda não configurada */
-export async function mpView(fetcher: Fetch, token: string, base?: string): Promise<MpView | { configured: false } | null> {
+export async function mpView(fetcher: Fetch, token: string, base?: string, fresh = false): Promise<MpView | { configured: false } | null> {
   try {
-    return await call<MpView | { configured: false }>(fetcher, token, 'GET', undefined, base)
+    return await call<MpView | { configured: false }>(fetcher, token, 'GET', undefined, base, fresh ? '?atualizar=1' : '')
   } catch (e) {
     if (e instanceof BotError && (e.status === 403 || e.status === 404)) return null
     throw e
@@ -102,3 +102,8 @@ export async function mpView(fetcher: Fetch, token: string, base?: string): Prom
 export const mpFind = (fetcher: Fetch, token: string, base?: string) => call<{ pots: MpFound[] }>(fetcher, token, 'POST', { acao: 'descobrir' }, base)
 export const mpSave = (fetcher: Fetch, token: string, body: MpSave, base?: string) => call<MpView>(fetcher, token, 'POST', body, base)
 export const mpRemove = (fetcher: Fetch, token: string, base?: string) => call<{ ok: boolean }>(fetcher, token, 'DELETE', undefined, base)
+
+/** o dono confirma que o saldo do app do Mercado Pago bate com a estimativa: registra a conferência de agora */
+export async function mpConfirm(fetcher: Fetch, token: string, base?: string): Promise<MpView> {
+  return call<MpView>(fetcher, token, 'POST', { acao: 'confirmar' }, base)
+}

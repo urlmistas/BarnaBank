@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Tooltip } from '@/components/ui/tooltip'
+import { useToast } from '@/components/ui/toast'
 import { Field, Modal } from '@/components/ui/modal'
 import { isMpWallet, MP_WALLET, mpAdjustment, mpNewTransactions, mpToday } from '@/lib/finance/mercadopago'
 import { walletBalance } from '@/lib/finance/wallets'
@@ -14,7 +15,7 @@ import { formatMoneyInput, maskMoney, parseMoney } from '@/lib/money-input'
 import { commit } from '@/lib/store'
 import { newId } from '@/lib/finance/mutations'
 import { Switch } from '@/pages/configuracoes/layout'
-import { mpFind, mpSave, mpView, type MpConferencia, type MpFound, type MpPot, type MpView } from '@/lib/sync/mpconta'
+import { mpConfirm, mpFind, mpSave, mpView, type MpConferencia, type MpFound, type MpPot, type MpView } from '@/lib/sync/mpconta'
 import { BOT_URL } from '@/lib/sync/telegram-link'
 import { botErrorText } from '@/lib/sync/worker'
 import type { AppData } from '@/lib/types'
@@ -53,6 +54,11 @@ const whenRel = (iso: string) => {
 type Modo = 'conta' | 'porquinhos' | 'tudo'
 const HOVER = 'hover:bg-fg/12'
 
+// pergunta se o saldo bate: depois de 1 dia sem confirmar, e no máximo de 12 em 12 horas se for dispensada
+const ASK_KEY = 'bb.mp.ask'
+const ASK_AFTER = 24 * 3600000
+const ASK_SNOOZE = 12 * 3600000
+
 const when = (iso: string) => {
   const d = new Date(iso)
   return isNaN(d.getTime()) ? '' : d.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
@@ -66,20 +72,24 @@ export function MercadoPago() {
   const [err, setErr] = useState<string | null>(null)
   const [dlg, setDlg] = useState<Modo | null>(null)
   const [all, setAll] = useState(false)
+  const toast = useToast()
+  const [respondida, setRespondida] = useState(false)
+  const [asking, setAsking] = useState(false)
 
   const fetcher = useCallback((url: string, init?: RequestInit) => fetch(url, init), [])
   const load = useCallback(async () => {
     setBusy(true)
     setErr(null)
     try {
-      setView(await mpView(fetcher, await botToken()))
+      setView(await mpView(fetcher, await botToken(), undefined, true))
+      toast.show('Dados atualizados!')
     } catch (e) {
       setErr(botErrorText(e))
       setView((v) => v ?? null)
     } finally {
       setBusy(false)
     }
-  }, [botToken, fetcher])
+  }, [botToken, fetcher, toast])
 
   // ao abrir (e ao entrar na conta): busca o estado
   useEffect(() => {
@@ -117,6 +127,39 @@ export function MercadoPago() {
     const novas = mpNewTransactions(configured.lancar, w.id, data.transactions)
     if (novas.length) commit((api) => api.transactions.push(...novas))
   }, [configured, data, canCreate])
+
+  // de vez em quando pergunta se o saldo bate com o app (passou um dia da última confirmação e não foi dispensado há pouco)
+  const confAt = configured?.conferencia?.at
+  const [dispensadoEm, setDispensadoEm] = useState(() => {
+    try {
+      return Number(localStorage.getItem(ASK_KEY)) || 0
+    } catch {
+      return 0 // sem armazenamento: pergunta mesmo assim
+    }
+  })
+  const [agora] = useState(() => Date.now())
+  const ask = !!confAt && agora - Date.parse(confAt) > ASK_AFTER && agora - dispensadoEm > ASK_SNOOZE && !respondida
+  const dismissAsk = () => {
+    const t = Date.now()
+    try {
+      localStorage.setItem(ASK_KEY, String(t))
+    } catch {
+      /* ignora */
+    }
+    setDispensadoEm(t)
+  }
+  const confirmAsk = async () => {
+    setAsking(true)
+    try {
+      setView(await mpConfirm(fetcher, await botToken()))
+      setRespondida(true)
+      toast.show('Saldo confirmado!')
+    } catch (e) {
+      toast.show(botErrorText(e))
+    } finally {
+      setAsking(false)
+    }
+  }
 
   if (!BOT_URL || !loggedIn || view === null) return null
   // view undefined = ainda buscando no bot: mostra o esqueleto do card em vez de aparecer de repente
@@ -282,6 +325,33 @@ export function MercadoPago() {
           </p>
         )}
       </CardContent>
+      <Modal open={ask && !!configured && dlg === null} onClose={dismissAsk} title="O saldo está batendo?">
+        <p className="text-sm text-fg-muted">
+          Veja no app do Mercado Pago: a conta está com <span className="num text-fg">{money(configured?.saldo ?? 0)}</span> e o total (com os porquinhos) em{' '}
+          <span className="num text-fg">{money(configured?.total ?? 0)}</span>?
+        </p>
+        <div className="mt-4 flex flex-wrap justify-end gap-2">
+          <Button type="button" variant="ghost" className="rounded-[7px]" onClick={dismissAsk} disabled={asking}>
+            Agora não
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            className="rounded-[7px]"
+            disabled={asking}
+            onClick={() => {
+              setRespondida(true)
+              setDlg('tudo')
+            }}
+          >
+            Não, ajustar valores
+          </Button>
+          <Button type="button" className="rounded-[7px]" onClick={() => void confirmAsk()} disabled={asking}>
+            {asking ? <Loader2 className="animate-spin" /> : null}
+            Sim, está batendo
+          </Button>
+        </div>
+      </Modal>
       <Modal open={dlg !== null} onClose={() => setDlg(null)} title={dlg === 'porquinhos' ? 'Porquinhos do Mercado Pago' : dlg === 'conta' ? 'Carteira Mercado Pago' : 'Configurar o Mercado Pago'}>
         <SetupForm
           mode={dlg ?? 'tudo'}

@@ -511,7 +511,8 @@ async function apiMpConta(req, url, env) {
   if (dono && dono !== w.uid) return json({error: 'forbidden'}, 403);
   if (req.method === 'GET') {
     if (!dono) return json({configured: false});
-    const st = await mpSync(env);
+    // ?atualizar=1 (botão Atualizar): busca agora, sem esperar o intervalo normal
+    const st = await mpSync(env, url.searchParams.get('atualizar') ? {min: 0} : {});
     return json(st ? visao(st) : {configured: false});
   }
   if (req.method === 'DELETE') {
@@ -527,6 +528,15 @@ async function apiMpConta(req, url, env) {
     return json({pots: descobrirPorquinhos(lista)});
   }
   if (!dono) return json({error: 'descubra os porquinhos antes'}, 409);
+  if (body.acao === 'confirmar') {
+    // o dono diz que o saldo do app bate com a estimativa: registra a conferência de agora
+    const st = await mpSync(env, {min: 0});
+    if (!st) return json({error: 'não configurado'}, 404);
+    const pots = Object.entries(st.pots || {}).map(([id, p]) => ({id, name: p.name, est: p.valor, real: p.valor}));
+    st.conferencias = [...(st.conferencias || []), {at: new Date().toISOString(), saldo: {est: st.saldo, real: st.saldo}, pots, diff: 0, total: 0}].slice(-20);
+    await putJSON(kv, MP_CONTA, st);
+    return json(visao(st));
+  }
   const saldo = mpNum(body.saldo, 1e9), saldoPct = mpNum(body.saldoPct == null ? 0 : body.saldoPct, 300);
   if (saldo === null || saldoPct === null) return json({error: 'saldo inválido'}, 400);
   const pots = {};

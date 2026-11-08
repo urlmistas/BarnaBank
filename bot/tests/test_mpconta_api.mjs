@@ -121,6 +121,17 @@ await forcar();
 assert.equal((await call('GET', 'a.a.a')).body.saldo, 50);
 assert.equal(enviadas.length, 1, 'com os avisos desligados não manda nada');
 
+// o dono confirma que o saldo bate: registra uma conferência nova, sem divergência
+const antesConf = (await call('GET', 'a.a.a')).body;
+await new Promise(r => setTimeout(r, 20));
+const okc = await call('POST', 'a.a.a', {acao: 'confirmar'});
+assert.equal(okc.status, 200);
+assert.equal(okc.body.conferencia.total, 0);
+assert.equal(okc.body.conferencia.diff, 0);
+assert.ok(Date.parse(okc.body.conferencia.at) > Date.parse(antesConf.conferencia.at), 'a hora da conferência anda');
+assert.equal(okc.body.saldo, antesConf.saldo, 'confirmar não mexe nos valores');
+assert.equal((await call('POST', 'b.b.b', {acao: 'confirmar'})).status, 403);
+
 // Mercado Pago fora do ar: devolve o último estado, sem erro
 await forcar();
 mpFora = true;
