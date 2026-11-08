@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useId, useState, type FormEvent } from 'react'
-import { BanknoteCheck, ChartNoAxesCombined, Info, PiggyBank, Loader2, Receipt, RefreshCw, Settings2, X } from 'lucide-react'
+import { BanknoteCheck, ChartNoAxesCombined, Info, PiggyBank, Loader2, Receipt, RefreshCw, Settings2, Trash } from 'lucide-react'
 import { useAppData } from '@/app/data-context'
 import { Button } from '@/components/ui/button'
 import { MercadoPagoLogo } from '@/components/mercado-pago-logo'
@@ -328,6 +328,17 @@ function ajustarCarteira(data: AppData, v: MpView, antes: MpView | null) {
   })
 }
 
+// campo com texto fixo antes (R$) ou depois (% do CDI) do valor
+function Affix({ pre, post, className, ...props }: Omit<React.ComponentProps<'input'>, 'prefix'> & { pre?: string; post?: string }) {
+  return (
+    <label className={cn('flex h-9 min-w-0 cursor-text items-center gap-1.5 rounded-sm border border-border bg-surface px-2.5 text-sm transition-colors focus-within:border-border-strong hover:border-border-strong', className)}>
+      {pre && <span className="shrink-0 text-xs text-fg-subtle">{pre}</span>}
+      <input {...props} className="h-full w-full min-w-0 bg-transparent text-fg outline-none placeholder:text-fg-subtle" />
+      {post && <span className="shrink-0 text-xs text-fg-subtle">{post}</span>}
+    </label>
+  )
+}
+
 interface Row {
   id: string
   name: string
@@ -451,22 +462,32 @@ function SetupForm({ mode, current, onClose, onSaved }: { mode: Modo; current: M
         </p>
       )}
       {rows && rows.length === 0 && <p className="mt-2 text-sm text-fg-muted">Nenhum porquinho apareceu nas suas movimentações.</p>}
-      {rows?.map((r) => (
-        <div key={r.id} className="mt-3 rounded-lg border border-border p-3">
-          <div className="text-xs text-fg-subtle">{r.porGasto > 0 ? 'Recebe ' + formatMoneyInput(r.porGasto) + ' a cada gasto' : 'Porquinho ' + r.id.slice(0, 4)}</div>
-          <div className="mt-2 grid grid-cols-2 gap-2">
-            <Input aria-label={'Nome do porquinho ' + r.id.slice(0, 4)} placeholder="Nome" value={r.name} onChange={(e) => set(r.id, { name: e.target.value })} />
-            <Input aria-label={'Valor do porquinho ' + (r.name || r.id.slice(0, 4))} inputMode="decimal" placeholder="Valor (R$)" value={r.valor} onChange={(e) => set(r.id, { valor: e.target.value })} />
+      {rows?.map((r) => {
+        const nome = r.name || r.id.slice(0, 4)
+        return (
+          <div key={r.id} className="mt-3 rounded-lg border border-border p-3">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs text-fg-subtle">{r.porGasto > 0 ? 'Recebe ' + formatMoneyInput(r.porGasto) + ' a cada gasto' : 'Porquinho ' + r.id.slice(0, 4)}</span>
+              <Tooltip label="Excluir porquinho" side="top" align="end">
+                <Button type="button" variant="ghost" size="icon" className="-mt-1 -mr-1 size-7 hover:bg-fg/12" aria-label={'Excluir o porquinho ' + nome} onClick={() => setRows((rs) => rs && rs.filter((x) => x.id !== r.id))}>
+                  <Trash />
+                </Button>
+              </Tooltip>
+            </div>
+            <div className="mt-1">
+              <label htmlFor={'nome-' + r.id} className="block text-xs font-medium text-fg-muted">
+                Nome
+              </label>
+              <Input id={'nome-' + r.id} className="mt-1" placeholder="Ex.: Viagem" value={r.name} onChange={(e) => set(r.id, { name: e.target.value })} />
+            </div>
+            <div className="mt-2 grid grid-cols-[0.9fr_1fr_1.45fr] gap-2">
+              <Affix pre="R$" aria-label={'Valor do porquinho ' + nome} inputMode="decimal" placeholder="0,00" value={r.valor} onChange={(e) => set(r.id, { valor: e.target.value })} />
+              <Affix post="% do CDI" aria-label={'Rendimento do porquinho ' + nome + ' (% do CDI)'} inputMode="decimal" placeholder="120" value={r.pct} onChange={(e) => set(r.id, { pct: e.target.value })} />
+              <Affix pre="Meta R$" aria-label={'Meta do porquinho ' + nome} inputMode="decimal" placeholder="0,00" value={r.meta} onChange={(e) => set(r.id, { meta: e.target.value })} />
+            </div>
           </div>
-          <div className="mt-2 grid grid-cols-[1fr_1fr_auto] gap-2">
-            <Input aria-label={'% do CDI do porquinho ' + (r.name || r.id.slice(0, 4))} inputMode="decimal" placeholder="% do CDI" value={r.pct} onChange={(e) => set(r.id, { pct: e.target.value })} />
-            <Input aria-label={'Meta do porquinho ' + (r.name || r.id.slice(0, 4))} inputMode="decimal" placeholder="Meta (R$)" value={r.meta} onChange={(e) => set(r.id, { meta: e.target.value })} />
-            <Button type="button" variant="ghost" size="icon" aria-label={'Tirar o porquinho ' + (r.name || r.id.slice(0, 4))} onClick={() => setRows((rs) => rs && rs.filter((x) => x.id !== r.id))}>
-              <X />
-            </Button>
-          </div>
-        </div>
-      ))}
+        )
+      })}
         </>
       )}
       <p role="alert" aria-live="assertive" className="mt-3 min-h-5 text-xs text-neg">
@@ -476,8 +497,8 @@ function SetupForm({ mode, current, onClose, onSaved }: { mode: Modo; current: M
         <Button type="button" variant="ghost" onClick={onClose}>
           Cancelar
         </Button>
-        <Button type="submit" disabled={(showPots && !rows) || busy}>
-          {busy ? 'Salvando…' : 'Salvar'}
+        <Button type="submit" className="rounded-[7px]" disabled={(showPots && !rows) || busy}>
+          {busy ? 'Salvando…' : 'Salvar alterações'}
         </Button>
       </div>
     </form>
