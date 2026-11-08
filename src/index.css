@@ -327,10 +327,10 @@ dialog[open]::backdrop {
     transform: scale(1);
   }
   35% {
-    transform: scale(0.9);
+    transform: scale(0.97);
   }
   70% {
-    transform: scale(1.07);
+    transform: scale(1.02);
   }
   100% {
     transform: scale(1);
