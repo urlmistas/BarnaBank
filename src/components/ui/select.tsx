@@ -14,6 +14,8 @@ export interface SelectOption<T extends string> {
 interface Place {
   /** onde a lista é desenhada: o <dialog> aberto que contém o campo, ou o body */
   host: Element
+  /** true = dentro de um <dialog>: lá o `fixed` vira relativo ao diálogo (o blur do fundo cria esse bloco), então a lista usa `absolute` */
+  abs: boolean
   left: number
   width: number
   top?: number
@@ -70,14 +72,27 @@ export function Select<T extends string>({
   React.useLayoutEffect(() => {
     if (!open || !btn.current) return
     const r = btn.current.getBoundingClientRect()
-    const host = btn.current.closest('dialog') ?? document.body
+    const dlg = btn.current.closest('dialog')
+    const host: Element = dlg ?? document.body
     const below = window.innerHeight - r.bottom - GAP - 8
     const above = r.top - GAP - 8
     const up = below < Math.min(MAX_LIST, options.length * 36 + 8) && above > below
+    if (dlg) {
+      // coordenadas dentro do diálogo (que rola junto com a lista)
+      const h = dlg.getBoundingClientRect()
+      const left = r.left - h.left - dlg.clientLeft
+      const top = r.top - h.top - dlg.clientTop + dlg.scrollTop
+      setPlace(
+        up
+          ? { host, abs: true, left, width: r.width, bottom: dlg.clientHeight - top + GAP, maxHeight: Math.min(MAX_LIST, above) }
+          : { host, abs: true, left, width: r.width, top: top + r.height + GAP, maxHeight: Math.min(MAX_LIST, below) },
+      )
+      return
+    }
     setPlace(
       up
-        ? { host, left: r.left, width: r.width, bottom: window.innerHeight - r.top + GAP, maxHeight: Math.min(MAX_LIST, above) }
-        : { host, left: r.left, width: r.width, top: r.bottom + GAP, maxHeight: Math.min(MAX_LIST, below) },
+        ? { host, abs: false, left: r.left, width: r.width, bottom: window.innerHeight - r.top + GAP, maxHeight: Math.min(MAX_LIST, above) }
+        : { host, abs: false, left: r.left, width: r.width, top: r.bottom + GAP, maxHeight: Math.min(MAX_LIST, below) },
     )
   }, [open, options.length])
 
@@ -191,7 +206,7 @@ export function Select<T extends string>({
             ref={list}
             id={listId}
             role="listbox"
-            style={{ position: 'fixed', left: place.left, width: place.width, top: place.top, bottom: place.bottom, maxHeight: place.maxHeight }}
+            style={{ position: place.abs ? 'absolute' : 'fixed', left: place.left, width: place.width, top: place.top, bottom: place.bottom, maxHeight: place.maxHeight }}
             className="bb-pop z-[100] overflow-y-auto overscroll-contain rounded-md border border-border-strong bg-surface p-1 shadow-lg"
           >
             {options.map((o, i) => (
