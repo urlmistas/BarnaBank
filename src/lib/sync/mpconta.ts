@@ -2,14 +2,14 @@ import type { Fetch } from '@/lib/cloud'
 import { BOT_URL } from './telegram-link'
 import { BotError } from './worker'
 
-// Conta Mercado Pago (rota /api/mpconta do bot): saldo e caixinhas estimados pelas movimentações.
+// Conta Mercado Pago (rota /api/mpconta do bot): saldo e porquinhos estimados pelas movimentações.
 // Só o dono da conta enxerga; para os outros a rota responde 403/404 e a tela some.
 
 export interface MpPot {
   id: string
   name: string
   valor: number
-  /** % do CDI que a caixinha rende */
+  /** % do CDI que o porquinho rende */
   pct: number
 }
 
@@ -42,7 +42,7 @@ export interface MpFound {
   id: string
   movimentos: number
   ultimo: string
-  /** valor que a caixinha recebe a cada gasto (0 = não recebe) */
+  /** valor que o porquinho recebe a cada gasto (0 = não recebe) */
   porGasto: number
 }
 

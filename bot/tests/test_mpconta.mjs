@@ -1,7 +1,7 @@
-// Conta Mercado Pago: saldo e caixinhas estimados pelas movimentações. Formatos copiados de respostas reais da API.
+// Conta Mercado Pago: saldo e porquinhos estimados pelas movimentações. Formatos copiados de respostas reais da API.
 // Uso: node bot/tests/test_mpconta.mjs
 import assert from 'node:assert/strict';
-import {efeito, estadoNovo, aplicar, rendimento, visao, descobrirCaixinhas, lerCdi} from '../mpconta.mjs';
+import {efeito, estadoNovo, aplicar, rendimento, visao, descobrirPorquinhos, lerCdi} from '../mpconta.mjs';
 
 const ME = 1000;
 const DG = 'b9b9156a-4fa7-495b-9d8d-7c3230cba756'; // recebe R$ 3 a cada gasto
@@ -22,12 +22,12 @@ assert.equal(efeito(pag({transaction_amount: 0, operation_type: 'card_validation
 assert.equal(efeito(pag({operation_type: 'account_fund', collector_id: ME, payment_type_id: 'credit_card', transaction_amount: 14.14}), ME).b, 14.14);
 assert.ok(efeito(pag({operation_type: 'money_exchange', collector_id: ME}), ME).ignorar);
 const g3 = efeito(pot(DG, '0_2', 3), ME);
-assert.deepEqual([g3.b, g3.pot, g3.tipo], [-3, {id: DG, v: 3}, 'guardar'], 'guardar ao pagar: sai da conta, entra na caixinha');
+assert.deepEqual([g3.b, g3.pot, g3.tipo], [-3, {id: DG, v: 3}, 'guardar'], 'guardar ao pagar: sai da conta, entra na porquinho');
 const fund = efeito(pot(DG, 'fund_manual', 2000), ME);
 assert.deepEqual([fund.b, fund.pot.v, fund.tipo], [-2000, 2000, 'guardado']);
 const tira = efeito(pot(DG, 'withdraw_manual', 2000), ME);
 assert.deepEqual([tira.b, tira.pot.v, tira.tipo], [2000, -2000, 'resgate']);
-assert.equal(efeito(pot(DG, '1_0', 40), ME).b, 40, '1_0 = tirou da caixinha');
+assert.equal(efeito(pot(DG, '1_0', 40), ME).b, 40, '1_0 = tirou do porquinho');
 assert.equal(efeito(pot(DG, '0_0', 50), ME).b, -50, '0_0 = guardou');
 assert.ok(efeito(pot(DG, 'novo', 5), ME).ignorar, 'formato desconhecido não mexe no saldo');
 assert.ok(efeito(pag({operation_type: 'partition_transfer', collector_id: ME, external_reference: 'xyz'}), ME).ignorar);
@@ -57,11 +57,11 @@ assert.equal(st.saldo, 120, 'pagamento estornado devolve o valor');
 aplicar(st, [{...saida, status: 'refunded'}], ME);
 assert.equal(st.saldo, 120, 'estorno repetido não devolve de novo');
 
-// caixinha nova que o estado não conhecia aparece com nome provisório
+// porquinho nova que o estado não conhecia aparece com nome provisório
 const nova = pot('d033f47f-330d-45a6-8890-3d429a2702bf', '0_0', 20, '2026-11-07T12:00:00.000-04:00');
 aplicar(st, [nova], ME);
 assert.equal(st.pots['d033f47f-330d-45a6-8890-3d429a2702bf'].valor, 20);
-assert.equal(st.pots['d033f47f-330d-45a6-8890-3d429a2702bf'].name, 'Caixinha d033');
+assert.equal(st.pots['d033f47f-330d-45a6-8890-3d429a2702bf'].name, 'Porquinho d033');
 
 // ---- rendimento: 120% do CDI nos dias úteis depois da última vez
 const r = estadoNovo({agora, hoje: '2026-11-07', saldo: 0, pots: {[DG]: {name: 'D', valor: 1000, pct: 120}}});
@@ -78,9 +78,9 @@ assert.equal(s0.saldo, 100, 'saldo da conta só rende se o dono ligar');
 // ---- CDI do Banco Central
 assert.deepEqual(lerCdi([{data: '10/11/2026', valor: '0.055131'}, {data: 'x', valor: '1'}, {data: '11/11/2026', valor: 'abc'}]), [{date: '2026-11-10', pct: 0.055131}]);
 
-// ---- descoberta das caixinhas no histórico
+// ---- descoberta dos porquinhos no histórico
 const hist = [pot(DG, '0_2', 3, '2026-11-06T10:00:00.000-04:00'), pot(DG, '0_2', 3, '2026-11-06T12:00:00.000-04:00'), pot(DG, 'fund_manual', 2000, '2026-02-06T10:00:00.000-04:00'), pot(EM, '0_2', 2, '2026-11-06T12:00:00.000-04:00')];
-const d = descobrirCaixinhas(hist);
+const d = descobrirPorquinhos(hist);
 assert.equal(d.find(x => x.id === DG).porGasto, 3);
 assert.equal(d.find(x => x.id === EM).porGasto, 2);
 

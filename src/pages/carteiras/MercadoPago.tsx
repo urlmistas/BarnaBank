@@ -11,13 +11,13 @@ import { mpFind, mpSave, mpView, type MpFound, type MpPot, type MpView } from '@
 import { BOT_URL } from '@/lib/sync/telegram-link'
 import { botErrorText } from '@/lib/sync/worker'
 import { cn } from '@/lib/utils'
-import viagem from '@/assets/caixinhas/viagem.webp'
-import emergencia from '@/assets/caixinhas/emergencia.webp'
+import viagem from '@/assets/porquinhos/viagem.webp'
+import emergencia from '@/assets/porquinhos/emergencia.webp'
 
-// Mercado Pago: saldo e caixinhas estimados. O Mercado Pago não entrega saldo nem rendimento, então o dono
+// Mercado Pago: saldo e porquinhos estimados. O Mercado Pago não entrega saldo nem rendimento, então o dono
 // informa os valores de hoje e o bot acompanha as movimentações novas e o CDI. Só aparece para o dono.
 
-// ícone da caixinha pelo nome (sem acento e sem maiúscula); as outras ficam sem ícone
+// ícone do porquinho pelo nome (sem acento e sem maiúscula); os outros ficam sem ícone
 const potIcon = (name: string): string | undefined => {
   const n = name.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
   if (/deutsch|viagem|travel|alemanha/.test(n)) return viagem
@@ -94,21 +94,34 @@ export function MercadoPago() {
       <CardContent>
         {!configured ? (
           <div>
-            <p className="text-sm text-fg-muted">Acompanhe o saldo e as caixinhas da sua conta Mercado Pago. Você informa os valores de hoje e o bot confere as movimentações novas.</p>
+            <p className="text-sm text-fg-muted">Acompanhe o saldo e os porquinhos da sua conta Mercado Pago. Você informa os valores de hoje e o bot confere as movimentações novas.</p>
             <Button className="mt-3" size="sm" onClick={() => setDlg(true)}>
               Configurar
             </Button>
           </div>
         ) : (
           <div>
-            <p className="text-xs text-fg-muted">Estimado · conta + caixinhas</p>
-            <p className="num mt-1 text-3xl font-semibold tracking-tight">{money(configured.total)}</p>
-            <ul className="mt-4 divide-y divide-border text-sm">
-              <Line label="Conta" value={money(configured.saldo)} hint={configured.saldoPct > 0 ? configured.saldoPct + '% do CDI' : undefined} />
-              {configured.pots.map((p) => (
-                <Line key={p.id} icon={potIcon(p.name)} label={p.name} value={money(p.valor)} hint={p.pct > 0 ? p.pct + '% do CDI' : undefined} />
-              ))}
-            </ul>
+            <p className="text-xs text-fg-muted">
+              Total estimado <span className="num text-fg">{money(configured.total)}</span>
+            </p>
+            <div className="mt-3 grid gap-3 md:grid-cols-2">
+              <section aria-label="Conta" className="rounded-lg border border-border p-4">
+                <p className="text-xs font-medium tracking-wide text-fg-subtle uppercase">Conta · saldo livre</p>
+                <p className="num mt-2 text-3xl font-semibold tracking-tight">{money(configured.saldo)}</p>
+                {configured.saldoPct > 0 && <p className="mt-1 text-xs text-fg-subtle">{configured.saldoPct}% do CDI</p>}
+              </section>
+              <section aria-label="Porquinhos" className="rounded-lg border border-border p-4">
+                <p className="text-xs font-medium tracking-wide text-fg-subtle uppercase">Guardado nos porquinhos</p>
+                <p className="num mt-2 text-3xl font-semibold tracking-tight">{money(configured.pots.reduce((sum, p) => sum + p.valor, 0))}</p>
+                {configured.pots.length > 0 && (
+                  <ul className="mt-3 divide-y divide-border text-sm">
+                    {configured.pots.map((p) => (
+                      <Line key={p.id} icon={potIcon(p.name)} label={p.name} value={money(p.valor)} hint={p.pct > 0 ? p.pct + '% do CDI' : undefined} />
+                    ))}
+                  </ul>
+                )}
+              </section>
+            </div>
             {configured.movs.length > 0 && (
               <div className="mt-4">
                 <p className="text-xs font-medium tracking-wide text-fg-subtle uppercase">Últimas movimentações</p>
@@ -117,7 +130,7 @@ export function MercadoPago() {
                     <li key={m.id} className="flex items-center justify-between gap-3 py-2">
                       <span className="min-w-0 truncate">
                         {m.label}
-                        {m.pot && <span className="text-fg-subtle"> · {configured.pots.find((p) => p.id === m.pot)?.name ?? 'caixinha'}</span>}
+                        {m.pot && <span className="text-fg-subtle"> · {configured.pots.find((p) => p.id === m.pot)?.name ?? 'porquinho'}</span>}
                         <span className="text-fg-subtle"> · {when(m.at)}</span>
                       </span>
                       <span className={cn('num shrink-0', m.sinal > 0 && 'text-pos', m.sinal < 0 && 'text-fg-muted')}>{(m.sinal > 0 ? '+' : m.sinal < 0 ? '−' : '') + money(m.valor)}</span>
@@ -161,9 +174,9 @@ export function MercadoPago() {
 
 function Line({ label, value, hint, icon }: { label: string; value: string; hint?: string; icon?: string }) {
   return (
-    <li className="flex items-center justify-between gap-3 py-2">
-      <span className="flex min-w-0 items-center gap-3">
-        {icon && <img src={icon} alt="" aria-hidden="true" className="size-10 shrink-0 object-contain" />}
+    <li className="flex items-center justify-between gap-3 py-1.5">
+      <span className="flex min-w-0 items-center gap-2.5">
+        {icon && <img src={icon} alt="" aria-hidden="true" className="size-7 shrink-0 object-contain" />}
         <span className="min-w-0 truncate">
           {label}
           {hint && <span className="text-fg-subtle"> · {hint}</span>}
@@ -192,7 +205,7 @@ function SetupForm({ current, onClose, onSaved }: { current: MpView | null; onCl
   const [err, setErr] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
-  // as caixinhas vêm do histórico do Mercado Pago; as que já têm nome mantêm o nome e o rendimento
+  // os porquinhos vêm do histórico do Mercado Pago; os que já têm nome mantêm o nome e o rendimento
   useEffect(() => {
     let live = true
     void (async () => {
@@ -200,7 +213,7 @@ function SetupForm({ current, onClose, onSaved }: { current: MpView | null; onCl
         const { pots } = await mpFind((u, i) => fetch(u, i), await botToken())
         if (!live) return
         const known = new Map<string, MpPot>((current?.pots ?? []).map((p) => [p.id, p]))
-        // caixinha antiga, parada e que você não usa mais não precisa aparecer (dá para tirar qualquer uma no X)
+        // porquinho antigo, parado e que você não usa mais não precisa aparecer (dá para tirar qualquer um no X)
         const recente = Date.now() - 60 * 86400000
         const ids = new Set([...pots.filter((p) => p.porGasto > 0 || Date.parse(p.ultimo) > recente).map((p) => p.id), ...known.keys()])
         const found = new Map<string, MpFound>(pots.map((p) => [p.id, p]))
@@ -230,9 +243,9 @@ function SetupForm({ current, onClose, onSaved }: { current: MpView | null; onCl
     for (const r of rows) {
       const v = parseMoney(r.valor)
       const pct = Number(r.pct.replace(',', '.'))
-      if (isNaN(v)) return setErr('Informe o valor de cada caixinha (ou 0).')
-      if (!isFinite(pct) || pct < 0 || pct > 300) return setErr('Rendimento da caixinha: de 0 a 300% do CDI.')
-      pots[r.id] = { name: r.name.trim() || 'Caixinha ' + r.id.slice(0, 4), valor: v, pct }
+      if (isNaN(v)) return setErr('Informe o valor de cada porquinho (ou 0).')
+      if (!isFinite(pct) || pct < 0 || pct > 300) return setErr('Rendimento do porquinho: de 0 a 300% do CDI.')
+      pots[r.id] = { name: r.name.trim() || 'Porquinho ' + r.id.slice(0, 4), valor: v, pct }
     }
     setBusy(true)
     setErr(null)
@@ -256,20 +269,20 @@ function SetupForm({ current, onClose, onSaved }: { current: MpView | null; onCl
           <Input id={pctId} inputMode="decimal" value={saldoPct} onChange={(e) => setSaldoPct(e.target.value)} />
         </Field>
       </div>
-      <p className="mt-5 text-xs font-medium tracking-wide text-fg-subtle uppercase">Caixinhas</p>
+      <p className="mt-5 text-xs font-medium tracking-wide text-fg-subtle uppercase">Porquinhos</p>
       {!rows && !err && (
         <p className="mt-3 flex items-center gap-2 text-sm text-fg-muted">
-          <Loader2 className="size-4 animate-spin" aria-hidden="true" /> Procurando suas caixinhas…
+          <Loader2 className="size-4 animate-spin" aria-hidden="true" /> Procurando seus porquinhos…
         </p>
       )}
-      {rows && rows.length === 0 && <p className="mt-2 text-sm text-fg-muted">Nenhuma caixinha apareceu nas suas movimentações.</p>}
+      {rows && rows.length === 0 && <p className="mt-2 text-sm text-fg-muted">Nenhum porquinho apareceu nas suas movimentações.</p>}
       {rows?.map((r) => (
         <div key={r.id} className="mt-3 grid grid-cols-[1fr_1fr_72px_auto] gap-2">
-          <div className="col-span-4 text-xs text-fg-subtle">{r.porGasto > 0 ? 'Recebe ' + formatMoneyInput(r.porGasto) + ' a cada gasto' : 'Caixinha ' + r.id.slice(0, 4)}</div>
-          <Input aria-label={'Nome da caixinha ' + r.id.slice(0, 4)} placeholder="Nome" value={r.name} onChange={(e) => set(r.id, { name: e.target.value })} />
-          <Input aria-label={'Valor da caixinha ' + (r.name || r.id.slice(0, 4))} inputMode="decimal" placeholder="Valor" value={r.valor} onChange={(e) => set(r.id, { valor: e.target.value })} />
-          <Input aria-label={'% do CDI da caixinha ' + (r.name || r.id.slice(0, 4))} inputMode="decimal" value={r.pct} onChange={(e) => set(r.id, { pct: e.target.value })} />
-          <Button type="button" variant="ghost" size="icon" aria-label={'Tirar a caixinha ' + (r.name || r.id.slice(0, 4))} onClick={() => setRows((rs) => rs && rs.filter((x) => x.id !== r.id))}>
+          <div className="col-span-4 text-xs text-fg-subtle">{r.porGasto > 0 ? 'Recebe ' + formatMoneyInput(r.porGasto) + ' a cada gasto' : 'Porquinho ' + r.id.slice(0, 4)}</div>
+          <Input aria-label={'Nome do porquinho ' + r.id.slice(0, 4)} placeholder="Nome" value={r.name} onChange={(e) => set(r.id, { name: e.target.value })} />
+          <Input aria-label={'Valor do porquinho ' + (r.name || r.id.slice(0, 4))} inputMode="decimal" placeholder="Valor" value={r.valor} onChange={(e) => set(r.id, { valor: e.target.value })} />
+          <Input aria-label={'% do CDI do porquinho ' + (r.name || r.id.slice(0, 4))} inputMode="decimal" value={r.pct} onChange={(e) => set(r.id, { pct: e.target.value })} />
+          <Button type="button" variant="ghost" size="icon" aria-label={'Tirar o porquinho ' + (r.name || r.id.slice(0, 4))} onClick={() => setRows((rs) => rs && rs.filter((x) => x.id !== r.id))}>
             <X />
           </Button>
         </div>

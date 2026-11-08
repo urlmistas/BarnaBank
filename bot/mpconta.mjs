@@ -1,12 +1,12 @@
-// Conta Mercado Pago: saldo e caixinhas estimados a partir das movimentações que a API devolve.
+// Conta Mercado Pago: saldo e porquinhos estimados a partir das movimentações que a API devolve.
 // Funções puras e sem estado: o worker.js só busca os pagamentos, o CDI e grava o resultado.
 //
-// A API não entrega saldo nem rendimento. O dono informa o saldo e as caixinhas num ponto de partida (a "âncora");
-// dali em diante o que entra na conta, o que sai e o que vai para as caixinhas vem dos pagamentos, e o rendimento
-// vem do CDI (série 12 do Banco Central) vezes a porcentagem de cada caixinha.
+// A API não entrega saldo nem rendimento. O dono informa o saldo e os porquinhos num ponto de partida (a "âncora");
+// dali em diante o que entra na conta, o que sai e o que vai para os porquinhos vem dos pagamentos, e o rendimento
+// vem do CDI (série 12 do Banco Central) vezes a porcentagem de cada porquinho.
 //
 // Como o Mercado Pago descreve cada movimentação (conferido nas respostas reais de /v1/payments/search):
-//  - partition_transfer, external_reference "POTS<n>_<id da caixinha>_<código>_<resto>": dinheiro entre a conta e uma caixinha.
+//  - partition_transfer, external_reference "POTS<n>_<id do porquinho>_<código>_<resto>": dinheiro entre a conta e um porquinho.
 //    "<resto>" é "fund_manual" / "withdraw_manual" (aporte e resgate à mão) ou "<0|1>_<n>": 0 = guardou, 1 = tirou;
 //    n = 2 é o "Guardar ao pagar" (os R$ 3 e R$ 2 por gasto). Os valores 0/1 foram deduzidos dos pares de dados reais;
 //    se aparecer outro formato, a movimentação vai para "ignoradas" em vez de mexer no saldo.
@@ -32,13 +32,13 @@ export function efeito(p, me) {
 
   if (op === 'partition_transfer') {
     const m = POT_REF.exec(String(p.external_reference || ''));
-    if (!m) return {ignorar: 'caixinha sem identificação'};
+    if (!m) return {ignorar: 'porquinho sem identificação'};
     const resto = m[2];
     const fim = /(?:^|_)(0|1)_(\d)$/.exec(resto); // ...<código>_<0|1>_<n>
     const auto = !!fim && fim[2] === '2';
-    if (/(?:^|_)fund_manual$/.test(resto) || (fim && fim[1] === '0')) return {b: -valor, pot: {id: m[1].toLowerCase(), v: valor}, tipo: auto ? 'guardar' : 'guardado', label: auto ? 'Guardar ao pagar' : 'Guardado na caixinha'};
-    if (/(?:^|_)withdraw_manual$/.test(resto) || (fim && fim[1] === '1')) return {b: valor, pot: {id: m[1].toLowerCase(), v: -valor}, tipo: 'resgate', label: 'Tirado da caixinha'};
-    return {ignorar: 'movimento de caixinha em formato novo (' + resto + ')'};
+    if (/(?:^|_)fund_manual$/.test(resto) || (fim && fim[1] === '0')) return {b: -valor, pot: {id: m[1].toLowerCase(), v: valor}, tipo: auto ? 'guardar' : 'guardado', label: auto ? 'Guardar ao pagar' : 'Guardado na porquinho'};
+    if (/(?:^|_)withdraw_manual$/.test(resto) || (fim && fim[1] === '1')) return {b: valor, pot: {id: m[1].toLowerCase(), v: -valor}, tipo: 'resgate', label: 'Tirado do porquinho'};
+    return {ignorar: 'movimento de porquinho em formato novo (' + resto + ')'};
   }
   if (op === 'account_fund') return {b: valor, tipo: 'aporte', label: 'Dinheiro colocado na conta'};
   if (op === 'money_exchange' || op === 'card_validation') return {ignorar: op};
@@ -61,7 +61,7 @@ export function estadoNovo({agora, hoje, saldo, saldoPct = 0, pots = {}}) {
   const ps = {};
   for (const id of Object.keys(pots)) {
     const x = pots[id] || {};
-    ps[id.toLowerCase()] = {name: String(x.name || 'Caixinha').slice(0, 40), valor: dois(x.valor), pct: Math.max(0, Math.min(300, Number(x.pct) || 0))};
+    ps[id.toLowerCase()] = {name: String(x.name || 'Porquinho').slice(0, 40), valor: dois(x.valor), pct: Math.max(0, Math.min(300, Number(x.pct) || 0))};
   }
   return {anchor: agora.toISOString(), yieldDate: hoje, saldo: dois(saldo), saldoPct: Math.max(0, Math.min(300, Number(saldoPct) || 0)), pots: ps, seen: {}, movs: [], ignoradas: [], syncedAt: null};
 }
@@ -85,7 +85,7 @@ export function aplicar(st, pagamentos, me) {
     for (const pid of ids) {
       const dp = dois((potSoma(novo)[pid] || 0) - (potSoma(velho)[pid] || 0));
       if (!dp) continue;
-      if (!st.pots[pid]) st.pots[pid] = {name: 'Caixinha ' + pid.slice(0, 4), valor: 0, pct: 120};
+      if (!st.pots[pid]) st.pots[pid] = {name: 'Porquinho ' + pid.slice(0, 4), valor: 0, pct: 120};
       st.pots[pid].valor = dois(st.pots[pid].valor + dp);
     }
     st.seen[id] = novo;
@@ -97,7 +97,7 @@ export function aplicar(st, pagamentos, me) {
   return st;
 }
 
-// rendimento: para cada dia útil do CDI depois da última vez, saldo e caixinhas crescem pct% do CDI do dia
+// rendimento: para cada dia útil do CDI depois da última vez, saldo e porquinhos crescem pct% do CDI do dia
 // serie: [{date:'AAAA-MM-DD', pct: CDI do dia em %}] (ex.: 0.055131)
 export function rendimento(st, serie) {
   const dias = (serie || []).filter(d => d && d.date > st.yieldDate && Number.isFinite(d.pct)).sort((a, b) => a.date < b.date ? -1 : 1);
@@ -120,8 +120,8 @@ export function visao(st) {
   };
 }
 
-// caixinhas que aparecem no histórico (para o dono dar nome e valor na primeira vez)
-export function descobrirCaixinhas(pagamentos) {
+// porquinhos que aparecem no histórico (para o dono dar nome e valor na primeira vez)
+export function descobrirPorquinhos(pagamentos) {
   const mapa = {};
   for (const p of pagamentos || []) {
     if (!p || p.operation_type !== 'partition_transfer' || p.status !== 'approved') continue;

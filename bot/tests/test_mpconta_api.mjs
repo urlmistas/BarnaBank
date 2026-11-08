@@ -53,7 +53,7 @@ assert.deepEqual((await call('GET', 'a.a.a')).body, {configured: false});
 // salvar sem descobrir antes não vale (ainda não há dono)
 assert.equal((await call('POST', 'a.a.a', {saldo: 1, pots: {}})).status, 409);
 
-// histórico antigo: o dono "descobre" as caixinhas e a primeira conta que pedir vira a dona
+// histórico antigo: o dono "descobre" os porquinhos e a primeira conta que pedir vira a dona
 pagamentos = [pot(DG, '0_2', 3, '2026-11-01T10:00:00.000-04:00'), pot(EM, '0_2', 2, '2026-11-01T10:00:00.000-04:00')];
 const desc = await call('POST', 'a.a.a', {acao: 'descobrir'});
 assert.equal(desc.status, 200);

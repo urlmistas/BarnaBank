@@ -1,7 +1,7 @@
 import {pixCode, qrSvg, qrPng} from './pix.mjs';
 import {getEngine} from './engine.js';
 import {criarPix, criarPreferenciaCartao, taxaCartao, valorCartao, buscarPagamento, assinaturaOk, montarRef, lerRef, MP_API} from './mercadopago.mjs';
-import {estadoNovo, aplicar, rendimento, visao, descobrirCaixinhas, lerCdi} from './mpconta.mjs';
+import {estadoNovo, aplicar, rendimento, visao, descobrirPorquinhos, lerCdi} from './mpconta.mjs';
 // BarnaBank: bot do Telegram + nuvem para sincronizar o app.
 // Roda como Cloudflare Worker. Precisa de:
 //   KV "BB" (os dados), segredos TELEGRAM_TOKEN e SYNC_KEY.
@@ -433,7 +433,7 @@ async function mpHook(req, env, url) {
   }
   return json({ok: true});
 }
-// ---------------------------------------------------------------- conta Mercado Pago (saldo e caixinhas estimados)
+// ---------------------------------------------------------------- conta Mercado Pago (saldo e porquinhos estimados)
 // Só o dono (a conta que configurou primeiro) vê: o token é o da conta dele. Estado inteiro em uma chave do KV raiz.
 const MP_CONTA = 'mpconta', MP_CONTA_DONO = 'mpconta:owner';
 async function mpGet(env, path) {
@@ -506,15 +506,15 @@ async function apiMpConta(req, url, env) {
     if (!dono) await kv.BB.put(MP_CONTA_DONO, w.uid);
     const lista = await mpPagamentos(env, 365);
     if (!lista) return json({error: 'Mercado Pago não respondeu'}, 502);
-    return json({pots: descobrirCaixinhas(lista)});
+    return json({pots: descobrirPorquinhos(lista)});
   }
-  if (!dono) return json({error: 'descubra as caixinhas antes'}, 409);
+  if (!dono) return json({error: 'descubra os porquinhos antes'}, 409);
   const saldo = mpNum(body.saldo, 1e9), saldoPct = mpNum(body.saldoPct == null ? 0 : body.saldoPct, 300);
   if (saldo === null || saldoPct === null) return json({error: 'saldo inválido'}, 400);
   const pots = {};
   for (const [id, p] of Object.entries(body.pots && typeof body.pots === 'object' ? body.pots : {})) {
     const valor = mpNum(p && p.valor, 1e9), pct = mpNum(p && p.pct == null ? 120 : p.pct, 300);
-    if (!/^[0-9a-f-]{36}$/i.test(id) || valor === null || pct === null) return json({error: 'caixinha inválida'}, 400);
+    if (!/^[0-9a-f-]{36}$/i.test(id) || valor === null || pct === null) return json({error: 'porquinho inválido'}, 400);
     pots[id] = {name: p.name, valor, pct};
   }
   const eu = await mpGet(env, '/users/me');
