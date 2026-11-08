@@ -154,7 +154,7 @@ export function PeopleList({
       {shown.length === 0 ? (
         <NoResults filter={filter} query={query} counts={counts} onFilter={onFilter} onQuery={onQuery} />
       ) : (
-        <ul ref={listRef} onKeyDown={onListKey} aria-label="Pessoas" className="mt-4 overflow-hidden rounded-lg border border-border bg-surface">
+        <ul ref={listRef} onKeyDown={onListKey} aria-label="Pessoas" className="mt-4 grid gap-3 sm:grid-cols-2">
           <AnimatePresence initial={false}>
             {shown.map((r) => (
               <motion.li
@@ -164,7 +164,7 @@ export function PeopleList({
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.16, ease: [0.2, 0, 0, 1] }}
-                className="border-b border-border last:border-b-0"
+                className="min-w-0"
               >
                 <PersonRowLink row={r} filter={filter} selected={selectedKey === r.key} href={personHref(r.key, search)} />
               </motion.li>
@@ -208,8 +208,8 @@ function PersonRowLink({ row, filter, selected, href }: { row: PersonRow; filter
       aria-current={selected ? 'page' : undefined}
       aria-label={`${row.name}, ${sub}, ${dirLabel} ${money(Math.abs(amount))}`}
       className={cn(
-        'relative flex items-center gap-3 px-4 py-3 transition-colors hover:bg-surface-2 focus-visible:bg-surface-2 focus-visible:outline-offset-[-2px]',
-        selected && 'bg-surface-2',
+        'relative flex items-center gap-3 overflow-hidden rounded-lg border border-border bg-surface px-4 py-4 transition-colors hover:border-border-strong hover:bg-surface-2 focus-visible:bg-surface-2 focus-visible:outline-offset-[-2px]',
+        selected && 'border-border-strong bg-surface-2',
         row.openCount === 0 && 'opacity-60 saturate-50 hover:opacity-100 hover:saturate-100 focus-visible:opacity-100',
       )}
     >
