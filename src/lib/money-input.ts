@@ -19,3 +19,12 @@ export function formatMoneyInput(v: number): string {
 }
 
 export const onlyDigits = (s: string) => s.replace(/\D/g, '')
+
+/** máscara ao digitar: "20000,5" → "20.000,5" (ponto nos milhares, vírgula nos centavos, no máximo 2 casas) */
+export function maskMoney(text: string): string {
+  const s = text.replace(/[^\d,]/g, '')
+  const c = s.indexOf(',')
+  const int = (c >= 0 ? s.slice(0, c) : s).replace(/,/g, '').replace(/^0+(?=\d)/, '')
+  const grouped = int.replace(/\B(?=(\d{3})+(?!\d))/g, '.')
+  return c < 0 ? grouped : grouped + ',' + s.slice(c + 1).replace(/,/g, '').slice(0, 2)
+}

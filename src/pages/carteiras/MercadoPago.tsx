@@ -9,7 +9,7 @@ import { Tooltip } from '@/components/ui/tooltip'
 import { Field, Modal } from '@/components/ui/modal'
 import { isMpWallet, MP_WALLET, mpAdjustment, mpNewTransactions, mpToday } from '@/lib/finance/mercadopago'
 import { walletBalance } from '@/lib/finance/wallets'
-import { formatMoneyInput, parseMoney } from '@/lib/money-input'
+import { formatMoneyInput, maskMoney, parseMoney } from '@/lib/money-input'
 import { commit } from '@/lib/store'
 import { newId } from '@/lib/finance/mutations'
 import { Switch } from '@/pages/configuracoes/layout'
@@ -361,7 +361,7 @@ function SetupForm({ mode, current, onClose, onSaved }: { mode: Modo; current: M
   const saldoId = useId()
   const pctId = useId()
   const [rows, setRows] = useState<Row[] | null>(null)
-  const [saldo, setSaldo] = useState(current ? formatMoneyInput(current.saldo) : '')
+  const [saldo, setSaldo] = useState(current ? maskMoney(formatMoneyInput(current.saldo)) : '')
   const [saldoPct, setSaldoPct] = useState(current ? String(current.saldoPct) : '0')
   const [err, setErr] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -382,7 +382,7 @@ function SetupForm({ mode, current, onClose, onSaved }: { mode: Modo; current: M
         setRows(
           [...ids].map((id) => {
             const k = known.get(id)
-            return { id, name: k?.name ?? '', valor: k ? formatMoneyInput(k.valor) : '', pct: String(k?.pct ?? 120), meta: k?.meta ? formatMoneyInput(k.meta) : '', porGasto: found.get(id)?.porGasto ?? 0 }
+            return { id, name: k?.name ?? '', valor: k ? maskMoney(formatMoneyInput(k.valor)) : '', pct: String(k?.pct ?? 120), meta: k?.meta ? maskMoney(formatMoneyInput(k.meta)) : '', porGasto: found.get(id)?.porGasto ?? 0 }
           }),
         )
       } catch (e) {
@@ -433,7 +433,7 @@ function SetupForm({ mode, current, onClose, onSaved }: { mode: Modo; current: M
         <>
       <div className="mt-4 grid grid-cols-[1fr_88px] gap-3">
         <Field label="Saldo da conta (R$)" htmlFor={saldoId}>
-          <Input id={saldoId} inputMode="decimal" value={saldo} onChange={(e) => setSaldo(e.target.value)} placeholder="0,00" />
+          <Input id={saldoId} inputMode="decimal" value={saldo} onChange={(e) => setSaldo(maskMoney(e.target.value))} placeholder="0,00" />
         </Field>
         <Field label="% do CDI" htmlFor={pctId}>
           <Input id={pctId} inputMode="decimal" value={saldoPct} onChange={(e) => setSaldoPct(e.target.value)} />
@@ -494,9 +494,9 @@ function SetupForm({ mode, current, onClose, onSaved }: { mode: Modo; current: M
               <Input id={'nome-' + r.id} className="mt-1" placeholder="Ex.: Viagem" value={r.name} onChange={(e) => set(r.id, { name: e.target.value })} />
             </div>
             <div className="mt-2 grid grid-cols-[0.9fr_1fr_1.45fr] gap-2">
-              <Affix pre="R$" aria-label={'Valor do porquinho ' + nome} inputMode="decimal" placeholder="0,00" value={r.valor} onChange={(e) => set(r.id, { valor: e.target.value })} />
+              <Affix pre="R$" aria-label={'Valor do porquinho ' + nome} inputMode="decimal" placeholder="0,00" value={r.valor} onChange={(e) => set(r.id, { valor: maskMoney(e.target.value) })} />
               <Affix post="% do CDI" aria-label={'Rendimento do porquinho ' + nome + ' (% do CDI)'} inputMode="decimal" placeholder="120" value={r.pct} onChange={(e) => set(r.id, { pct: e.target.value })} />
-              <Affix pre="Meta R$" aria-label={'Meta do porquinho ' + nome} inputMode="decimal" placeholder="0,00" value={r.meta} onChange={(e) => set(r.id, { meta: e.target.value })} />
+              <Affix pre="Meta R$" aria-label={'Meta do porquinho ' + nome} inputMode="decimal" placeholder="0,00" value={r.meta} onChange={(e) => set(r.id, { meta: maskMoney(e.target.value) })} />
             </div>
           </div>
         )
