@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useId, useState, type FormEvent } from 'react'
-import { ChartNoAxesCombined, Loader2, Receipt, RefreshCw, Settings2, X } from 'lucide-react'
+import { BanknoteCheck, ChartNoAxesCombined, Info, Loader2, Receipt, RefreshCw, Settings2, X } from 'lucide-react'
 import { useAppData } from '@/app/data-context'
 import { Button } from '@/components/ui/button'
 import { MercadoPagoLogo } from '@/components/mercado-pago-logo'
@@ -33,6 +33,19 @@ const potIcon = (name: string): string | undefined => {
 
 // '' = ainda não escolheu (a integração vem ligada), 'nao' = desligou de propósito, qualquer outro valor = ligada
 const lancaNaCarteira = (c: string) => !!c && c !== 'nao'
+
+// "hoje às 23:27", "ontem às 23:27" ou "07/11 às 23:27"
+const whenRel = (iso: string) => {
+  const d = new Date(iso)
+  if (isNaN(d.getTime())) return ''
+  const hm = d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+  const dia = (x: Date) => x.toDateString()
+  const hoje = new Date()
+  const ontem = new Date(hoje.getTime() - 86400000)
+  if (dia(d) === dia(hoje)) return 'hoje às ' + hm
+  if (dia(d) === dia(ontem)) return 'ontem às ' + hm
+  return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) + ' às ' + hm
+}
 
 const when = (iso: string) => {
   const d = new Date(iso)
@@ -129,9 +142,17 @@ export function MercadoPago() {
           </div>
         ) : (
           <div>
-            <p className="text-xs text-fg-muted">
-              Total estimado <span className="num text-fg">{money(configured.total)}</span>
-            </p>
+            <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
+              <p className="text-xs text-fg-muted">
+                Total estimado <span className="num text-fg">{money(configured.total)}</span>
+              </p>
+              {configured.conferencia && configured.conferencia.total < 1 && (
+                <p className="flex items-center gap-1.5 text-xs text-fg-muted">
+                  <BanknoteCheck className="size-4 shrink-0 text-pos" aria-hidden="true" />
+                  Saldo confirmado. Verificado {whenRel(configured.conferencia.at)}.
+                </p>
+              )}
+            </div>
             <div className="mt-3 grid gap-3 md:grid-cols-2">
               <section aria-label="Conta" className="rounded-lg border border-border p-4">
                 <p className="text-xs font-medium tracking-wide text-fg-subtle uppercase">Conta · saldo livre</p>
@@ -207,8 +228,9 @@ export function MercadoPago() {
             {configured.ignoradas.length > 0 && (
               <p className="mt-3 text-xs text-fg-subtle">{configured.ignoradas.length} movimentação(ões) de tipo desconhecido não entraram na conta.</p>
             )}
-            <p className="mt-3 text-xs text-fg-subtle">
-              Desde {when(configured.since)}. O rendimento usa o CDI até {configured.yieldDate.split('-').reverse().join('/')}. Valores estimados: quando o app do Mercado Pago mostrar outro número, informe de novo.
+            <p className="mt-3 flex items-center gap-1.5 text-xs text-fg-subtle">
+              <Info className="size-4 shrink-0" aria-hidden="true" />
+              Valores estimados com base no CDI. Atualize os dados se houver divergência com o app do Mercado Pago.
             </p>
           </div>
         )}
@@ -261,14 +283,15 @@ function Line({ label, value, hint, icon, progress }: { label: string; value: st
 
 // o quanto a estimativa errou na última vez que o dono informou os valores reais
 function Conferencia({ c, money }: { c: MpConferencia; money: (v: number) => string }) {
-  const bateu = c.total < 1
+  // quando bateu, a confirmação aparece na linha do total; aqui só o aviso de diferença
+  if (c.total < 1) return null
   const partes = [
     c.saldo.real !== c.saldo.est ? 'conta ' + (c.diff > 0 ? '+' : '−') + money(Math.abs(c.diff)) : '',
     ...c.pots.filter((p) => Math.abs(p.real - p.est) >= 0.01).map((p) => p.name + ' ' + (p.real > p.est ? '+' : '−') + money(Math.abs(p.real - p.est))),
   ].filter(Boolean)
   return (
-    <p className={cn('mt-3 rounded-md border px-3 py-2 text-xs', bateu ? 'border-border text-fg-muted' : 'border-neg/40 text-neg')}>
-      Conferido em {when(c.at)}: {bateu ? 'a estimativa bateu com o app do Mercado Pago.' : 'a estimativa estava errada em ' + money(c.total) + ' (' + partes.join(', ') + '). Rendimento e movimentos fora da API explicam a diferença.'}
+    <p className="mt-3 rounded-md border border-neg/40 px-3 py-2 text-xs text-neg">
+      Conferido em {when(c.at)}: a estimativa estava errada em {money(c.total)} ({partes.join(', ')}). Rendimento e movimentos fora da API explicam a diferença.
     </p>
   )
 }
