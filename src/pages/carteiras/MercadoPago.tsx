@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useId, useState, type FormEvent } from 'react'
-import { BanknoteCheck, ChartNoAxesCombined, Info, PiggyBank, Loader2, Receipt, RefreshCw, Settings2, Trash } from 'lucide-react'
+import { BanknoteCheck, ChartNoAxesCombined, Info, PiggyBank, Loader2, Plus, Receipt, RefreshCw, Settings2, Trash, Zap } from 'lucide-react'
 import { useAppData } from '@/app/data-context'
 import { Button } from '@/components/ui/button'
 import { MercadoPagoLogo } from '@/components/mercado-pago-logo'
@@ -346,6 +346,8 @@ interface Row {
   pct: string
   meta: string
   porGasto: number
+  /** criado aqui, sem ligação com um porquinho do Mercado Pago (não recebe movimentações sozinho) */
+  manual?: boolean
 }
 
 function SetupForm({ mode, current, onClose, onSaved }: { mode: Modo; current: MpView | null; onClose: () => void; onSaved: (v: MpView) => void }) {
@@ -426,7 +428,7 @@ function SetupForm({ mode, current, onClose, onSaved }: { mode: Modo; current: M
   const set = (id: string, patch: Partial<Row>) => setRows((rs) => rs && rs.map((r) => (r.id === id ? { ...r, ...patch } : r)))
   return (
     <form onSubmit={(e) => void submit(e)} className="p-5">
-      <p className="text-xs text-fg-muted">{mode === 'porquinhos' ? 'Nome, valor, rendimento e meta de cada porquinho. Digite o que o app do Mercado Pago mostra agora.' : 'Digite o que o app do Mercado Pago mostra agora. A partir daqui o bot soma o que entrar e tirar o que sair.'}</p>
+      <p className="text-xs text-fg-muted">{mode === 'porquinhos' ? 'Nome, valor, rendimento e meta de cada porquinho. Digite o que o app do Mercado Pago mostra agora, com vírgula nos centavos (ex.: 72,50).' : 'Digite o que o app do Mercado Pago mostra agora, com vírgula nos centavos (ex.: 72,50). A partir daqui o bot soma o que entrar e tirar o que sair.'}</p>
       {showConta && (
         <>
       <div className="mt-4 grid grid-cols-[1fr_88px] gap-3">
@@ -467,7 +469,18 @@ function SetupForm({ mode, current, onClose, onSaved }: { mode: Modo; current: M
         return (
           <div key={r.id} className="mt-3 rounded-lg border border-border p-3">
             <div className="flex items-center justify-between gap-2">
-              <span className="text-xs text-fg-subtle">{r.porGasto > 0 ? 'Recebe ' + formatMoneyInput(r.porGasto) + ' a cada gasto' : 'Porquinho ' + r.id.slice(0, 4)}</span>
+              <span className="flex items-center gap-1.5 text-xs text-fg-subtle">
+          {r.porGasto > 0 ? (
+            <>
+              <Zap className="size-3.5 shrink-0 text-accent-text" aria-hidden="true" />
+              Recebe {formatMoneyInput(r.porGasto)} a cada gasto (automático)
+            </>
+          ) : r.manual ? (
+            'Porquinho manual: não recebe movimentações sozinho'
+          ) : (
+            'Porquinho ' + r.id.slice(0, 4)
+          )}
+        </span>
               <Tooltip label="Excluir porquinho" side="top" align="end">
                 <Button type="button" variant="ghost" size="icon" className="-mt-1 -mr-1 size-7 hover:bg-fg/12" aria-label={'Excluir o porquinho ' + nome} onClick={() => setRows((rs) => rs && rs.filter((x) => x.id !== r.id))}>
                   <Trash />
@@ -488,6 +501,12 @@ function SetupForm({ mode, current, onClose, onSaved }: { mode: Modo; current: M
           </div>
         )
       })}
+      {rows && (
+        <Button type="button" variant="outline" size="sm" className="mt-3 w-full rounded-[7px] hover:bg-fg/12" onClick={() => setRows((rs) => [...(rs ?? []), { id: crypto.randomUUID(), name: '', valor: '', pct: '120', meta: '', porGasto: 0, manual: true }])}>
+          <Plus aria-hidden="true" />
+          Adicionar novo porquinho
+        </Button>
+      )}
         </>
       )}
       <p role="alert" aria-live="assertive" className="mt-3 min-h-5 text-xs text-neg">
