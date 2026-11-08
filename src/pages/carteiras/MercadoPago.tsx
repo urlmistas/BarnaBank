@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useId, useRef, useState, type FormEvent } from 'react'
 import { BanknoteCheck, ChartNoAxesCombined, Info, PiggyBank, Loader2, Plus, RefreshCw, RotateCcwClock, SaveCheck, Settings2, Trash, Zap } from 'lucide-react'
 import { useAppData } from '@/app/data-context'
 import { Button } from '@/components/ui/button'
@@ -36,7 +36,7 @@ const potIcon = (name: string): string | undefined => {
 }
 
 // '' = ainda não escolheu (a integração vem ligada), 'nao' = desligou de propósito, qualquer outro valor = ligada
-const lancaNaCarteira = (c: string) => !!c && c !== 'nao'
+const lancaNaCarteira = (c: string) => c !== 'nao'
 
 // "hoje às 23:27", "ontem às 23:27" ou "07/11 às 23:27"
 const whenRel = (iso: string) => {
@@ -76,6 +76,7 @@ export function MercadoPago() {
   const toast = useToast()
   const [respondida, setRespondida] = useState(false)
   const [asking, setAsking] = useState(false)
+  const reparou = useRef(false)
 
   const fetcher = useCallback((url: string, init?: RequestInit) => fetch(url, init), [])
   const load = useCallback(async () => {
@@ -118,11 +119,14 @@ export function MercadoPago() {
   useEffect(() => {
     if (!configured || !lancaNaCarteira(configured.carteira) || !data || !canCreate) return
     const w = data.wallets.find(isMpWallet)
-    if (!w) {
-      // o Mercado Pago é a carteira principal: nasce sozinha na primeira vez (o saldo dela vem no ajuste ao salvar)
-      commit((api) => {
-        if (!api.wallets.some(isMpWallet)) api.wallets.push({ id: newId(), name: MP_WALLET, icon: 'wallet' })
-      })
+    const ajustada = !!w && data.transactions.some((t) => t.walletId === w.id && t.imp?.startsWith('mp:ajuste:'))
+    if (!ajustada) {
+      // o Mercado Pago é a carteira principal: nasce sozinha e o saldo dela passa a ser o total do Mercado Pago (uma vez só).
+      // Cobre quem configurou antes da carteira existir ou sem ter passado pela janela de valores.
+      if (!reparou.current) {
+        reparou.current = true
+        ajustarCarteira(data, configured, configured)
+      }
       return
     }
     const novas = mpNewTransactions(configured.lancar, w.id, data.transactions)
