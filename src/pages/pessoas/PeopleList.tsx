@@ -6,6 +6,7 @@ import { useAppData } from '@/app/data-context'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Segmented } from '@/components/ui/segmented'
+import { Tooltip } from '@/components/ui/tooltip'
 import { filterCounts, filterPeople, personStatus, type PeopleFilter, type PersonRow } from '@/lib/finance/people'
 import { Select } from '@/components/ui/select'
 import { PEOPLE_SORTS, SORT_LABEL, sortPeople, type PeopleSort } from '@/lib/finance/person-extra'
@@ -227,7 +228,7 @@ function PersonRowLink({ row, filter, selected, href }: { row: PersonRow; filter
         data-row
         aria-current={selected ? 'page' : undefined}
         aria-label={`${row.name}, ${sub}, ${dirLabel} ${money(Math.abs(amount))}`}
-        className="flex items-center gap-3 rounded-lg px-4 py-4 after:absolute after:inset-0 after:rounded-lg focus-visible:outline-offset-[-2px]"
+        className={cn('flex items-center gap-3 rounded-lg px-4 py-4 after:absolute after:inset-0 after:rounded-lg focus-visible:outline-offset-[-2px]', chargeHref && 'pr-14')}
       >
         <span className="relative z-10 shrink-0">
           <Avatar name={row.name} />
@@ -248,13 +249,14 @@ function PersonRowLink({ row, filter, selected, href }: { row: PersonRow; filter
         <SignedMoney value={amount} className={cn('text-sm', !settledView && amount > 0 && 'text-pos/70')} />
       </Link>
       {chargeHref && (
-        <div className="relative z-10 flex justify-end px-4 pb-3 -mt-1">
-          <Button asChild size="sm" variant="outline">
-            <a href={chargeHref} target="_blank" rel="noreferrer" aria-label={`Cobrar ${row.name}`}>
-              <HandCoins aria-hidden="true" />
-              Cobrar
-            </a>
-          </Button>
+        <div className="absolute top-1/2 right-3 z-10 -translate-y-1/2">
+          <Tooltip label="Cobrar no WhatsApp" align="end">
+            <Button asChild size="icon" variant="ghost" className="size-8">
+              <a href={chargeHref} target="_blank" rel="noreferrer" aria-label={`Cobrar ${row.name}`}>
+                <HandCoins aria-hidden="true" />
+              </a>
+            </Button>
+          </Tooltip>
         </div>
       )}
     </div>

@@ -7,6 +7,7 @@ import { useMpTotal } from '@/app/use-mp-total'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Tooltip } from '@/components/ui/tooltip'
 import { dashboardAlert, dashboardSummary, upcomingItems, type DashboardAlert, type UpcomingItem } from '@/lib/finance/dashboard'
 import { quickPayment } from '@/lib/finance/mutations'
 import { replaceDebt } from '@/lib/store'
@@ -265,9 +266,11 @@ function PayNextCard({ data, today }: { data: AppData; today: string }) {
                 <span className="num shrink-0 text-sm font-medium text-neg">{money(amount)}</span>
               </Link>
               {canEdit && q?.pay && (
+                <Tooltip label="Pagar" align="end">
                 <Button
-                  size="sm"
-                  variant="outline"
+                  size="icon"
+                  variant="ghost"
+                  className="size-8"
                   aria-label={`Pagar ${money(amount)} a ${d.name}`}
                   onClick={() => {
                     const pay = q.pay
@@ -280,8 +283,8 @@ function PayNextCard({ data, today }: { data: AppData; today: string }) {
                   }}
                 >
                   <Check aria-hidden="true" />
-                  Pagar
                 </Button>
+                </Tooltip>
               )}
             </li>
           )
