@@ -74,12 +74,13 @@ export function Select<T extends string>({
     const r = btn.current.getBoundingClientRect()
     const dlg = btn.current.closest('dialog')
     const host: Element = dlg ?? document.body
-    const below = window.innerHeight - r.bottom - GAP - 8
-    const above = r.top - GAP - 8
+    // dentro de um diálogo só cabe o que está visível nele: o resto seria cortado
+    const h = dlg ? dlg.getBoundingClientRect() : null
+    const below = Math.min(window.innerHeight, h ? h.bottom : Infinity) - r.bottom - GAP - 8
+    const above = r.top - Math.max(0, h ? h.top : 0) - GAP - 8
     const up = below < Math.min(MAX_LIST, options.length * 36 + 8) && above > below
-    if (dlg) {
+    if (dlg && h) {
       // coordenadas dentro do diálogo (que rola junto com a lista)
-      const h = dlg.getBoundingClientRect()
       const left = r.left - h.left - dlg.clientLeft
       const top = r.top - h.top - dlg.clientTop + dlg.scrollTop
       setPlace(

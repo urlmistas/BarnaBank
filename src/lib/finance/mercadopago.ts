@@ -1,4 +1,4 @@
-import type { Transaction } from '@/lib/types'
+import type { Transaction, Wallet } from '@/lib/types'
 import type { MpMov } from '@/lib/sync/mpconta'
 
 // Mercado Pago → carteiras: cada entrada e saída que o bot viu vira um lançamento na carteira escolhida.
@@ -36,3 +36,29 @@ export function mpNewTransactions(movs: MpMov[], walletId: string, existing: Tra
   }
   return out
 }
+
+/** o Mercado Pago é a carteira principal: uma carteira com este nome, criada sozinha se não existir */
+export const MP_WALLET = 'Mercado Pago'
+export const isMpWallet = (w: Pick<Wallet, 'name'>) => w.name.trim().toLowerCase() === MP_WALLET.toLowerCase()
+
+/**
+ * Ao informar os valores reais (ou ligar a integração pela primeira vez) o saldo da carteira passa a ser o total do
+ * Mercado Pago (conta + porquinhos): um lançamento de ajuste cobre a diferença. null = já está igual.
+ */
+export function mpAdjustment(total: number, balance: number, walletId: string, date: string, key: string): Transaction | null {
+  const diff = Math.round((total - balance) * 100) / 100
+  if (Math.abs(diff) < 0.01) return null
+  return {
+    id: 'mpaj' + key,
+    walletId,
+    type: diff > 0 ? 'entrada' : 'gasto',
+    amount: Math.abs(diff),
+    date,
+    category: 'Ajuste Mercado Pago',
+    note: 'Ajuste ao informar os valores do Mercado Pago',
+    imp: 'mp:ajuste:' + key,
+  }
+}
+
+/** data de hoje (AAAA-MM-DD) no horário de Brasília */
+export const mpToday = (now = new Date()): string => new Date(now.getTime() - 3 * 3600000).toISOString().slice(0, 10)
