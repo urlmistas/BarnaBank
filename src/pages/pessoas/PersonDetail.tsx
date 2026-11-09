@@ -84,7 +84,8 @@ export function PersonDetailView({
     tiles.push({ label: 'Falta receber', value: t.toReceive, icon: CalendarClock })
     tiles.push({ label: 'Em atraso', value: t.overdue, icon: ClockAlert, tone: t.overdue > 0.005 ? 'text-neg' : undefined })
     tiles.push({ label: 'Já recebi', value: t.received, icon: HandCoins, tone: t.received > 0.005 ? 'text-pos' : undefined })
-    tiles.push({ label: 'Total emprestado', value: t.lent, icon: PiggyBank })
+    if (t.lent > 0.005 || t.sold <= 0.005) tiles.push({ label: 'Total emprestado', value: t.lent, icon: PiggyBank })
+    if (t.sold > 0.005) tiles.push({ label: 'Total vendido', value: t.sold, icon: PiggyBank })
   }
   if (p.hasPayable) {
     tiles.push({ label: 'Eu devo', value: t.owe, icon: ReceiptText })
@@ -322,7 +323,7 @@ function statusText(v: DebtView, money: (n: number) => string): { text: string; 
 function metaLine(v: DebtView, money: (n: number) => string, date: (iso: string) => string): string {
   const d = v.debt
   const pay = v.kind === 'payable'
-  const parts = [(pay ? 'Dívida de ' : 'Emprestado em ') + date(d.date)]
+  const parts = [(pay ? 'Dívida de ' : d.op === 'venda' ? 'Vendido em ' : 'Emprestado em ') + date(d.date)]
   if (d.recurring) parts.push('todo mês · ' + money(d.recurring.amount))
   else if (d.plan) parts.push(`${v.n} parcelas (plano próprio)`)
   else parts.push(v.n > 1 ? `${v.n}x de ${money(v.instValue)}` : 'parcela única')

@@ -49,6 +49,8 @@ export interface Debt {
   notes: string
   subject?: string
   pubNote?: string
+  /** 'venda' = venda a prazo; ausente = empréstimo */
+  op?: 'venda'
   [k: string]: unknown
 }
 

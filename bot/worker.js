@@ -854,6 +854,7 @@ const HELP =
   'Escreva do jeito que falaria:\n\n' +
   '• <code>Vini me deve 50</code>\n' +
   '• <code>emprestei 300 pra Larissa em 3x</code>\n' +
+  '• <code>vendi 300 pra Larissa em 3x</code>\n' +
   '• <code>devo 80 pro Carlos</code>\n' +
   '• <code>recebi 20 do Vini</code>  /  <code>Vini pagou 20</code>\n' +
   '• <code>paguei 40 pro Carlos</code>\n' +
@@ -1252,6 +1253,8 @@ function parseMessage(raw, summary) {
   if ((m = new RegExp('^(.+?)\\s+me\\s+deve\\s+' + NUM + '(.*)$', 'i').exec(t))) return {type: 'debt', kind: 'receivable', name: cleanName(m[1]), amount: money(m[2]), ...extras(m[3])};
   // "emprestei 300 pra Larissa em 3x"
   if ((m = new RegExp('^emprestei\\s+' + NUM + '\\s+(?:pra|para|pro|ao|à|a)\\s+(.+?)(\\s+(?:em\\s*)?\\d{1,2}\\s*x.*|\\s+dia\\s+\\d.*)?$', 'i').exec(t))) return {type: 'debt', kind: 'receivable', name: cleanName(m[2]), amount: money(m[1]), ...extras(m[3] || '')};
+  // "vendi 300 pra Larissa em 3x" (venda a prazo, sem juros)
+  if ((m = new RegExp('^vendi\\s+' + NUM + '\\s+(?:pra|para|pro|ao|à|a)\\s+(.+?)(\\s+(?:em\\s*)?\\d{1,2}\\s*x.*|\\s+dia\\s+\\d.*)?$', 'i').exec(t))) return {type: 'debt', kind: 'receivable', op: 'venda', name: cleanName(m[2]), amount: money(m[1]), ...extras(m[3] || '')};
   // "devo 80 pro Carlos"
   if ((m = new RegExp('^devo\\s+' + NUM + '\\s+(?:pra|para|pro|ao|à|a)\\s+(.+?)(\\s+(?:em\\s*)?\\d{1,2}\\s*x.*|\\s+dia\\s+\\d.*)?$', 'i').exec(t))) return {type: 'debt', kind: 'payable', name: cleanName(m[2]), amount: money(m[1]), ...extras(m[3] || '')};
   // "Vini pagou 20"
@@ -1284,7 +1287,7 @@ function describe(op) {
   const v = brl(op.amount);
   if (op.type === 'debt') {
     const tail = (op.installments > 1 ? ' em ' + op.installments + 'x' : '') + (op.dueDay ? ', todo dia ' + op.dueDay : '') + (op.note ? ' (' + esc(op.note) + ')' : '');
-    return op.kind === 'payable' ? 'Você deve <b>' + v + '</b> a <b>' + esc(op.name) + '</b>' + tail : '<b>' + esc(op.name) + '</b> te deve <b>' + v + '</b>' + tail;
+    return op.kind === 'payable' ? 'Você deve <b>' + v + '</b> a <b>' + esc(op.name) + '</b>' + tail : (op.op === 'venda' ? 'Venda de <b>' + v + '</b> para <b>' + esc(op.name) + '</b>' : '<b>' + esc(op.name) + '</b> te deve <b>' + v + '</b>') + tail;
   }
   if (op.type === 'pay') return op.kind === 'payable' ? 'Pago <b>' + v + '</b> a <b>' + esc(op.name) + '</b>' : 'Recebido <b>' + v + '</b> de <b>' + esc(op.name) + '</b>';
   return (op.kind === 'entrada' ? 'Entrada' : 'Gasto') + ' de <b>' + v + '</b> · ' + esc(op.category) + (op.wallet ? ' (' + esc(op.wallet) + ')' : '');
@@ -1529,7 +1532,7 @@ function matchPerson(raw, summary, kind) {
   return pick(people.filter(p => { const f = tokens(p.name)[0] || ''; return f.length >= 3 && q[0].startsWith(f); }));
 }
 function parseBankNotice(t, summary) {
-  if (/^(gastei|recebi|paguei|ganhei|emprestei|devo|comprei)\b/i.test(t)) return null;
+  if (/^(gastei|recebi|paguei|ganhei|emprestei|vendi|devo|comprei)\b/i.test(t)) return null;
   const vm = /R\$\s*(\d{1,3}(?:\.\d{3})*,\d{2}|\d+(?:,\d{2})?)/i.exec(t);
   if (!vm) return null;
   const n = norm(t);

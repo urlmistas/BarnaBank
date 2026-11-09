@@ -101,17 +101,16 @@ export function statementHtml(d: Debt, ctx: DocCtx): string {
         `<td class="num">${esc(ctx.money(it.open))}</td><td><span class="pill pill-pending">${it.late ? 'Em atraso' : it.touched ? 'Parcial' : 'A vencer'}</span></td></tr>`
     }
   }
-  const profit = calc.effectiveTotal(d) - d.principal
+  const sale = d.kind === 'receivable' && d.op === 'venda'
   const body =
-    `<div class="sheet">${top(pay ? 'Extrato de Dívida' : 'Extrato de Empréstimo')}` +
+    `<div class="sheet">${top(pay ? 'Extrato de Dívida' : sale ? 'Extrato de Venda' : 'Extrato de Empréstimo')}` +
     `<div class="s-title">${esc(d.name)}</div>` +
-    `<div class="s-sub">${pay ? 'Referente à dívida contraída em ' : 'Referente ao empréstimo concedido em '}${esc(ctx.date(d.date))}</div>` +
+    `<div class="s-sub">${pay ? 'Referente à dívida contraída em ' : sale ? 'Referente à venda realizada em ' : 'Referente ao empréstimo concedido em '}${esc(ctx.date(d.date))}</div>` +
     `<div class="s-grid"><div><div class="s-label">Valor original</div><div class="s-val">${esc(ctx.money(d.principal))}</div></div>` +
-    (pay ? '' : `<div><div class="s-label">Juros ao mês</div><div class="s-val accent">${esc(pct(d.rate || 0))}% (${esc(typeLabel(d.interestType))})</div></div>`) +
+    (pay || sale ? '' : `<div><div class="s-label">Juros ao mês</div><div class="s-val accent">${esc(pct(d.rate || 0))}% (${esc(typeLabel(d.interestType))})</div></div>`) +
     `<div><div class="s-label">Parcelas</div><div class="s-val">${n}x</div></div></div>` +
     `<div class="s-summary">` +
     `<div class="row"><span>${pay ? 'Valor total da dívida' : 'Valor total a receber'}</span><b>${esc(ctx.money(finalValue(d)))}</b></div>` +
-    (pay ? '' : `<div class="row"><span>Lucro estimado</span><b>${esc(ctx.money(profit))}</b></div>`) +
     `<div class="row"><span>${pay ? 'Já pago' : 'Já recebido'}</span><b>${esc(ctx.money(paidAmount(d)))}</b></div>` +
     `<div class="row"><span>${pay ? 'Falta pagar' : 'Falta receber'}</span><b>${esc(ctx.money(calc.remaining(d)))}</b></div>` +
     (d.discount > 0.005 ? `<div class="row"><span>Desconto concedido</span><b>${esc(ctx.money(d.discount))}</b></div>` : '') +
@@ -181,7 +180,7 @@ export function receiptHtml(d: Debt, ctx: DocCtx, groupTitle?: string): string {
   const pays = [...d.payments].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0))
   const ref = groupTitle
     ? `referente à sua parte em "${groupTitle}" (${dataCompleta(d.date)})`
-    : `referente ao empréstimo feito em ${dataCompleta(d.date)}${n > 1 ? `, em ${n} parcelas` : ''}`
+    : `referente ${d.op === 'venda' ? 'à venda feita' : 'ao empréstimo feito'} em ${dataCompleta(d.date)}${n > 1 ? `, em ${n} parcelas` : ''}`
   const para =
     `${owner ? `Eu, ${esc(owner)}, declaro` : 'Declaro'} que recebi de <b>${esc(d.name)}</b> a importância de <b>${esc(ctx.money(total))}</b> (${esc(extenso(total))}), ` +
     `${esc(ref)}, e dou plena e total quitação desta dívida, nada mais tendo a receber a esse título.`
@@ -239,7 +238,8 @@ export function personSheetHtml(s: PersonSheet, ctx: DocCtx): string {
   const row = (l: string, v: string) => `<div class="row"><span>${esc(l)}</span><b>${esc(v)}</b></div>`
   const summary =
     row('Situação', status) +
-    row('Total emprestado', ctx.money(t.lent)) +
+    (t.lent > 0.005 || t.sold <= 0.005 ? row('Total emprestado', ctx.money(t.lent)) : '') +
+    (t.sold > 0.005 ? row('Total vendido', ctx.money(t.sold)) : '') +
     row('Dívidas em aberto', String(f.openCount)) +
     row('Dívidas quitadas', String(f.paidCount)) +
     row('Próximo vencimento', f.nextDue ? ctx.date(f.nextDue) : '—') +

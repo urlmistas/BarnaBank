@@ -2,6 +2,7 @@ import type { AppData, Debt, DebtKind, ISODate, YearMonth } from '@/lib/types'
 import { daysBetweenISO, round2, toISO, ymOf } from './dates'
 import { installmentValue, installments, makeDebtCalc, paidAmount, type DebtCalc, type DebtStatus, type InstState } from './debts'
 import { dashboardSummary } from './dashboard'
+import { isSale } from './debt-words'
 
 // Pessoas: uma linha por pessoa, detalhe da pessoa e calendário de vencimentos.
 // Fontes (app.js antigo): nameKey ~l.124, initials ~l.659, debtLabel ~l.1116, buildCard ~l.1123
@@ -33,7 +34,7 @@ export function debtLabel(d: Debt, groupTitle: string | undefined, fmtDate: (iso
   if (groupTitle) return groupTitle
   if (d.recurring) return d.recurring.label || 'Cobrança mensal'
   const n = installments(d)
-  return (d.kind === 'payable' ? 'Dívida' : 'Empréstimo') + ' de ' + fmtDate(d.date) + (n > 1 ? ' · ' + n + 'x' : '')
+  return (d.kind === 'payable' ? 'Dívida' : isSale(d) ? 'Venda' : 'Empréstimo') + ' de ' + fmtDate(d.date) + (n > 1 ? ' · ' + n + 'x' : '')
 }
 
 // ---------------------------------------------------------------- lista
@@ -255,6 +256,8 @@ export interface PersonDetail {
   hasPayable: boolean
   totals: {
     lent: number
+    /** total vendido (vendas a prazo) */
+    sold: number
     received: number
     toReceive: number
     overdue: number
@@ -338,7 +341,8 @@ export function personDetail(
     hasReceivable: rec.length > 0,
     hasPayable: pay.length > 0,
     totals: {
-      lent: sum(rec, (v) => v.debt.principal),
+      lent: sum(rec, (v) => (isSale(v.debt) ? 0 : v.debt.principal)),
+      sold: sum(rec, (v) => (isSale(v.debt) ? v.debt.principal : 0)),
       received: sum(rec, (v) => v.paidAmount),
       toReceive: sum(rec, (v) => (v.paid ? 0 : v.remaining)),
       // como o antigo: só dívidas com status "atrasado"

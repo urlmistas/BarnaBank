@@ -1164,7 +1164,7 @@ export function getEngine() {
     var g = groupOf(d), n = installments(d);
     if(g) return g.title;
     if(d.recurring) return d.recurring.label || 'Cobrança mensal';
-    return (d.kind === 'payable' ? 'Dívida' : 'Empréstimo') + ' de ' + fmtDate(d.date) + (n > 1 ? ' · ' + n + 'x' : '');
+    return (d.kind === 'payable' ? 'Dívida' : d.op === 'venda' ? 'Venda' : 'Empréstimo') + ' de ' + fmtDate(d.date) + (n > 1 ? ' · ' + n + 'x' : '');
   }
   function buildCard(d, opts){
     opts = opts || {};
@@ -5925,7 +5925,7 @@ export function getEngine() {
       openDebts: state.debts.filter(function(d){ return !isPaid(d); }).map(function(d){
         var g = groupOf(d), n = installments(d);
         return {id: d.id, name: d.name, kind: d.kind, remaining: round2(remaining(d)), late: overdueAmount(d) > EPS,
-          title: (g ? g.title : (n > 1 ? 'Empréstimo em ' + n + 'x' : 'Empréstimo')) + ' de ' + fmtDate(d.date)};
+          title: (g ? g.title : d.op === 'venda' ? (n > 1 ? 'Venda em ' + n + 'x' : 'Venda') : (n > 1 ? 'Empréstimo em ' + n + 'x' : 'Empréstimo')) + ' de ' + fmtDate(d.date)};
       }),
       defaultWallet: (state.wallets.find(function(w){ return w.id === settings.defaultWalletId; }) || {}).name || '',
       pix: settings.pixKey || '',
@@ -5968,6 +5968,7 @@ export function getEngine() {
           dueDay: dueDay >= 1 && dueDay <= 31 ? dueDay : parseInt(date.slice(8), 10), payments: [], notes: (op.note ? op.note + ' · ' : '') + 'via Telegram',
           kind: op.kind === 'payable' ? 'payable' : 'receivable', discount: 0,
           lateFeePct: op.kind === 'payable' ? 0 : (+settings.defaultLateFee || 0), lateInterestPct: op.kind === 'payable' ? 0 : (+settings.defaultLateInterest || 0)};
+        if(op.op === 'venda' && d.kind === 'receivable') d.op = 'venda';
         if(!d.name){ res.push({id: op.id, ok: false, msg: 'sem nome'}); return; }
         var existing = state.debts.find(function(x){ return nameKey(x.name) === nameKey(d.name); });
         if(!existing){
@@ -6672,7 +6673,7 @@ export function getEngine() {
         var s = debtSchedule(d), g = groupOf(d), n = installments(d);
         return {
           payNow: round2(s.overdue > EPS ? s.overdue : amountDueNow(d)), _id: d.id,
-          title: d.subject ? d.subject : g ? g.title : d.recurring ? (d.recurring.label || 'Cobrança mensal') : owe ? (n > 1 ? 'Dívida em ' + n + 'x' : 'Dívida') : (n > 1 ? 'Empréstimo em ' + n + 'x' : 'Empréstimo'), date: d.date,
+          title: d.subject ? d.subject : g ? g.title : d.recurring ? (d.recurring.label || 'Cobrança mensal') : owe ? (n > 1 ? 'Dívida em ' + n + 'x' : 'Dívida') : (d.op === 'venda' ? (n > 1 ? 'Venda em ' + n + 'x' : 'Venda') : (n > 1 ? 'Empréstimo em ' + n + 'x' : 'Empréstimo')), date: d.date,
           monthly: d.recurring ? round2(d.recurring.amount) : 0,
           total: round2(effectiveTotal(d)), paid: round2(Math.min(paidAmount(d), effectiveTotal(d))), remaining: round2(remaining(d)), late: round2(s.overdue),
           due: n === 1 && s.insts[0] ? s.insts[0].dueISO : '',
@@ -6686,7 +6687,7 @@ export function getEngine() {
   }
   // números do topo do link: quantas em aberto, recorrentes, quitadas, quanto já foi pago, próximo pagamento e histórico
   function shareSummary(ds, open, done){
-    var titleOf = function(d){ var g = groupOf(d), n = installments(d); return d.subject || (g ? g.title : d.recurring ? (d.recurring.label || 'Cobrança mensal') : d.kind === 'payable' ? (n > 1 ? 'Dívida em ' + n + 'x' : 'Dívida') : (n > 1 ? 'Empréstimo em ' + n + 'x' : 'Empréstimo')); };
+    var titleOf = function(d){ var g = groupOf(d), n = installments(d); return d.subject || (g ? g.title : d.recurring ? (d.recurring.label || 'Cobrança mensal') : d.kind === 'payable' ? (n > 1 ? 'Dívida em ' + n + 'x' : 'Dívida') : d.op === 'venda' ? (n > 1 ? 'Venda em ' + n + 'x' : 'Venda') : (n > 1 ? 'Empréstimo em ' + n + 'x' : 'Empréstimo')); };
     var hist = [], dues = [], ends = [];
     ds.forEach(function(d){
       var s = debtSchedule(d), t = titleOf(d);
@@ -8071,7 +8072,7 @@ export function getEngine() {
     pg.text(R - 14, y - 22, 9, 'QUITADO EM', {bold: true, color: MUTED, align: 'right'});
     pg.text(R - 14, y - 42, 14, fmtFull(last), {bold: true, align: 'right'});
     y -= 84;
-    var ref = g ? 'referente à sua parte em "' + g.title + '" (' + fmtFull(g.date || d.date) + ')' : 'referente ao empréstimo feito em ' + fmtFull(d.date) + (n > 1 ? ', em ' + n + ' parcelas' : '');
+    var ref = g ? 'referente à sua parte em "' + g.title + '" (' + fmtFull(g.date || d.date) + ')' : (d.op === 'venda' ? 'referente à venda feita em ' : 'referente ao empréstimo feito em ') + fmtFull(d.date) + (n > 1 ? ', em ' + n + ' parcelas' : '');
     var para = (owner ? 'Eu, ' + owner + ', declaro' : 'Declaro') + ' que recebi de ' + d.name + ' a importância de ' + money.format(total).replace(/ /g, ' ') + ' (' + extenso(total) + '), ' + ref +
       ', e dou plena e total quitação desta dívida, nada mais tendo a receber a esse título.';
     pdfWrap(para, 12, false, R - L).forEach(function(ln){ pg.text(L, y, 12, ln); y -= 19; });

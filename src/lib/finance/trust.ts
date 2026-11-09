@@ -2,6 +2,7 @@ import type { Debt, ISODate } from '@/lib/types'
 import { daysBetweenISO, EPS, round2 } from './dates'
 import { makeDebtCalc, paidAmount } from './debts'
 import { nameKey } from './people'
+import { isSale } from './debt-words'
 
 // Pontualidade, nota de confiança e placar dos amigos (app.js: personReliability ~l.5445,
 // trustInfo ~l.7866, boardData ~l.7451). Só dívidas a receber contam.
@@ -73,7 +74,8 @@ export function trustInfo(debts: Debt[], key: string, today: ISODate): Trust | n
   for (const d of debts) {
     if (nameKey(d.name) !== key || d.kind !== 'receivable') continue
     paidTotal += paidAmount(d)
-    if (calc.isPaid(d)) doneMax = Math.max(doneMax, d.principal)
+    // venda paga conta como pontualidade, mas não entra no limite sugerido de empréstimo
+    if (calc.isPaid(d) && !isSale(d)) doneMax = Math.max(doneMax, d.principal)
     for (const it of calc.schedule(d).insts) {
       const dl = it.state === 'paga' && it.lastPayISO ? daysBetweenISO(it.dueISO, it.lastPayISO) : it.late ? daysBetweenISO(it.dueISO, today) : 0
       if (dl > maxDelay) maxDelay = dl
@@ -118,7 +120,7 @@ export function boardData(debts: Debt[], today: ISODate): BoardRow[] {
     if (d.kind !== 'receivable') continue
     const k = nameKey(d.name)
     const p = by.get(k) ?? { key: k, name: d.name, lent: 0, paid: 0, open: 0, debts: 0, done: 0, rel: null, medals: [], score: 0 }
-    p.lent += d.principal
+    if (!isSale(d)) p.lent += d.principal
     p.paid += paidAmount(d)
     const paid = calc.isPaid(d)
     p.open += paid ? 0 : calc.remaining(d)

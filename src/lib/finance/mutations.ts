@@ -111,6 +111,8 @@ export function settleDebt(d: Debt, today: ISODate, input: { value: number; date
 
 export interface DebtInput {
   kind: DebtKind
+  /** só vale em 'receivable' */
+  op: 'emprestimo' | 'venda'
   name: string
   principal: number
   rate: number
@@ -131,7 +133,7 @@ export interface DebtInput {
 
 export function emptyDebtInput(kind: DebtKind, today: ISODate): DebtInput {
   return {
-    kind, name: '', principal: 0, rate: 0, interestType: 'composto', date: today, installments: 1,
+    kind, op: 'emprestimo', name: '', principal: 0, rate: 0, interestType: 'composto', date: today, installments: 1,
     dueDay: Number(today.slice(8, 10)), lateFeePct: 0, lateInterestPct: 0, notes: '', subject: '', pubNote: '',
     recurring: false, recLabel: '', phone: '',
   }
@@ -139,7 +141,7 @@ export function emptyDebtInput(kind: DebtKind, today: ISODate): DebtInput {
 
 export function debtToInput(d: Debt, phone = ''): DebtInput {
   return {
-    kind: d.kind, name: d.name,
+    kind: d.kind, op: d.kind === 'receivable' && d.op === 'venda' ? 'venda' : 'emprestimo', name: d.name,
     principal: d.recurring ? d.recurring.amount : d.principal,
     rate: d.rate || 0, interestType: d.interestType || 'composto', date: d.date, installments: installments(d),
     dueDay: d.dueDay, lateFeePct: d.lateFeePct || 0, lateInterestPct: d.lateInterestPct || 0,
@@ -155,10 +157,10 @@ export function checkDebtInput(i: DebtInput): string | null {
   const pay = i.kind === 'payable'
   if (!i.name.trim()) return pay ? 'Informe o nome da empresa ou pessoa.' : 'Informe o nome do amigo.'
   if (!(i.principal > 0) || !isFinite(i.principal)) return 'Informe um valor válido.'
-  if (!pay && (isNaN(i.rate) || i.rate < 0)) return 'Informe uma taxa de juros válida (pode ser 0 para sem juros).'
+  if (!pay && i.op !== 'venda' && (isNaN(i.rate) || i.rate < 0)) return 'Informe uma taxa de juros válida (pode ser 0 para sem juros).'
   if (isNaN(i.lateFeePct) || i.lateFeePct < 0 || i.lateFeePct > 100) return 'Multa por atraso inválida (use de 0 a 100%).'
   if (isNaN(i.lateInterestPct) || i.lateInterestPct < 0 || i.lateInterestPct > 100) return 'Juros de mora inválidos (use de 0 a 100% ao mês).'
-  if (!ISO_RE.test(i.date)) return pay ? 'Informe quando a dívida começou.' : 'Informe a data do empréstimo.'
+  if (!ISO_RE.test(i.date)) return pay ? 'Informe quando a dívida começou.' : (i.op === 'venda' ? 'Informe a data da venda.' : 'Informe a data do empréstimo.')
   if (!i.recurring && (!Number.isInteger(i.installments) || i.installments < 1 || i.installments > 600)) return 'Informe um número de parcelas válido.'
   if (!pay && i.phone && i.phone.length < 10) return 'Telefone incompleto: inclua o DDD (ex: 11999998888).'
   return null
@@ -170,12 +172,13 @@ export const HIGH_RATE = 100
 function fields(i: DebtInput) {
   const pay = i.kind === 'payable'
   const rec = pay && i.recurring
+  const sale = !pay && i.op === 'venda'
   const inst = rec ? 1 : i.installments
   const dueDay = i.dueDay >= 1 && i.dueDay <= 31 ? Math.floor(i.dueDay) : Number(i.date.slice(8, 10)) || 1
   return {
     name: i.name.trim(),
     principal: round2(i.principal),
-    rate: pay ? 0 : i.rate,
+    rate: pay || sale ? 0 : i.rate,
     interestType: (pay ? 'composto' : i.interestType) as InterestType,
     date: i.date,
     days: inst * 30,
@@ -186,12 +189,14 @@ function fields(i: DebtInput) {
     lateFeePct: i.lateFeePct,
     lateInterestPct: i.lateInterestPct,
     rec,
+    sale,
   }
 }
 
 export function createDebt(i: DebtInput, id = newId()): Debt {
-  const { rec, ...base } = fields(i)
+  const { rec, sale, ...base } = fields(i)
   const d: Debt = { id, ...base, payments: [], discount: 0 }
+  if (sale) d.op = 'venda'
   if (rec) d.recurring = { amount: round2(i.principal), label: i.recLabel.trim().slice(0, 40) }
   if (i.subject.trim()) d.subject = i.subject.trim().slice(0, 50)
   if (i.pubNote.trim()) d.pubNote = i.pubNote.trim().slice(0, 140)
@@ -201,8 +206,10 @@ export function createDebt(i: DebtInput, id = newId()): Debt {
 /** edição (saveForm ~l.1790): mexer em valor, parcelas, juros, data ou dia desfaz a renegociação */
 export function updateDebt(d: Debt, i: DebtInput): Debt {
   const f = fields(i)
-  const { rec, ...base } = f
+  const { rec, sale, ...base } = f
   const next: Debt = { ...d, ...base }
+  if (sale) next.op = 'venda'
+  else delete next.op
   if (rec) {
     delete next.plan
     delete next.reneg

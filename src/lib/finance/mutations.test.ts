@@ -127,3 +127,21 @@ describe('formulário de dívida', () => {
     expect(updateDebt(d, { ...debtToInput(d), dueDay: 31 }).firstDue).toBe('2026-02-28')
   })
 })
+
+describe('venda a prazo', () => {
+  it('grava op=venda, zera juros e volta ao editar para empréstimo', () => {
+    const i = { ...emptyDebtInput('receivable', TODAY), op: 'venda' as const, name: 'Ana', principal: 600, rate: 5, installments: 3 }
+    expect(checkDebtInput(i)).toBeNull()
+    const d = createDebt(i, 'v1')
+    expect(d.op).toBe('venda')
+    expect(d.rate).toBe(0)
+    expect(debtToInput(d).op).toBe('venda')
+    const back = updateDebt(d, { ...debtToInput(d), op: 'emprestimo' })
+    expect(back.op).toBeUndefined()
+  })
+
+  it('empréstimo não grava op', () => {
+    const d = createDebt({ ...emptyDebtInput('receivable', TODAY), name: 'Ana', principal: 100 }, 'e1')
+    expect(d.op).toBeUndefined()
+  })
+})

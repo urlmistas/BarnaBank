@@ -84,6 +84,7 @@ function DebtForm({ debt, kind, initialName, onClose, onSaved }: { debt?: Debt; 
   })()
 
   const [k, setK] = useState<DebtKind>(start.kind)
+  const [op, setOp] = useState<'emprestimo' | 'venda'>(start.op)
   const [name, setName] = useState(start.name)
   const [subject, setSubject] = useState(start.subject)
   const [principal, setPrincipal] = useState(start.principal ? formatMoneyInput(start.principal) : '')
@@ -103,11 +104,12 @@ function DebtForm({ debt, kind, initialName, onClose, onSaved }: { debt?: Debt; 
   const [confirmRate, setConfirmRate] = useState(false)
 
   const pay = k === 'payable'
+  const sale = !pay && op === 'venda'
   const names = [...new Set((result?.data.debts ?? []).map((d) => d.name))].sort((a, b) => a.localeCompare(b, 'pt-BR'))
 
   function build(): DebtInput {
     return {
-      kind: k, name, principal: parseMoney(principal), rate: rate.trim() === '' ? 0 : Number(rate.replace(',', '.')), interestType: itype,
+      kind: k, op: k === 'receivable' ? op : 'emprestimo', name, principal: parseMoney(principal), rate: rate.trim() === '' ? 0 : Number(rate.replace(',', '.')), interestType: itype,
       date, installments: inst.trim() === '' ? 1 : Number(inst), dueDay: Number(dueDay), lateFeePct: fee.trim() === '' ? 0 : Number(fee.replace(',', '.')),
       lateInterestPct: mora.trim() === '' ? 0 : Number(mora.replace(',', '.')), notes, subject, pubNote: pub, recurring: rec, recLabel,
       phone: onlyDigits(phone),
@@ -178,6 +180,22 @@ function DebtForm({ debt, kind, initialName, onClose, onSaved }: { debt?: Debt; 
         </div>
       )}
 
+      {!pay && (
+        <div role="group" aria-label="Operação" className="mb-3 grid grid-cols-2 gap-1 rounded-md border border-border p-1">
+          {(['emprestimo', 'venda'] as const).map((v) => (
+            <button
+              key={v}
+              type="button"
+              aria-pressed={op === v}
+              onClick={() => setOp(v)}
+              className={`h-8 cursor-pointer rounded-sm text-sm font-medium transition-colors ${op === v ? 'bg-surface-2 text-fg' : 'text-fg-muted hover:text-fg'}`}
+            >
+              {v === 'emprestimo' ? 'Empréstimo' : 'Venda'}
+            </button>
+          ))}
+        </div>
+      )}
+
       <Field label={pay ? 'Empresa ou pessoa' : 'Nome do amigo'} htmlFor={ids.name}>
         <Input id={ids.name} list={ids.list} value={name} onChange={(e) => setName(e.target.value)} autoComplete="off" autoFocus />
         <datalist id={ids.list}>
@@ -187,7 +205,7 @@ function DebtForm({ debt, kind, initialName, onClose, onSaved }: { debt?: Debt; 
         </datalist>
       </Field>
       <Field label="Assunto (opcional)" htmlFor={ids.subject} className="mt-3">
-        <Input id={ids.subject} value={subject} maxLength={50} onChange={(e) => setSubject(e.target.value)} placeholder="Ex: notebook, conserto da moto" autoComplete="off" />
+        <Input id={ids.subject} value={subject} maxLength={50} onChange={(e) => setSubject(e.target.value)} placeholder={sale ? 'Ex: notebook vendido' : 'Ex: notebook, conserto da moto'} autoComplete="off" />
       </Field>
 
       {pay && (
@@ -203,15 +221,15 @@ function DebtForm({ debt, kind, initialName, onClose, onSaved }: { debt?: Debt; 
       )}
 
       <div className="mt-3 grid grid-cols-2 gap-3">
-        <Field label={rec ? 'Valor por mês (R$)' : 'Valor (R$)'} htmlFor={ids.principal}>
+        <Field label={rec ? 'Valor por mês (R$)' : sale ? 'Valor da venda (R$)' : 'Valor (R$)'} htmlFor={ids.principal}>
           <Input id={ids.principal} inputMode="decimal" value={principal} onChange={(e) => setPrincipal(e.target.value)} placeholder="0,00" autoComplete="off" />
         </Field>
-        <Field label={pay ? 'Começou em' : 'Data do empréstimo'} htmlFor={ids.date}>
+        <Field label={pay ? 'Começou em' : sale ? 'Data da venda' : 'Data do empréstimo'} htmlFor={ids.date}>
           <Input id={ids.date} type="date" value={date} onChange={(e) => setDate(e.target.value)} />
         </Field>
       </div>
 
-      {!pay && (
+      {!pay && !sale && (
         <div className="mt-3 grid grid-cols-2 gap-3">
           <Field label="Juros ao mês (%)" htmlFor={ids.rate}>
             <Input id={ids.rate} inputMode="decimal" value={rate} onChange={(e) => setRate(e.target.value)} placeholder="0 = sem juros" />

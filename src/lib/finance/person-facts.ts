@@ -134,7 +134,7 @@ export function personTimeline(p: PersonDetail, today: ISODate): TimelineItem[] 
       key: 'debt:' + d.id,
       date: d.date,
       kind: 'debt',
-      title: v.kind === 'payable' ? `Dívida criada: ${v.label}` : `Empréstimo criado: ${v.label}`,
+      title: v.kind === 'payable' ? `Dívida criada: ${v.label}` : `${d.op === 'venda' ? 'Venda criada' : 'Empréstimo criado'}: ${v.label}`,
       detail: v.n > 1 ? `${v.n} parcelas` : 'parcela única',
       amount: v.total,
     })

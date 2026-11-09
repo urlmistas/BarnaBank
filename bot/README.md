@@ -9,6 +9,7 @@ Com o bot, você manda mensagens como estas e elas entram no app:
 |---|---|
 | `Vini me deve 50` | nova dívida: Vini te deve R$ 50 |
 | `emprestei 300 pra Larissa em 3x` | empréstimo de R$ 300 em 3 parcelas |
+| `vendi 300 pra Larissa em 3x` | venda a prazo de R$ 300 em 3 parcelas (sem juros) |
 | `devo 80 pro Carlos` | você deve R$ 80 ao Carlos |
 | `recebi 20 do Vini` ou `Vini pagou 20` | pagamento do Vini. Se ele tem mais de uma dívida, o bot pergunta de qual; se você tem mais de uma carteira (e nenhuma padrão em Configurações), pergunta em qual caiu |
 | `paguei 40 pro Carlos` | pagamento do que você deve ao Carlos |
