@@ -1,6 +1,6 @@
 import { useId, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import { Link } from 'react-router-dom'
-import { AnimatePresence, motion } from 'motion/react'
+import { AnimatePresence, motion, useMotionValue, useTransform } from 'motion/react'
 import { Check, HandCoins, Search, SearchX, Users, X } from 'lucide-react'
 import { useAppData } from '@/app/data-context'
 import { Button } from '@/components/ui/button'
@@ -192,6 +192,9 @@ function PersonRowLink({ row, filter, selected, href }: { row: PersonRow; filter
   const coarse = useMediaQuery('(pointer: coarse)')
   const [open, setOpen] = useState(false)
   const dragged = useRef(false)
+  const x = useMotionValue(0)
+  // as ações só aparecem quando o card já saiu do lugar (parado, nada pode vazar por trás)
+  const reveal = useTransform(x, [-6, 0], [1, 0])
   const st = personStatus(row, today)
   // em "Quitados" (ou sem nada em aberto) o valor é o que já foi quitado, em tom neutro
   const settledView = filter === 'quitados' || row.openCount === 0
@@ -248,7 +251,7 @@ function PersonRowLink({ row, filter, selected, href }: { row: PersonRow; filter
   return (
     <div className="relative rounded-lg" data-no-tab-swipe={swipe ? '' : undefined}>
       {swipe && (
-        <div className="absolute inset-y-0 right-0 flex overflow-hidden rounded-r-lg" style={{ width: W }}>
+        <motion.div className="absolute inset-y-0 right-0 flex overflow-hidden rounded-r-lg" style={{ width: W, opacity: reveal }}>
           {chargeHref && (
             <a
               href={chargeHref}
@@ -273,9 +276,10 @@ function PersonRowLink({ row, filter, selected, href }: { row: PersonRow; filter
               {quick.dir === 'out' ? 'Paguei' : 'Recebi'}
             </button>
           )}
-        </div>
+        </motion.div>
       )}
       <motion.div
+        style={{ x }}
         drag={swipe ? 'x' : false}
         dragDirectionLock
         dragConstraints={{ left: -W, right: 0 }}
