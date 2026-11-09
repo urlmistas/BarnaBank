@@ -39,12 +39,17 @@ function loadSw(fetchImpl: (r: Request) => Promise<Response>) {
   const src = readFileSync(new URL('../../../public/sw.js', import.meta.url), 'utf8').replace(/__BUILD_ID__/g, 'teste')
   const shown: { title: string; opts: Record<string, unknown> }[] = []
   const opened: string[] = []
+  const badges: number[] = []
   const windows: { url: string; focused: boolean; focus: () => Promise<void> }[] = []
   const self = {
     location: new URL('https://x.github.io/BarnaBank/sw.js'),
     registration: {
       scope: 'https://x.github.io/BarnaBank/',
       showNotification: async (title: string, opts: Record<string, unknown>) => void shown.push({ title, opts }),
+    },
+    navigator: {
+      setAppBadge: async (n: number) => void badges.push(n),
+      clearAppBadge: async () => void badges.push(0),
     },
     clients: {
       claim: async () => {},
@@ -62,7 +67,7 @@ function loadSw(fetchImpl: (r: Request) => Promise<Response>) {
     handlers.fetch({ request: fake, respondWith: (p: Promise<Response>) => (responded = p) })
     return responded ? await responded : undefined
   }
-  return { fire, stores, handlers, shown, opened, windows, activate: () => new Promise<void>((ok) => handlers.activate({ waitUntil: (p: Promise<void>) => p.then(ok) })) }
+  return { fire, stores, handlers, shown, opened, windows, badges, activate: () => new Promise<void>((ok) => handlers.activate({ waitUntil: (p: Promise<void>) => p.then(ok) })) }
 }
 
 const ok = (body: string) => new Response(body, { status: 200 })
@@ -87,6 +92,15 @@ describe('service worker: notificações', () => {
     expect(sw.shown).toHaveLength(1)
     expect(sw.shown[0].title).toBe('Pix recebido')
     expect(sw.shown[0].opts).toMatchObject({ body: 'R$ 50,00', tag: 'pagamento', icon: 'https://x.github.io/BarnaBank/icons/icon-192.png' })
+  })
+
+  it('o aviso pode trazer o número do selo do ícone do app (0 limpa)', async () => {
+    const sw = loadSw(async () => ok('x'))
+    await push(sw, { title: 'BarnaBank · seu dia', body: 'x', badge: 3 })
+    await push(sw, { title: 'BarnaBank · seu dia', body: 'x', badge: 0 })
+    await push(sw, { title: 'Pix recebido', body: 'x' }) // sem número: não mexe no selo
+    expect(sw.badges).toEqual([3, 0])
+    expect(sw.shown).toHaveLength(3)
   })
 
   it('sem dados ainda mostra um aviso (o navegador exige)', async () => {

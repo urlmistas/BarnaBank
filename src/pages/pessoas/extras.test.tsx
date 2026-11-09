@@ -156,6 +156,23 @@ describe('Pessoas: WhatsApp', () => {
     }
   })
 
+  it('celular: o card da lista tem "Recebi" nas ações de deslizar e dá baixa na parcela sem abrir a pessoa', async () => {
+    seed()
+    mount('/pessoas')
+    const btn = await screen.findByRole('button', { name: /^Receber R\$\s.* de Ana Souza$/ })
+    const before = stored().debts[0].payments.length
+    fireEvent.click(btn)
+    await waitFor(() => expect(stored().debts[0].payments.length).toBe(before + 1))
+    expect(stored().debts[0].payments.at(-1)).toMatchObject({ mode: expect.any(String) })
+  })
+
+  it('celular: quem eu devo tem "Paguei"; quem não tem nada em aberto não tem ação', async () => {
+    seed({ debts: [debt({ id: 'p1', name: 'Carlos', kind: 'payable' }), debt({ id: 'q1', name: 'Quitado', payments: [{ id: 'x', date: '2020-02-01', amount: 300, mode: 'fifo' }] })] })
+    mount('/pessoas')
+    expect(await screen.findByRole('button', { name: /^Pagar R\$\s.* a Carlos$/ })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /Quitado/ })).toBeNull()
+  })
+
   it('sem telefone o botão avisa onde cadastrar', async () => {
     seed()
     mount()

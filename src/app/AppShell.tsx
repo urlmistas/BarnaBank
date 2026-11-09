@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { NavLink, useLocation, useNavigate, useOutlet } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
 import { ArrowDown, Calculator, ChartColumn, Eye, EyeOff, House, Loader2, Receipt, Search, Settings, Users, Wallet, type LucideIcon } from 'lucide-react'
@@ -15,9 +15,12 @@ import { SearchDialog } from './SearchDialog'
 import { SimulatorDialog } from './SimulatorDialog'
 import { QuickAdd } from './QuickAdd'
 import { useGestures } from './use-gestures'
+import { useShake } from './use-shake'
+import { useAppBadge } from './use-app-badge'
+import { upcomingItems } from '@/lib/finance/dashboard'
 import { useToast } from '@/components/ui/toast'
 import { isStandalone } from '@/lib/pwa/install'
-import { PULL_THRESHOLD, REFRESH_EVENT } from '@/lib/gestures'
+import { PULL_THRESHOLD, REFRESH_EVENT, neighborTab, readTabSwipe } from '@/lib/gestures'
 import { useShortcuts } from './use-shortcuts'
 import type { ShortcutAction } from '@/lib/shortcuts'
 
@@ -46,7 +49,7 @@ export function AppShell() {
   const location = useLocation()
   const outlet = useOutlet()
   const { toggle } = useTheme()
-  const { result, cloud, bot, conflict, hideValues, toggleHideValues, refreshCloud } = useAppData()
+  const { result, cloud, bot, conflict, hideValues, toggleHideValues, refreshCloud, today } = useAppData()
   const toast = useToast()
   const [searchOpen, setSearchOpen] = useState(false)
   const [simOpen, setSimOpen] = useState(false)
@@ -63,11 +66,26 @@ export function AppShell() {
     [navigate, toggle, toggleHideValues],
   )
   useShortcuts(runShortcut)
+  // selo no ícone do app: quantos vencimentos estão atrasados
+  const lateCount = useMemo(() => (result ? upcomingItems(result.data, today, 0).filter((i) => i.late).length : 0), [result, today])
+  useAppBadge(lateCount)
+  // sacudir o celular esconde ou mostra os valores (opção em Configurações → Visual)
+  useShake(() => {
+    toggleHideValues()
+    toast.show(hideValues ? 'Valores à mostra' : 'Valores escondidos')
+  })
   // app instalado no celular: arrastar da borda esquerda volta; puxar para baixo no topo atualiza (no navegador, o próprio navegador faz isso)
-  const { pull, refreshing } = useGestures({
+  const { pull, edge, refreshing } = useGestures({
     enabled: isStandalone(),
     canGoBack: () => ((window.history.state as { idx?: number } | null)?.idx ?? 0) > 0,
     onBack: () => navigate(-1),
+    // deslizar para o lado troca de aba (só nas telas principais do menu; dá para desligar em Configurações → Visual)
+    canTab: () => NAV.some((n) => n.to === location.pathname),
+    tabsEnabled: readTabSwipe,
+    onTab: (dir) => {
+      const to = neighborTab(NAV.map((n) => n.to), location.pathname, dir)
+      if (to) navigate(to)
+    },
     onRefresh: async () => {
       refreshCloud()
       window.dispatchEvent(new Event(REFRESH_EVENT))
@@ -186,6 +204,10 @@ export function AppShell() {
       <SearchDialog open={searchOpen} onClose={() => setSearchOpen(false)} />
       <SimulatorDialog open={simOpen} onClose={() => setSimOpen(false)} />
 
+      {/* "voltar" arrastando: a tela acompanha o dedo (sem transform parado, para não virar referência de posição dos filhos fixos) */}
+      <div
+        style={edge > 0 ? { transform: `translateX(${edge}px)`, opacity: 1 - edge / 420 } : { transition: 'transform 0.2s, opacity 0.2s' }}
+      >
       <AnimatePresence mode="wait" initial={false}>
         <motion.main
           id="conteudo"
@@ -200,6 +222,7 @@ export function AppShell() {
           {outlet}
         </motion.main>
       </AnimatePresence>
+      </div>
 
       <QuickAdd />
 

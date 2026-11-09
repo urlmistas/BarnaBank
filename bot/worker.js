@@ -1379,8 +1379,14 @@ async function dailyReminder(env) {
     if (late.length) out += '\n\n<b>Atrasado</b>\n' + late.map(i => '• ' + esc(i.title) + ' (desde ' + fmtDate(i.date) + '): ' + brl(i.amount)).join('\n');
     out += '\n\nResponda <code>recebi 20 do Fulano</code> quando alguém pagar' + (late.some(i => i.dir === 'in') ? ', ou /cobrar para mandar a cobrança' : '') + '.';
     await say(env, owner, out + stale(s));
-    const parts = [dueToday.length && dueToday.length + ' vence(m) hoje', dueTomorrow.length && dueTomorrow.length + ' amanhã', late.length && late.length + ' atrasado(s)'].filter(Boolean);
-    await pushTo(env, {title: 'Bom dia! Vencimentos', body: parts.join(' · '), tag: 'diario'});
+    // resumo que fica na tela de bloqueio: o que vence hoje (pagar e receber), amanhã e o atrasado, com os valores
+    const total = list => list.reduce((t, i) => t + Number(i.amount || 0), 0);
+    const lines = [];
+    const hojePagar = dueToday.filter(i => i.dir === 'out'), hojeReceber = dueToday.filter(i => i.dir !== 'out');
+    if (dueToday.length) lines.push('Hoje: ' + [hojePagar.length && 'pagar ' + brl(total(hojePagar)), hojeReceber.length && 'receber ' + brl(total(hojeReceber))].filter(Boolean).join(' · '));
+    if (dueTomorrow.length) lines.push('Amanhã: ' + dueTomorrow.length + (dueTomorrow.length === 1 ? ' vencimento' : ' vencimentos') + ' (' + brl(total(dueTomorrow)) + ')');
+    if (late.length) lines.push('Atrasado: ' + brl(total(late)) + ' (' + late.length + ')');
+    await pushTo(env, {title: 'BarnaBank · seu dia', body: lines.join('\n'), tag: 'diario', badge: late.length});
   }
   // dia 1: resumo do mês que passou (uma vez)
   if (prefs.monthly !== false && today.slice(8, 10) === '01' && s.lastMonth && !sentA[month + ':monthly']) {

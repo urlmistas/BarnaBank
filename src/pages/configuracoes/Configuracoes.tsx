@@ -17,6 +17,7 @@ import { BackupSection, DefaultsSection, InstallSection, PixSection } from './se
 import { ShortcutsSection } from './atalhos'
 import { BotPrefsSection, TelegramSection } from './telegram'
 import { HistorySection } from './history'
+import { GesturesSection } from './gestos'
 import { LockSection } from './lock'
 import { BOT_URL } from '@/lib/sync/telegram-link'
 
@@ -121,6 +122,7 @@ export function Configuracoes() {
             {cat === 'visual' && (
               <>
                 <AppearanceSection />
+                <GesturesSection />
                 <FormatSection />
               </>
             )}

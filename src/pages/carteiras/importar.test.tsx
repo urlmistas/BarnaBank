@@ -86,6 +86,28 @@ describe('Carteiras: importar extrato', () => {
     expect(stored().budgets).toEqual({ Mercado: 500 })
   })
 
+  it('conferência: mostra o que já está na carteira, o que falta e o que está no app e não aparece no extrato', async () => {
+    seed({
+      transactions: [
+        { id: 't1', walletId: 'w1', type: 'gasto', amount: 45.9, date: '2026-03-04', category: 'Alimentação', note: 'ifood' }, // casa (1 dia antes)
+        { id: 't2', walletId: 'w1', type: 'gasto', amount: 77, date: '2026-03-05', category: 'Lazer', note: 'cinema' }, // só no app
+      ],
+    })
+    mount()
+    await pickFile(OFX)
+    const d = await waitFor(() => {
+      const el = dlg()
+      expect(el).toBeTruthy()
+      return el
+    })
+    const box = within(d).getByRole('region', { name: 'Conferência com o app' })
+    expect(box.textContent).toMatch(/1\s*já no app/)
+    expect(box.textContent).toMatch(/1\s*faltam lançar/)
+    expect(box.textContent).toMatch(/1\s*no app e fora do extrato/)
+    fireEvent.click(within(box).getByText(/Ver o que está no app e não aparece/))
+    expect(within(box).getByText(/cinema/)).toBeTruthy()
+  })
+
   it('importar de novo o mesmo arquivo não duplica: tudo vem como "já importado"', async () => {
     seed()
     mount()

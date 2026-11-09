@@ -1,4 +1,5 @@
 import { useId, useMemo, useRef, useState, type ChangeEvent } from 'react'
+import { reconcile } from '@/lib/finance/reconcile'
 import { Upload } from 'lucide-react'
 import { useAppData } from '@/app/data-context'
 import { useWrite } from '@/app/write'
@@ -80,6 +81,18 @@ function ImportForm({ data, fileName, parsed, onClose }: { data: AppData; fileNa
     () => viewItems(first.items, { flip, target: tgt, transactions: data.transactions, rules }),
     [first, flip, tgt, data.transactions, rules],
   )
+  // conferência: o que do extrato já está na carteira, o que falta e o que está no app mas não aparece no extrato
+  const check = useMemo(
+    () =>
+      tgt.kind === 'wallet'
+        ? reconcile(
+            views.map((v) => ({ date: v.item.date, amount: v.amount, desc: v.item.desc, imp: v.item.imp })),
+            data.transactions,
+            tgt.id,
+          )
+        : null,
+    [views, tgt, data.transactions],
+  )
   // o que a pessoa mexeu: marcação e categoria por linha. Trocar destino/sinal recomeça das sugestões.
   const [marks, setMarks] = useState<Record<number, boolean>>({})
   const [catEdits, setCatEdits] = useState<Record<number, string>>({})
@@ -139,6 +152,40 @@ function ImportForm({ data, fileName, parsed, onClose }: { data: AppData; fileNa
         />
         Inverter sinais (marque se os gastos aparecerem como entradas)
       </label>
+
+      {check && (
+        <section aria-label="Conferência com o app" className="mt-3 rounded-md border border-border bg-surface-2/40 px-3 py-2.5 text-sm">
+          <p className="flex flex-wrap gap-x-4 gap-y-1">
+            <span>
+              <b className="num font-semibold text-pos">{check.matched.length}</b> já no app
+            </span>
+            <span>
+              <b className="num font-semibold">{check.missing.length}</b> faltam lançar
+            </span>
+            <span>
+              <b className={cn('num font-semibold', check.extra.length > 0 && 'text-neg')}>{check.extra.length}</b> no app e fora do extrato
+            </span>
+          </p>
+          <p className="mt-1 text-xs text-fg-subtle">
+            Período do arquivo: {date(check.from)} a {date(check.to)}.
+          </p>
+          {check.extra.length > 0 && (
+            <details className="mt-2 text-xs">
+              <summary className="cursor-pointer text-fg-muted">Ver o que está no app e não aparece no extrato</summary>
+              <ul className="mt-1.5 divide-y divide-border">
+                {check.extra.map((t) => (
+                  <li key={t.id} className="flex items-center justify-between gap-3 py-1.5">
+                    <span className="min-w-0 truncate">
+                      {date(t.date)} · {t.note || t.category || (t.type === 'transferencia' ? 'Transferência' : t.type === 'gasto' ? 'Gasto' : 'Entrada')}
+                    </span>
+                    <span className="num shrink-0">{money(t.amount)}</span>
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
+        </section>
+      )}
 
       <div className="mt-4 flex items-center justify-between gap-3 border-b border-border pb-2 text-sm">
         <label htmlFor={ids.all} className="flex cursor-pointer items-center gap-2">

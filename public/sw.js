@@ -90,6 +90,11 @@ self.addEventListener('push', (event) => {
     d = { body: event.data ? event.data.text() : '' }
   }
   const scope = self.registration.scope
+  // número no ícone do app (iPhone com o app instalado, Android): atrasados
+  if (typeof d.badge === 'number' && self.navigator && self.navigator.setAppBadge) {
+    const p = d.badge > 0 ? self.navigator.setAppBadge(d.badge) : self.navigator.clearAppBadge()
+    if (p && p.catch) p.catch(() => {})
+  }
   event.waitUntil(
     self.registration.showNotification(d.title || 'BarnaBank', {
       body: d.body || '',

@@ -31,7 +31,7 @@ globalThis.fetch = async (url, init) => {
     return Response.json({ok: true, result: {username: 'barna_test_bot', message_id: 1}});
   }
   if (url.startsWith('https://push.test/')) {
-    pushed.push({url, headers: init.headers, size: init.body.length});
+    pushed.push({url, headers: init.headers, size: init.body.length, body: init.body});
     return new Response(null, {status: pushStatus});
   }
   return Response.json({ok: true, result: {}});
@@ -45,10 +45,30 @@ const call = async (path, method, token, body) => {
 };
 
 // uma inscrição de verdade (chaves P-256 válidas), como o navegador manda
+const devices = new Map();
 const mkSub = async name => {
   const kp = await crypto.subtle.generateKey({name: 'ECDH', namedCurve: 'P-256'}, true, ['deriveBits']);
-  return {endpoint: 'https://push.test/send/' + name, keys: {p256dh: b64u(await crypto.subtle.exportKey('raw', kp.publicKey)), auth: b64u(crypto.getRandomValues(new Uint8Array(16)))}};
+  const auth = crypto.getRandomValues(new Uint8Array(16));
+  const pub = new Uint8Array(await crypto.subtle.exportKey('raw', kp.publicKey));
+  const endpoint = 'https://push.test/send/' + name;
+  devices.set(endpoint, {priv: kp.privateKey, pub, auth});
+  return {endpoint, keys: {p256dh: b64u(pub), auth: b64u(auth)}};
 };
+// decifra (RFC 8291) como o navegador faria
+const enc = new TextEncoder();
+const cat = (...p) => { const o = new Uint8Array(p.reduce((n, x) => n + x.length, 0)); let i = 0; for (const x of p) { o.set(x, i); i += x.length; } return o; };
+const hk = async (ikm, salt, info, n) => new Uint8Array(await crypto.subtle.deriveBits({name: 'HKDF', hash: 'SHA-256', salt, info}, await crypto.subtle.importKey('raw', ikm, 'HKDF', false, ['deriveBits']), n * 8));
+async function decrypt(endpoint, body) {
+  const d = devices.get(endpoint);
+  const salt = body.slice(0, 16), idlen = body[20], asPub = body.slice(21, 21 + idlen), cipher = body.slice(21 + idlen);
+  const asKey = await crypto.subtle.importKey('raw', asPub, {name: 'ECDH', namedCurve: 'P-256'}, false, []);
+  const shared = new Uint8Array(await crypto.subtle.deriveBits({name: 'ECDH', public: asKey}, d.priv, 256));
+  const ikm = await hk(shared, d.auth, cat(enc.encode('WebPush: info\0'), d.pub, asPub), 32);
+  const cek = await hk(ikm, salt, enc.encode('Content-Encoding: aes128gcm\0'), 16);
+  const nonce = await hk(ikm, salt, enc.encode('Content-Encoding: nonce\0'), 12);
+  const plain = new Uint8Array(await crypto.subtle.decrypt({name: 'AES-GCM', iv: nonce}, await crypto.subtle.importKey('raw', cek, 'AES-GCM', false, ['decrypt']), cipher));
+  return JSON.parse(new TextDecoder().decode(plain.slice(0, -1)));
+}
 
 // sem login: nada
 assert.equal((await call('/api/push', 'GET', null)).status, 401);
@@ -101,7 +121,13 @@ assert.equal((await call('/api/push', 'DELETE', 'a.a.a', {endpoint: s1.endpoint}
 const today = '2026-10-21';
 store.set('u:' + UID_A + ':owner', '111');
 store.set('acct:' + UID_A, JSON.stringify({chat: '111'}));
-store.set('u:' + UID_A + ':summary', JSON.stringify({due: [{title: 'Aluguel', date: today, dir: 'out', amount: 100}]}));
+store.set('u:' + UID_A + ':summary', JSON.stringify({due: [
+  {title: 'Aluguel', date: today, dir: 'out', amount: 100},
+  {title: 'Ana', date: today, dir: 'in', amount: 40.5},
+  {title: 'Luz', date: '2026-10-22', dir: 'out', amount: 80},
+  {title: 'Vini', date: '2026-10-10', dir: 'in', amount: 250},
+  {title: 'Internet', date: '2026-10-15', dir: 'out', amount: 50}
+]}));
 const realNow = Date.now;
 Date.now = () => Date.UTC(2026, 9, 21, 9 + 3, 5, 0);
 pushed.length = 0;
@@ -112,5 +138,10 @@ await Promise.all(tasks.splice(0));
 Date.now = realNow;
 assert.ok(sent.some(m => /Bom dia/.test(m.text)), 'Telegram continua avisando');
 assert.equal(pushed.length, 1, 'e o aparelho restante recebe a notificação');
+const note = await decrypt(pushed[0].url, pushed[0].body);
+assert.equal(note.title, 'BarnaBank · seu dia');
+assert.equal(note.tag, 'diario');
+assert.equal(note.badge, 2, 'o número do ícone é a quantidade de atrasados');
+assert.deepEqual(note.body.split('\n'), ['Hoje: pagar R$ 100,00 · receber R$ 40,50', 'Amanhã: 1 vencimento (R$ 80,00)', 'Atrasado: R$ 300,00 (2)']);
 
 console.log('push api: ok');

@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
-import { CircleCheck, ClockAlert, HandCoins, Medal, Plus, Trophy, type LucideIcon } from 'lucide-react'
+import { CircleCheck, ClockAlert, HandCoins, Medal, Plus, Scale, Trophy, type LucideIcon } from 'lucide-react'
 import { useAppData } from '@/app/data-context'
 import { Button } from '@/components/ui/button'
 import { Tooltip } from '@/components/ui/tooltip'
@@ -20,6 +20,7 @@ import { ClaimsPanel } from './claims-panel'
 import { GroupsSection } from './groups/GroupsSection'
 import { DebtFormDialog } from './dialogs'
 import { BoardDialog } from './dialogs-extra'
+import { SplitDialog } from './SplitDialog'
 import { PEOPLE_SORTS, type PeopleSort } from '@/lib/finance/person-extra'
 
 // Pessoas: lista primeiro. No PC (≥1024px) a pessoa abre num painel ao lado;
@@ -38,6 +39,7 @@ function PessoasReady({ data, today }: { data: AppData; today: string }) {
   const { canCreate } = useAppData()
   const [creating, setCreating] = useState(false)
   const [board, setBoard] = useState(false)
+  const [split, setSplit] = useState(false)
   const toast = useToast()
   const doc = useDocCtx()
   const rawF = params.get('f') as PeopleFilter | null
@@ -112,6 +114,11 @@ function PessoasReady({ data, today }: { data: AppData; today: string }) {
                 </Button>
               </Tooltip>
             )}
+            <Tooltip label="Racha de contas" side="bottom">
+              <Button size="icon" variant="ghost" aria-label="Racha de contas" onClick={() => setSplit(true)}>
+                <Scale aria-hidden="true" />
+              </Button>
+            </Tooltip>
             {canCreate && (
               <Button size="sm" onClick={() => setCreating(true)}>
                 <Plus aria-hidden="true" />
@@ -144,6 +151,7 @@ function PessoasReady({ data, today }: { data: AppData; today: string }) {
       </div>
       <DebtFormDialog open={creating} onClose={() => setCreating(false)} />
       <BoardDialog open={board} onClose={() => setBoard(false)} />
+      <SplitDialog open={split} onClose={() => setSplit(false)} />
     </div>
   )
 }

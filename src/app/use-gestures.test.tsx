@@ -3,12 +3,32 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, render } from '@testing-library/react'
 import { useGestures } from './use-gestures'
 
-function Harness(props: { enabled: boolean; back?: boolean; onBack: () => void; onRefresh: () => Promise<void> | void }) {
-  const { pull, refreshing } = useGestures({ enabled: props.enabled, canGoBack: () => props.back ?? true, onBack: props.onBack, onRefresh: props.onRefresh })
+function Harness(props: {
+  enabled: boolean
+  back?: boolean
+  onBack: () => void
+  onRefresh: () => Promise<void> | void
+  onTab?: (d: -1 | 1) => void
+  canTab?: boolean
+  tabsOn?: boolean
+}) {
+  const { pull, edge, refreshing } = useGestures({
+    enabled: props.enabled,
+    canGoBack: () => props.back ?? true,
+    onBack: props.onBack,
+    onRefresh: props.onRefresh,
+    canTab: () => props.canTab ?? true,
+    tabsEnabled: () => props.tabsOn ?? true,
+    onTab: props.onTab,
+  })
   return (
     <div>
       <input aria-label="campo" />
+      <div data-testid="card" data-no-tab-swipe="">
+        card
+      </div>
       <span data-testid="s">{refreshing ? 'refreshing' : String(pull)}</span>
+      <span data-testid="edge">{String(edge)}</span>
     </div>
   )
 }
@@ -95,5 +115,57 @@ describe('useGestures', () => {
     touch('touchend', 150, 300)
     expect(onBack).not.toHaveBeenCalled()
     dlg.remove()
+  })
+
+  it('arrastar da borda: a tela acompanha o dedo; soltar devagar também volta; arrasto curto solta e volta ao lugar', () => {
+    const onBack = vi.fn()
+    const { getByTestId } = render(<Harness enabled onBack={onBack} onRefresh={vi.fn()} />)
+    touch('touchstart', 5, 300)
+    touch('touchmove', 60, 302)
+    expect(Number(getByTestId('edge').textContent)).toBeGreaterThan(0)
+    touch('touchmove', 110, 302)
+    touch('touchend', 110, 302)
+    expect(onBack).toHaveBeenCalledTimes(1)
+    expect(getByTestId('edge').textContent).toBe('0')
+    touch('touchstart', 5, 300)
+    touch('touchmove', 40, 300)
+    touch('touchend', 40, 300)
+    expect(onBack).toHaveBeenCalledTimes(1)
+    expect(getByTestId('edge').textContent).toBe('0')
+  })
+
+  it('arrastão rápido para o lado troca de aba (esquerda = próxima, direita = anterior)', () => {
+    const onTab = vi.fn()
+    render(<Harness enabled onBack={vi.fn()} onRefresh={vi.fn()} onTab={onTab} />)
+    touch('touchstart', 300, 300)
+    touch('touchend', 150, 305)
+    touch('touchstart', 100, 300)
+    touch('touchend', 260, 296)
+    expect(onTab.mock.calls).toEqual([[1], [-1]])
+  })
+
+  it('não troca de aba: desligado nas Configurações, fora das telas do menu, em campo de texto, em card deslizável ou em área que rola', () => {
+    const onTab = vi.fn()
+    const { rerender, getByTestId, getByLabelText } = render(<Harness enabled onBack={vi.fn()} onRefresh={vi.fn()} onTab={onTab} tabsOn={false} />)
+    touch('touchstart', 300, 300)
+    touch('touchend', 150, 300)
+    rerender(<Harness enabled onBack={vi.fn()} onRefresh={vi.fn()} onTab={onTab} canTab={false} />)
+    touch('touchstart', 300, 300)
+    touch('touchend', 150, 300)
+    rerender(<Harness enabled onBack={vi.fn()} onRefresh={vi.fn()} onTab={onTab} />)
+    touch('touchstart', 300, 300, getByLabelText('campo'))
+    touch('touchend', 150, 300)
+    touch('touchstart', 300, 300, getByTestId('card'))
+    touch('touchend', 150, 300)
+    // área que rola para o lado
+    const scroller = document.createElement('div')
+    scroller.style.overflowX = 'auto'
+    Object.defineProperty(scroller, 'scrollWidth', { value: 900 })
+    Object.defineProperty(scroller, 'clientWidth', { value: 300 })
+    document.body.appendChild(scroller)
+    touch('touchstart', 300, 300, scroller)
+    touch('touchend', 150, 300)
+    scroller.remove()
+    expect(onTab).not.toHaveBeenCalled()
   })
 })

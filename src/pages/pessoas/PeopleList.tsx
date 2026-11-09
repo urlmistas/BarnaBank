@@ -1,7 +1,7 @@
-import { useId, useMemo, useRef, type KeyboardEvent } from 'react'
+import { useId, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
-import { HandCoins, Search, SearchX, Users, X } from 'lucide-react'
+import { Check, HandCoins, Search, SearchX, Users, X } from 'lucide-react'
 import { useAppData } from '@/app/data-context'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -16,6 +16,11 @@ import { Avatar, SignedMoney, StatusBadge } from './parts'
 import { personHref } from './links'
 import { lateChargeHref } from './charge-link'
 import { personReliability } from '@/lib/finance/trust'
+import { useWrite } from '@/app/write'
+import { useMediaQuery } from '@/lib/use-media-query'
+import { firstName } from '@/lib/format'
+import { replaceDebt } from '@/lib/store'
+import { quickTarget } from './quick-pay'
 import { PEOPLE_SIDES, SIDE_LABEL, rowsOfSide, type PeopleSide } from './people-sides'
 
 const FILTER_LABEL: Record<PeopleFilter, string> = {
@@ -182,7 +187,11 @@ export function PeopleList({
 }
 
 function PersonRowLink({ row, filter, selected, href }: { row: PersonRow; filter: PeopleFilter; selected: boolean; href: string }) {
-  const { money, date, today, baseSettings, result } = useAppData()
+  const { money, date, today, baseSettings, result, canEdit } = useAppData()
+  const write = useWrite()
+  const coarse = useMediaQuery('(pointer: coarse)')
+  const [open, setOpen] = useState(false)
+  const dragged = useRef(false)
   const st = personStatus(row, today)
   // em "Quitados" (ou sem nada em aberto) o valor é o que já foi quitado, em tom neutro
   const settledView = filter === 'quitados' || row.openCount === 0
@@ -219,8 +228,76 @@ function PersonRowLink({ row, filter, selected, href }: { row: PersonRow; filter
     result?.data.groups,
   )
 
+  // deslizar o card para a esquerda (celular) mostra as ações rápidas: cobrar e dar baixa na parcela que vence primeiro
+  const defWallet = typeof baseSettings.defaultWalletId === 'string' ? baseSettings.defaultWalletId : ''
+  const quick = canEdit && row.openCount > 0 && filter !== 'quitados' ? quickTarget(row.debts, row.net, today, defWallet || undefined) : null
+  const nActions = (chargeHref ? 1 : 0) + (quick ? 1 : 0)
+  const swipe = coarse && nActions > 0
+  const W = nActions * 80
+  const doQuick = () => {
+    if (!quick) return
+    const pay = quick.dir === 'out'
+    write(
+      `${pay ? 'Pago' : 'Recebido'} ${money(quick.payment.amount)}${pay ? ' a ' : ' de '}${firstName(quick.debt.name)}`,
+      (api) => replaceDebt(api, quick.debt.id, (d) => ({ ...d, payments: [...d.payments, quick.payment] })),
+      'Pagamento desfeito',
+    )
+    setOpen(false)
+  }
+
   return (
-    <div
+    <div className="relative rounded-lg" data-no-tab-swipe={swipe ? '' : undefined}>
+      {swipe && (
+        <div className="absolute inset-y-0 right-0 flex overflow-hidden rounded-r-lg" style={{ width: W }}>
+          {chargeHref && (
+            <a
+              href={chargeHref}
+              target="_blank"
+              rel="noreferrer"
+              onClick={() => setOpen(false)}
+              aria-label={`Cobrar ${row.name}`}
+              className="flex flex-1 flex-col items-center justify-center gap-1 bg-accent text-xs font-medium text-white"
+            >
+              <HandCoins aria-hidden="true" className="size-4" />
+              Cobrar
+            </a>
+          )}
+          {quick && (
+            <button
+              type="button"
+              onClick={doQuick}
+              aria-label={`${quick.dir === 'out' ? 'Pagar' : 'Receber'} ${money(quick.payment.amount)} ${quick.dir === 'out' ? 'a' : 'de'} ${row.name}`}
+              className={cn('flex flex-1 cursor-pointer flex-col items-center justify-center gap-1 text-xs font-medium text-white', quick.dir === 'out' ? 'bg-neg' : 'bg-pos')}
+            >
+              <Check aria-hidden="true" className="size-4" />
+              {quick.dir === 'out' ? 'Paguei' : 'Recebi'}
+            </button>
+          )}
+        </div>
+      )}
+      <motion.div
+        drag={swipe ? 'x' : false}
+        dragDirectionLock
+        dragConstraints={{ left: -W, right: 0 }}
+        dragElastic={0.06}
+        dragMomentum={false}
+        animate={{ x: open && swipe ? -W : 0 }}
+        transition={{ type: 'spring', stiffness: 500, damping: 40 }}
+        onDragStart={() => {
+          dragged.current = true
+        }}
+        onDragEnd={(_, info) => {
+          setOpen(info.offset.x < -W / 3 || info.velocity.x < -300 ? true : info.offset.x > W / 4 ? false : open)
+          window.setTimeout(() => (dragged.current = false), 0)
+        }}
+        onClickCapture={(e) => {
+          // depois de arrastar não abre a pessoa; com as ações abertas, tocar no card só fecha
+          if (dragged.current || open) {
+            e.preventDefault()
+            e.stopPropagation()
+            if (!dragged.current) setOpen(false)
+          }
+        }}
       className={cn(
         'relative rounded-lg border border-border bg-surface transition-colors hover:border-border-strong hover:bg-surface-2 focus-within:bg-surface-2',
         selected && 'border-border-strong bg-surface-2',
@@ -233,7 +310,7 @@ function PersonRowLink({ row, filter, selected, href }: { row: PersonRow; filter
         data-row
         aria-current={selected ? 'page' : undefined}
         aria-label={`${row.name}, ${sub}${relShown ? ', ' + relShown.label.toLowerCase() : ''}, ${dirLabel} ${money(Math.abs(amount))}`}
-        className={cn('flex items-center gap-3 rounded-lg px-4 py-4 after:absolute after:inset-0 after:rounded-lg focus-visible:outline-offset-[-2px]', chargeHref && 'pr-14')}
+        className={cn('flex items-center gap-3 rounded-lg px-4 py-4 after:absolute after:inset-0 after:rounded-lg focus-visible:outline-offset-[-2px]', chargeHref && !swipe && 'pr-14')}
       >
         <span className="relative z-10 shrink-0">
           <Avatar name={row.name} />
@@ -256,7 +333,7 @@ function PersonRowLink({ row, filter, selected, href }: { row: PersonRow; filter
         {/* verde vivo só para o que já foi recebido; o que ainda está a receber fica em verde discreto */}
         <SignedMoney value={amount} className={cn('text-sm', !settledView && amount > 0 && 'text-pos/70')} />
       </Link>
-      {chargeHref && (
+      {chargeHref && !swipe && (
         <div className="absolute top-1/2 right-3 z-10 -translate-y-1/2">
           <Tooltip label="Cobrar no WhatsApp" align="end">
             <Button asChild size="icon" variant="ghost" className="size-8">
@@ -267,6 +344,7 @@ function PersonRowLink({ row, filter, selected, href }: { row: PersonRow; filter
           </Tooltip>
         </div>
       )}
+      </motion.div>
     </div>
   )
 }
