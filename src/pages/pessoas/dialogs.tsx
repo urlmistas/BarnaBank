@@ -5,10 +5,11 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Field, Modal } from '@/components/ui/modal'
 import { Select } from '@/components/ui/select'
-import { makeDebtCalc } from '@/lib/finance/debts'
+import { round2, toISO } from '@/lib/finance/dates'
+import { dueDateForInstallment, makeDebtCalc, syncRecurringDebt } from '@/lib/finance/debts'
 import {
   checkDebtInput, checkPartial, createDebt, debtToInput, editPayment, emptyDebtInput, HIGH_RATE, partialPayment,
-  settleDebt, updateDebt, type DebtInput,
+  installmentPayment, settleDebt, updateDebt, type DebtInput,
 } from '@/lib/finance/mutations'
 import { firstName } from '@/lib/format'
 import { formatMoneyInput, onlyDigits, parseMoney } from '@/lib/money-input'
@@ -297,6 +298,81 @@ function DebtForm({ debt, kind, initialName, onClose, onSaved }: { debt?: Debt; 
 }
 
 // ---------------------------------------------------------------- pagamento parcial
+
+export function InstallmentPayDialog({ open, onClose, debt }: { open: boolean; onClose: () => void; debt: Debt }) {
+  return (
+    <Modal open={open} onClose={onClose} title={`Escolher parcela · ${firstName(debt.name)}`}>
+      <InstallmentPayForm debt={debt} onClose={onClose} />
+    </Modal>
+  )
+}
+
+function InstallmentPayForm({ debt, onClose }: { debt: Debt; onClose: () => void }) {
+  const { today, money, date } = useAppData()
+  const write = useWrite()
+  const w = useWalletOptions('')
+  const installmentId = useId()
+  const walletId = useId()
+  const open = makeDebtCalc(today).schedule(debt).insts.filter((inst) => inst.open > 0)
+  const [target, setTarget] = useState(open[0] ? String(open[0].i) : '')
+  const [wallet, setWallet] = useState(w.initial)
+  const [err, setErr] = useState<string | null>(null)
+  const selected = open.find((inst) => String(inst.i) === target)
+  const amount = round2(selected?.open ?? 0)
+  const payable = debt.kind === 'payable'
+
+  function submit(e: FormEvent) {
+    e.preventDefault()
+    if (!selected) return
+    const changed = new Error('O saldo, o vencimento ou a carteira mudou. Feche a janela e confira os dados.')
+    setErr(null)
+    try {
+      const ok = write(
+        `Parcela ${selected.i + 1} · ${payable ? 'Pago' : 'Recebido'} ${money(amount)}`,
+        (api) => {
+          const current = api.debts.find((d) => d.id === debt.id)
+          if (!current || current.kind !== debt.kind || (wallet && !api.wallets.some((item) => item.id === wallet))) throw changed
+          const synced = syncRecurringDebt(current, today)
+          const payment = installmentPayment(synced, today, selected.i, wallet || undefined)
+          if (!payment || payment.amount !== amount || toISO(dueDateForInstallment(synced, selected.i)) !== selected.dueISO) throw changed
+          replaceDebt(api, debt.id, (d) => ({ ...d, payments: [...d.payments, payment] }))
+        },
+        'Pagamento desfeito',
+      )
+      if (ok) onClose()
+    } catch (error) {
+      if (error !== changed) throw error
+      setErr(changed.message)
+    }
+  }
+
+  return (
+    <form onSubmit={submit} className="px-5 py-4">
+      {open.length > 0 ? (
+        <>
+          <Field label="Parcela em aberto" htmlFor={installmentId}>
+            <Select
+              id={installmentId}
+              value={target}
+              onChange={setTarget}
+              options={open.map((inst) => ({
+                value: String(inst.i),
+                label: `Parcela ${inst.i + 1} · ${date(inst.dueISO)} · ${money(round2(inst.open))}${inst.late ? ' · Em atraso' : ''}`,
+              }))}
+            />
+          </Field>
+          <Field label="Carteira" htmlFor={walletId} className="mt-3">
+            <Select id={walletId} value={wallet} onChange={setWallet} options={w.options} />
+          </Field>
+          <ErrorLine>{err}</ErrorLine>
+          {selected && <Actions onCancel={onClose} okLabel={`Registrar ${money(amount)}`} />}
+        </>
+      ) : (
+        <p className="text-sm text-fg-muted">Todas as parcelas estão quitadas.</p>
+      )}
+    </form>
+  )
+}
 
 export function PartialPayDialog({ open, onClose, debt }: { open: boolean; onClose: () => void; debt: Debt }) {
   const pay = debt.kind === 'payable'

@@ -33,6 +33,12 @@ export function quickPayment(d: Debt, today: ISODate, walletId?: string): Paymen
   return p
 }
 
+export function installmentPayment(d: Debt, today: ISODate, target: number, walletId?: string): Payment | null {
+  const inst = makeDebtCalc(today).schedule(d).insts[target]
+  if (!inst || inst.open <= EPS) return null
+  return { id: newId(), date: today, amount: round2(inst.open), mode: 'target', target, selectedInstallment: true, walletId }
+}
+
 export interface PartialInput {
   amount: number
   date: ISODate
@@ -74,8 +80,8 @@ export function editPayment(d: Debt, idx: number, input: PartialInput): Debt {
 }
 
 /**
- * Remove um pagamento. Os pagamentos de mesma data ou depois que tinham ido para uma parcela
- * adiantada voltam a cobrir a mais antiga em aberto (senão, apagar a parcela 3 deixa a 5 paga e a 3 atrasada).
+ * Remove um pagamento. Reaplica os pagamentos automáticos posteriores à parcela mais antiga
+ * em aberto e preserva os pagamentos vinculados manualmente.
  */
 export function removePayment(d: Debt, idx: number): Debt {
   const gone = d.payments[idx]
@@ -83,7 +89,7 @@ export function removePayment(d: Debt, idx: number): Debt {
   const payments = d.payments
     .filter((_, i) => i !== idx)
     .map((p) => {
-      if (p.mode === 'target' && p.date >= gone.date) {
+      if (p.mode === 'target' && !p.selectedInstallment && p.date >= gone.date) {
         const { target: _t, pendingPart: _pp, ...rest } = p
         void _t
         void _pp

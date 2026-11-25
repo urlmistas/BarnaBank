@@ -84,6 +84,21 @@ describe('Pessoas: escrita', () => {
     await waitFor(() => expect(stored().debts[0].payments).toHaveLength(0))
   })
 
+  it('registra e desfaz o pagamento de uma parcela escolhida pelo usuário', async () => {
+    seed({ debts: [debt({ principal: 300, installments: 3, days: 90 })] })
+    mount()
+    fireEvent.click(await screen.findByRole('button', { name: 'Escolher parcela' }))
+    const dialog = await screen.findByRole('dialog', { name: /Escolher parcela/ })
+    fireEvent.click(within(dialog).getByRole('combobox', { name: 'Parcela em aberto' }))
+    fireEvent.click(await within(dialog).findByRole('option', { name: /Parcela 2/ }))
+    fireEvent.click(within(dialog).getByRole('button', { name: /Registrar/ }))
+    await waitFor(() => expect(stored().debts[0].payments).toMatchObject([
+      { amount: 100, target: 1, selectedInstallment: true },
+    ]))
+    fireEvent.click(await screen.findByRole('button', { name: 'Desfazer' }))
+    await waitFor(() => expect(stored().debts[0].payments).toHaveLength(0))
+  })
+
   it('"Nova dívida" valida e grava', async () => {
     seed()
     mount('/pessoas')

@@ -144,7 +144,10 @@ export function computeSchedule(d: Debt, asOf: ISODate): Schedule {
   for (const { p } of ordered) {
     const t = p.date
     let left = p.amount || 0
-    if (p.mode === 'target' && typeof p.target === 'number') {
+    if (p.mode === 'target' && p.selectedInstallment) {
+      const inst = typeof p.target === 'number' ? insts[p.target] : undefined
+      if (inst) left = payInst(inst, left, t)
+    } else if (p.mode === 'target' && typeof p.target === 'number') {
       const tgt = Math.max(0, Math.min(n - 1, p.target))
       const pend = Math.min(left, Math.max(0, p.pendingPart || 0))
       const pendLeft = payRange(0, tgt, pend, t)

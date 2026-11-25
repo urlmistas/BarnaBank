@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { Debt } from '@/lib/types'
 import { makeDebtCalc } from './debts'
 import {
-  checkDebtInput, checkPartial, createDebt, debtToInput, emptyDebtInput, partialPayment, quickPayInfo, quickPayment, removePayment,
+  checkDebtInput, checkPartial, createDebt, debtToInput, emptyDebtInput, installmentPayment, partialPayment, quickPayInfo, quickPayment, removePayment,
   settleDebt, updateDebt,
 } from './mutations'
 
@@ -31,6 +31,30 @@ describe('pagamento rápido', () => {
     const p = quickPayment(base(), TODAY, 'w1')!
     expect(p).toMatchObject({ date: TODAY, amount: 200, mode: 'fifo', walletId: 'w1' })
     expect(p.id).toBeTruthy()
+  })
+})
+
+describe('pagamento de parcela escolhida', () => {
+  it('quita o saldo da parcela antiga com encargos e deixa a mais nova em aberto', () => {
+    const d = base({
+      lateFeePct: 10,
+      payments: [{ date: '2026-02-10', amount: 60, mode: 'fifo' }],
+    })
+    const payment = installmentPayment(d, TODAY, 0, 'w1')!
+    expect(payment).toMatchObject({ amount: 44, date: TODAY, mode: 'target', target: 0, walletId: 'w1' })
+    const updated = { ...d, payments: [...d.payments, payment] }
+    expect(makeDebtCalc(TODAY).schedule(updated).insts.map((inst) => inst.open)).toEqual([0, 110, 100])
+    expect(installmentPayment(updated, TODAY, 0)).toBeNull()
+    expect(installmentPayment(updated, TODAY, 3)).toBeNull()
+  })
+
+  it('antecipa uma parcela e mantém o vínculo após excluir outro pagamento', () => {
+    const d = base({ payments: [{ date: '2026-02-10', amount: 100, mode: 'fifo' }] })
+    const payment = installmentPayment(d, TODAY, 2)!
+    const updated = { ...d, payments: [...d.payments, payment] }
+    expect(makeDebtCalc(TODAY).schedule(updated).insts.map((inst) => inst.open)).toEqual([0, 100, 0])
+    const afterRemoval = removePayment(updated, 0)
+    expect(makeDebtCalc(TODAY).schedule(afterRemoval).insts.map((inst) => inst.open)).toEqual([100, 100, 0])
   })
 })
 

@@ -53,4 +53,15 @@ assert.equal(parc.info.next.n, 1);
 assert.ok(all.debts.find(d => d.info.recurring).info.day === 10, 'recorrente: dia do mês');
 assert.equal(sh[T.person].dir, '', 'link de quem me deve continua igual');
 assert.equal(sh[T.person].remaining, 50);
+E.load({
+  debts: [{
+    id: 'targeted', name: 'Outra Pessoa', kind: 'payable', principal: 300, rate: 0,
+    installments: 3, date: '2026-08-10', dueDay: 10, notes: '',
+    payments: [{date: today, amount: 110, mode: 'target', target: 2, selectedInstallment: true}]
+  }],
+  shares: {[T.debt]: {type: 'debt', ref: 'targeted'}}
+}, {url: 'https://x'});
+const targeted = E.shares()[T.debt];
+assert.equal(targeted.remaining, 200, 'excedente do pagamento escolhido não abate outras parcelas');
+assert.equal(targeted.late, 200, 'as duas parcelas vencidas continuam em aberto');
 console.log('ok test_recurring');

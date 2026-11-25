@@ -591,7 +591,10 @@ export function getEngine() {
     ordered.sort(function(a,b){ return a.p.date < b.p.date ? -1 : (a.p.date > b.p.date ? 1 : a.idx - b.idx); });
     ordered.forEach(function(o){
       var p = o.p, t = p.date, left = p.amount || 0;
-      if(p.mode === 'target' && typeof p.target === 'number'){
+      if(p.mode === 'target' && p.selectedInstallment){
+        var inst = typeof p.target === 'number' ? insts[p.target] : undefined;
+        if(inst) left = payInst(inst, left, t);
+      } else if(p.mode === 'target' && typeof p.target === 'number'){
         var tgt = Math.max(0, Math.min(n-1, p.target));
         var pend = Math.min(left, Math.max(0, p.pendingPart || 0));
         var pendLeft = payRange(0, tgt, pend, t);
@@ -1144,10 +1147,10 @@ export function getEngine() {
     if(idx === -1) return;
     d.payments.splice(idx, 1);
     // pagamentos depois deste que tinham ido para uma parcela adiantada voltam a cobrir a mais antiga em aberto
-    // (senão, apagar a parcela 3 deixa a 5 paga e a 3 atrasada)
+    // preserva os pagamentos vinculados manualmente a uma parcela.
     var retarget = [];
     d.payments.forEach(function(x){
-      if(x.mode === 'target' && x.date >= p.date){ retarget.push({x: x, target: x.target, pendingPart: x.pendingPart}); x.mode = 'fifo'; delete x.target; delete x.pendingPart; }
+      if(x.mode === 'target' && !x.selectedInstallment && x.date >= p.date){ retarget.push({x: x, target: x.target, pendingPart: x.pendingPart}); x.mode = 'fifo'; delete x.target; delete x.pendingPart; }
     });
     invalidateSchedules();
     render();

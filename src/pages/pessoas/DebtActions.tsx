@@ -1,10 +1,11 @@
 import { useState } from 'react'
-import { CalendarClock, Check, Coins, Ellipsis, FileText, Handshake, Laugh, MessageCircle, Pencil, Percent, Receipt, Trash2 } from 'lucide-react'
+import { CalendarClock, CalendarDays, Check, Coins, Ellipsis, FileText, Handshake, Laugh, MessageCircle, Pencil, Percent, Receipt, Trash2 } from 'lucide-react'
 import { useAppData } from '@/app/data-context'
 import { useWrite } from '@/app/write'
 import { Button } from '@/components/ui/button'
 import { Menu } from '@/components/ui/menu'
 import { useToast } from '@/components/ui/toast'
+import { installments } from '@/lib/finance/debts'
 import { quickPayment } from '@/lib/finance/mutations'
 import { firstName } from '@/lib/format'
 import { canIssueReceipt, receiptHtml, statementHtml } from '@/lib/print/documents'
@@ -16,7 +17,7 @@ import { funnyReceipt } from '@/lib/finance/comedy'
 import { whatsPhone, whatsappLink } from '@/lib/finance/whatsapp'
 import { nameKey } from '@/lib/finance/people'
 import { chargeLinkFor } from './charge-link'
-import { ConfirmDialog, DebtFormDialog, PartialPayDialog, SettleDialog } from './dialogs'
+import { ConfirmDialog, DebtFormDialog, InstallmentPayDialog, PartialPayDialog, SettleDialog } from './dialogs'
 import { ExtendDialog, RenegDialog } from './dialogs-extra'
 import { useDebtActions } from './use-debt-actions'
 import { ShareButton } from './share-dialog'
@@ -33,7 +34,7 @@ export function DebtActions({ debt, paid }: { debt: Debt; paid: boolean }) {
   const toast = useToast()
   const doc = useDocCtx()
   const { removeDebt } = useDebtActions(debt)
-  const [dlg, setDlg] = useState<'partial' | 'settle' | 'edit' | 'delete' | 'extend' | 'reneg' | null>(null)
+  const [dlg, setDlg] = useState<'installment' | 'partial' | 'settle' | 'edit' | 'delete' | 'extend' | 'reneg' | null>(null)
 
   const pay = debt.kind === 'payable'
   const defWallet = typeof baseSettings.defaultWalletId === 'string' ? baseSettings.defaultWalletId : ''
@@ -93,6 +94,12 @@ export function DebtActions({ debt, paid }: { debt: Debt; paid: boolean }) {
           {pay ? 'Paguei' : 'Recebi'} <span className="num">{money(quick.amount)}</span>
         </Button>
       )}
+      {canEdit && !paid && installments(debt) > 1 && (
+        <Button size="sm" variant="outline" onClick={() => setDlg('installment')}>
+          <CalendarDays aria-hidden="true" />
+          Escolher parcela
+        </Button>
+      )}
       {receipt && paid && (
         <Button size="sm" onClick={() => print(receiptHtml(debt, { ...doc, issuedAt: new Date() }, groupTitle))}>
           <Receipt aria-hidden="true" />
@@ -134,6 +141,7 @@ export function DebtActions({ debt, paid }: { debt: Debt; paid: boolean }) {
 
       {canEdit && (
         <>
+          <InstallmentPayDialog open={dlg === 'installment'} onClose={close} debt={debt} />
           <PartialPayDialog open={dlg === 'partial'} onClose={close} debt={debt} />
           <SettleDialog open={dlg === 'settle'} onClose={close} debt={debt} />
           <ExtendDialog open={dlg === 'extend'} onClose={close} debt={debt} />

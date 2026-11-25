@@ -16,6 +16,8 @@ export interface Payment {
   mode?: 'target' | 'fifo'
   target?: number
   pendingPart?: number
+  /** Pagamento vinculado à parcela escolhida manualmente. */
+  selectedInstallment?: boolean
   walletId?: string
   note?: string
 }
