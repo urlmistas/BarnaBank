@@ -4,6 +4,7 @@ import { cleanup, configure, fireEvent, render, screen, waitFor, within } from '
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { DataProvider } from '@/app/data-context'
 import { ToastProvider } from '@/components/ui/toast'
+import { toISO, ymAdd, ymOf } from '@/lib/finance/dates'
 import { STORAGE_KEY } from '@/lib/storage'
 import { Pessoas } from './Pessoas'
 import { clickAction } from '@/test-menu'
@@ -82,6 +83,35 @@ describe('Pessoas: escrita', () => {
     await waitFor(() => expect(stored().debts[0].payments).toHaveLength(1))
     fireEvent.click(await screen.findByRole('button', { name: 'Desfazer' }))
     await waitFor(() => expect(stored().debts[0].payments).toHaveLength(0))
+  })
+
+  it('soma os saldos a pagar e a receber pelos vencimentos do mês selecionado', async () => {
+    const month = ymOf(toISO(new Date()))
+    const previous = ymAdd(month, -1)
+    const next = ymAdd(month, 1)
+    seed({ debts: [
+      debt({
+        principal: 300, installments: 3, days: 90, firstDue: previous + '-01',
+        payments: [{ date: previous + '-01', amount: 125 }],
+      }),
+      debt({ id: 'd2', principal: 30, firstDue: month + '-01' }),
+      debt({ id: 'd3', kind: 'payable', principal: 100, installments: 2, days: 60, firstDue: month + '-02' }),
+      debt({ id: 'd4', kind: 'payable', firstDue: previous + '-02' }),
+      debt({ id: 'd5', kind: 'payable', firstDue: next + '-03', payments: [{ date: month + '-01', amount: 100 }] }),
+    ] })
+    mount()
+    const summary = within(await screen.findByRole('region', { name: 'Vencimentos em aberto por mês' }))
+    const balance = (label: string) => summary.getByText(label).nextElementSibling?.textContent
+    expect(balance('A receber no mês')).toMatch(/105,00/)
+    expect(balance('A pagar no mês')).toMatch(/50,00/)
+
+    fireEvent.click(summary.getByRole('button', { name: 'Próximo mês no resumo mensal' }))
+    expect(balance('A receber no mês')).toMatch(/100,00/)
+    expect(balance('A pagar no mês')).toMatch(/50,00/)
+
+    fireEvent.click(summary.getByRole('button', { name: 'Mês anterior no resumo mensal' }))
+    fireEvent.click(summary.getByRole('button', { name: 'Mês anterior no resumo mensal' }))
+    expect(balance('A pagar no mês')).toMatch(/100,00/)
   })
 
   it('registra e desfaz o pagamento de uma parcela escolhida pelo usuário', async () => {

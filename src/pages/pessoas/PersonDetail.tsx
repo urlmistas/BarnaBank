@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
-import { ArrowLeft, BanknoteArrowUp, CalendarClock, Check, ChevronDown, Circle, CircleAlert, CircleCheck, CircleDashed, ClockAlert, FileDown, HandCoins, Image, Inbox, MessageCircle, Paperclip, Pencil, PiggyBank, Plus, ReceiptText, Share2, Trash2, UserRound, type LucideIcon } from 'lucide-react'
+import { ArrowLeft, BanknoteArrowUp, CalendarClock, Check, ChevronDown, ChevronLeft, ChevronRight, Circle, CircleAlert, CircleCheck, CircleDashed, ClockAlert, FileDown, HandCoins, Image, Inbox, MessageCircle, Paperclip, Pencil, PiggyBank, Plus, ReceiptText, Share2, Trash2, UserRound, type LucideIcon } from 'lucide-react'
 import { useAppData } from '@/app/data-context'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -15,9 +15,10 @@ import { useDocCtx } from '@/lib/print/use-doc-ctx'
 import { useToast } from '@/components/ui/toast'
 import { whatsPhone } from '@/lib/finance/groups'
 import { lateChargeHref, lateChargeText } from './charge-link'
-import { personDetail, type DebtView, type HistoryItem, type InstView, type PersonDetail } from '@/lib/finance/people'
+import { pendingMonthTotals, personDetail, personMonthEvents, personMonthRange, type DebtView, type HistoryItem, type InstView, type PersonDetail } from '@/lib/finance/people'
 import type { DebtCalc } from '@/lib/finance/debts'
-import { plural } from '@/lib/format'
+import { ymAdd, ymOf } from '@/lib/finance/dates'
+import { MONTHS, plural } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import type { AppData, Debt } from '@/lib/types'
 import { Avatar, SignedMoney, StatusBadge } from './parts'
@@ -199,6 +200,8 @@ export function PersonDetailView({
         )}
       </Card>
 
+      <PersonMonthlyAmounts p={p} />
+
       <div className="mt-4">
         <PersonTabs
           p={p}
@@ -242,6 +245,46 @@ function Fact({ label, value, tone }: { label: string; value: string; tone?: str
       <dt className="text-fg-muted">{label}</dt>
       <dd className={cn('num font-medium', tone)}>{value}</dd>
     </div>
+  )
+}
+
+function PersonMonthlyAmounts({ p }: { p: PersonDetail }) {
+  const { today, money } = useAppData()
+  const [pickedMonth, setPickedMonth] = useState<string | null>(null)
+  const { min, max } = personMonthRange(p, today)
+  const month = pickedMonth && pickedMonth >= min && pickedMonth <= max ? pickedMonth : ymOf(today)
+  const title = `${MONTHS[Number(month.slice(5, 7)) - 1]} de ${month.slice(0, 4)}`
+  const { toReceive, toPay } = pendingMonthTotals(personMonthEvents(p, month))
+
+  return (
+    <Card aria-label="Vencimentos em aberto por mês" className="mt-4 px-4 py-3 sm:px-6">
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+        <h2 className="text-sm font-medium">Vencimentos em aberto</h2>
+        <div className="flex items-center gap-1">
+          <Button type="button" size="icon" variant="ghost" aria-label="Mês anterior no resumo mensal" disabled={month <= min} onClick={() => setPickedMonth(ymAdd(month, -1))}>
+            <ChevronLeft aria-hidden="true" />
+          </Button>
+          <p className="min-w-28 text-center text-sm text-fg-muted first-letter:uppercase" aria-live="polite">{title}</p>
+          <Button type="button" size="icon" variant="ghost" aria-label="Próximo mês no resumo mensal" disabled={month >= max} onClick={() => setPickedMonth(ymAdd(month, 1))}>
+            <ChevronRight aria-hidden="true" />
+          </Button>
+        </div>
+      </div>
+      <dl className="mt-2 flex flex-wrap gap-x-8 gap-y-2">
+        {p.hasPayable && (
+          <div>
+            <dt className="text-xs text-fg-muted">A pagar no mês</dt>
+            <dd className="num mt-1 text-lg font-semibold">{money(toPay)}</dd>
+          </div>
+        )}
+        {p.hasReceivable && (
+          <div>
+            <dt className="text-xs text-fg-muted">A receber no mês</dt>
+            <dd className="num mt-1 text-lg font-semibold">{money(toReceive)}</dd>
+          </div>
+        )}
+      </dl>
+    </Card>
   )
 }
 

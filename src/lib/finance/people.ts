@@ -388,6 +388,17 @@ export function personMonthEvents(detail: PersonDetail, ym: YearMonth): CalEvent
   return ev.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0))
 }
 
+export function pendingMonthTotals(events: readonly CalEvent[]) {
+  let toReceive = 0
+  let toPay = 0
+  for (const event of events) {
+    if (event.done) continue
+    if (event.dir === 'in') toReceive += event.amount
+    else toPay += event.amount
+  }
+  return { toReceive: round2(toReceive), toPay: round2(toPay) }
+}
+
 /** meses com parcelas (primeiro e último) e o mês inicial do calendário */
 export function personMonthRange(detail: PersonDetail, today: ISODate): { min: YearMonth; max: YearMonth; initial: YearMonth } {
   const cur = ymOf(today)

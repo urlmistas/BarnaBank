@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { useAppData } from '@/app/data-context'
 import { Button } from '@/components/ui/button'
-import { paymentSeries, personMonthEvents, personMonthRange, type CalEvent, type PersonDetail } from '@/lib/finance/people'
+import { paymentSeries, pendingMonthTotals, personMonthEvents, personMonthRange, type CalEvent, type PersonDetail } from '@/lib/finance/people'
 import { daysInMonth, pad2, parseISO, ymAdd, ymOf } from '@/lib/finance/dates'
 import { MONTHS } from '@/lib/format'
 import { cn } from '@/lib/utils'
@@ -34,9 +34,7 @@ export function PersonCalendar({ p }: { p: PersonDetail }) {
 
   const byDay = new Map<string, CalEvent[]>()
   for (const e of events) byDay.set(e.date, [...(byDay.get(e.date) ?? []), e])
-  const pending = events.filter((e) => !e.done)
-  const inSum = pending.filter((e) => e.dir === 'in').reduce((s, e) => s + e.amount, 0)
-  const outSum = pending.filter((e) => e.dir === 'out').reduce((s, e) => s + e.amount, 0)
+  const { toReceive: inSum, toPay: outSum } = pendingMonthTotals(events)
 
   const y = +ym.slice(0, 4)
   const m = +ym.slice(5, 7) - 1
